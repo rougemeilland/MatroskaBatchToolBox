@@ -43,7 +43,7 @@ namespace MatroskaBatchToolBox
         /// <summary>
         /// ヒストリーへの最新の項目からこの値以上進捗が変化しない限りヒストリへの新たな追加はできません。
         /// </summary>
-        private static double _minimumPercentageDifferenceForValidHistoryItem;
+        private const double _minimumPercentageDifferenceForValidHistoryItem = 0.01 / 100;
 
         /// <summary>
         /// 推定終了時刻の計算において、ヒストリの最新の項目からこの時間より前の項目は参考にされません。
@@ -58,7 +58,7 @@ namespace MatroskaBatchToolBox
         /// <summary>
         /// 有効な推定終了時刻の計算のためには、少なくともこの値以上進捗がなければなりません。
         /// </summary>
-        private const double _minimumPercentageForFinishTimeCalculation = 1 / 100.0;
+        private const double _minimumPercentageForFinishTimeCalculation = 0.01 / 100.0;
 
         private Queue<SourceFileInfo> _unprocessedSourceFiles;
         private IDictionary<int, SourceFileInfo> _processingSourceFiles;
@@ -70,7 +70,6 @@ namespace MatroskaBatchToolBox
 
         static ProgressState()
         {
-            _minimumPercentageDifferenceForValidHistoryItem = 0.01 / 100;
             _maximumHistoryIntervalForValidHistoryItem = TimeSpan.FromDays(1);
             _minimumHistoryIntervalForFinishTimeCalculation = TimeSpan.FromMinutes(1);
         }
