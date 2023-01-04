@@ -7,7 +7,6 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Sources;
 
 namespace MatroskaBatchToolBox
 {
@@ -48,137 +47,158 @@ namespace MatroskaBatchToolBox
         {
             Console.Title = nameof(MatroskaBatchToolBox);
 
-            var actionMode = ActionMode.None;
-            foreach (var arg in args)
+            try
             {
-                if (string.Equals(arg, _optionStringNormalizeAudio, StringComparison.InvariantCulture))
+                var actionMode = ActionMode.None;
+                foreach (var arg in args)
                 {
-                    actionMode = ActionMode.NormalizeAudio;
-                    break;
+                    if (string.Equals(arg, _optionStringNormalizeAudio, StringComparison.InvariantCulture))
+                    {
+                        actionMode = ActionMode.NormalizeAudio;
+                        break;
+                    }
+                    if (string.Equals(arg, _optionStringResizeResolution, StringComparison.InvariantCulture))
+                    {
+                        actionMode = ActionMode.ResizeVideo;
+                        break;
+                    }
                 }
-                if (string.Equals(arg, _optionStringResizeResolution, StringComparison.InvariantCulture))
+                if (actionMode == ActionMode.None)
+                    actionMode = ActionMode.NormalizeAudio;
+
+                var applicationLock = new Mutex(false, _applicationUniqueId);
+                if (!applicationLock.WaitOne(0, false))
                 {
-                    actionMode = ActionMode.ResizeVideo;
-                    break;
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine(string.Format(Resource.AlreadyRunnningMessasgeText, nameof(MatroskaBatchToolBox)));
+                    return;
+                }
+
+                Console.WriteLine(
+                    actionMode switch
+                    {
+                        ActionMode.NormalizeAudio => Resource.AudioNormalizationProcessStartMessageText,
+                        ActionMode.ResizeVideo => Resource.VideoResizingProcessStartMessageText,
+                        _ => throw new Exception("internal error"),
+                    });
+                Console.WriteLine();
+
+                Task.Run(() =>
+                {
+                    while (true)
+                    {
+                        var keyInfo = Console.ReadKey(true);
+                        if (keyInfo.Key == ConsoleKey.Q)
+                        {
+                            ExternalCommand.AbortExternalCommands();
+                            lock (_lockConsoleObject)
+                            {
+                                _cancelRequested = true;
+                                Console.WriteLine();
+                                Console.WriteLine();
+                                var color = Console.ForegroundColor;
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                                Console.WriteLine(Resource.Q_KeyPressedMessasgeText);
+                                Console.WriteLine();
+                                Console.ForegroundColor = color;
+                            }
+                            break;
+                        }
+                    }
+                });
+
+                var sourceFileList =
+                    EnumerateSourceFile(args.Where(arg => !arg.StartsWith("--", StringComparison.InvariantCulture)), actionMode)
+                    .OrderBy(file => file.FullName)
+                    .ToList();
+
+
+                var progressState = new ProgressState(sourceFileList);
+                progressState.WriteProgressText(PrintProgress);
+
+                var degreeOfParallelism = Settings.CurrentSettings.DegreeOfParallelism;
+                if (degreeOfParallelism > Environment.ProcessorCount)
+                    degreeOfParallelism = Environment.ProcessorCount;
+                if (degreeOfParallelism < 1)
+                    degreeOfParallelism = 1;
+
+                var workerTasks = new List<Task>();
+                for (var count = 0; count < degreeOfParallelism; ++count)
+                    workerTasks.Add(Task.Run(worker));
+
+                foreach (var workerTask in workerTasks)
+                {
+                    while (!workerTask.Wait(_maximumTimeForProgressUpdate))
+                        progressState.WriteProgressText(PrintProgress);
+                }
+
+                if (!IsRequestedCancellation())
+                    progressState.CheckCompletion();
+                progressState.WriteProgressText(PrintProgress);
+
+                lock (_lockConsoleObject)
+                {
+                    _completed = true;
+                }
+
+                Console.WriteLine();
+                Console.WriteLine();
+                Console.Beep();
+                Console.WriteLine(Resource.ProcessCompletedMessageText);
+                Console.ReadLine();
+
+                void worker()
+                {
+                    while (progressState.TryGetNextSourceFile(out int sourceFileId, out FileInfo? sourceFile))
+                    {
+                        if (_cancelRequested)
+                            break;
+
+                        var progress =
+                            new Progress<double>(percent =>
+                            {
+                                progressState.UpdateProgress(sourceFileId, percent);
+                                progressState.WriteProgressText(PrintProgress);
+                            });
+                        try
+                        {
+                            var actionResult =
+                                actionMode switch
+                                {
+                                    ActionMode.NormalizeAudio => MatroskaAction.NormalizeMovieFile(sourceFile, progress),
+                                    ActionMode.ResizeVideo => MatroskaAction.ResizeMovieFile(sourceFile, progress),
+                                    _ => ActionResult.Skipped,
+                                };
+                            progressState.CompleteSourceFile(sourceFileId, actionResult);
+                            progressState.WriteProgressText(PrintProgress);
+                        }
+                        catch (Exception)
+                        {
+                            // ここに到達することはないはず
+                        }
+                        finally
+                        {
+                        }
+                    }
                 }
             }
-            if (actionMode == ActionMode.None)
-                actionMode = ActionMode.NormalizeAudio;
-
-            var applicationLock = new Mutex(false, _applicationUniqueId);
-            if (!applicationLock.WaitOne(0, false))
+            catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(string.Format(Resource.AlreadyRunnningMessasgeText, nameof(MatroskaBatchToolBox)));
-                return;
-            }
-
-            Console.WriteLine(
-                actionMode switch
+                Console.WriteLine($"Fatal error occured.");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine();
+                for (var e = ex; e is not null; e = e.InnerException)
                 {
-                    ActionMode.NormalizeAudio => Resource.AudioNormalizationProcessStartMessageText,
-                    ActionMode.ResizeVideo => Resource.VideoResizingProcessStartMessageText,
-                    _ => throw new Exception("internal error"),
-                });
-            Console.WriteLine();
-
-            Task.Run(() =>
-            {
-                while (true)
-                {
-                    var keyInfo = Console.ReadKey(true);
-                    if (keyInfo.Key == ConsoleKey.Q)
-                    {
-                        ExternalCommand.AbortExternalCommands();
-                        lock (_lockConsoleObject)
-                        {
-                            _cancelRequested = true;
-                            Console.WriteLine();
-                            Console.WriteLine();
-                            var color = Console.ForegroundColor;
-                            Console.ForegroundColor = ConsoleColor.Yellow;
-                            Console.WriteLine(Resource.Q_KeyPressedMessasgeText);
-                            Console.WriteLine();
-                            Console.ForegroundColor = color;
-                        }
-                        break;
-                    }
+                    Console.WriteLine("-----");
+                    Console.WriteLine(ex.Message);
+                    Console.WriteLine(ex.StackTrace);
                 }
-            });
-
-            var sourceFileList =
-                EnumerateSourceFile(args.Where(arg => !arg.StartsWith("--", StringComparison.InvariantCulture)), actionMode)
-                .OrderBy(file => file.FullName)
-                .ToList();
-
-
-            var progressState = new ProgressState(sourceFileList);
-            progressState.WriteProgressText(PrintProgress);
-
-            var degreeOfParallelism = Settings.CurrentSettings.DegreeOfParallelism;
-            if (degreeOfParallelism > Environment.ProcessorCount)
-                degreeOfParallelism = Environment.ProcessorCount;
-            if (degreeOfParallelism < 1)
-                degreeOfParallelism = 1;
-
-            var workerTasks = new List<Task>();
-            for (var count = 0; count < degreeOfParallelism; ++count)
-                workerTasks.Add(Task.Run(worker));
-
-            foreach (var workerTask in workerTasks)
-            {
-                while (!workerTask.Wait(_maximumTimeForProgressUpdate))
-                    progressState.WriteProgressText(PrintProgress);
-            }
-
-            if (!IsRequestedCancellation())
-                progressState.CheckCompletion();
-            progressState.WriteProgressText(PrintProgress);
-
-            lock (_lockConsoleObject)
-            {
-                _completed = true;
-            }
-
-            Console.WriteLine();
-            Console.WriteLine();
-            Console.Beep();
-            Console.WriteLine(Resource.ProcessCompletedMessageText);
-            Console.ReadLine();
-
-            void worker()
-            {
-                while (progressState.TryGetNextSourceFile(out int sourceFileId, out FileInfo? sourceFile))
-                {
-                    if (_cancelRequested)
-                        break;
-
-                    var progress =
-                        new Progress<double>(percent =>
-                        {
-                            progressState.UpdateProgress(sourceFileId, percent);
-                            progressState.WriteProgressText(PrintProgress);
-                        });
-                    try
-                    {
-                        var actionResult =
-                            actionMode switch
-                            {
-                                ActionMode.NormalizeAudio => MatroskaAction.NormalizeMovieFile(sourceFile, progress),
-                                ActionMode.ResizeVideo => MatroskaAction.ResizeMovieFile(sourceFile, progress),
-                                _ => ActionResult.Skipped,
-                            };
-                        progressState.CompleteSourceFile(sourceFileId, actionResult);
-                        progressState.WriteProgressText(PrintProgress);
-                    }
-                    catch (Exception)
-                    {
-                        // ここに到達することはないはず
-                    }
-                    finally
-                    {
-                    }
-                }
+                Console.WriteLine("-----");
+                Console.WriteLine();
+                Console.Beep();
+                Console.WriteLine("Press ENTER key to exit.");
+                Console.ReadLine();
             }
         }
 
