@@ -90,15 +90,18 @@ namespace MatroskaBatchToolBox
                             ExternalCommand.AbortExternalCommands();
                             lock (_lockConsoleObject)
                             {
-                                _cancelRequested = true;
-                                Console.CursorVisible = true;
-                                Console.WriteLine();
-                                Console.WriteLine();
-                                var color = Console.ForegroundColor;
-                                Console.ForegroundColor = ConsoleColor.Yellow;
-                                Console.WriteLine(Resource.Q_KeyPressedMessasgeText);
-                                Console.WriteLine();
-                                Console.ForegroundColor = color;
+                                if (!_completed)
+                                {
+                                    _cancelRequested = true;
+                                    Console.CursorVisible = true;
+                                    Console.WriteLine();
+                                    Console.WriteLine();
+                                    var color = Console.ForegroundColor;
+                                    Console.ForegroundColor = ConsoleColor.Yellow;
+                                    Console.WriteLine(Resource.Q_KeyPressedMessasgeText);
+                                    Console.WriteLine();
+                                    Console.ForegroundColor = color;
+                                }
                             }
                             break;
                         }
