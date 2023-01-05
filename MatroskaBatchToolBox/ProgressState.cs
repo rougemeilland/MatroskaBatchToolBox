@@ -196,6 +196,7 @@ namespace MatroskaBatchToolBox
             DateTime oldDateTime;
             double latestPercentage;
             DateTime latestDateTime;
+            double progressValue;
             lock (this)
             {
                 if (_progressHistory.First is null)
@@ -206,10 +207,11 @@ namespace MatroskaBatchToolBox
                     throw new Exception("internal error");
                 latestDateTime = _progressHistory.Last.Value.DateTime;
                 latestPercentage = _progressHistory.Last.Value.Percentage;
+                progressValue = GetProgressValue();
             }
 
             var elapsedTime = latestDateTime - _firstDateTime;
-            var percentText = (GetProgressValue() * 100).ToString("F2");
+            var percentText = (progressValue * 100).ToString("F2");
 
             if (elapsedTime < _minimumHistoryIntervalForFinishTimeCalculation || latestPercentage < _minimumPercentageForFinishTimeCalculation)
             {
