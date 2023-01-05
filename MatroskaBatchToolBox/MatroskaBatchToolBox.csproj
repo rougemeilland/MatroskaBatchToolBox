@@ -8,6 +8,8 @@
     <PackageProjectUrl>https://github.com/rougemeilland/MatroskaBatchToolBox</PackageProjectUrl>
     <RepositoryUrl>https://github.com/rougemeilland/MatroskaBatchToolBox</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

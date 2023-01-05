@@ -22,10 +22,9 @@ namespace MatroskaBatchToolBox
 
         private const string _optionStringNormalizeAudio = "--normalize-audio";
         private const string _optionStringResizeResolution = "--change-resolution";
+        private const string _consoleEscapeSequenceForDeleteUntilEndOfLine = "\x1b[K";
         private static readonly string _applicationUniqueId;
         private static readonly object _lockConsoleObject;
-        private static readonly Regex _duplicatedFileNamePattern;
-        private static readonly Regex _normalizedFileNamePattern;
         private static readonly TimeSpan _maximumTimeForProgressUpdate;
         private static string _previousProgressText;
         private static bool _cancelRequested;
@@ -35,8 +34,6 @@ namespace MatroskaBatchToolBox
         {
             _applicationUniqueId = $"{nameof(MatroskaBatchToolBox)}.{typeof(Program).GUID}";
             _lockConsoleObject = new object();
-            _duplicatedFileNamePattern = new Regex(@" \(\d+\)$", RegexOptions.Compiled);
-            _normalizedFileNamePattern = new Regex(@"[ \[]audio-normalized[ \]]", RegexOptions.Compiled);
             _maximumTimeForProgressUpdate = TimeSpan.FromMinutes(1);
             _previousProgressText = "";
             _cancelRequested = false;
@@ -108,7 +105,7 @@ namespace MatroskaBatchToolBox
                 });
 
                 var sourceFileList =
-                    EnumerateSourceFile(args.Where(arg => !arg.StartsWith("--", StringComparison.InvariantCulture)), actionMode)
+                    EnumerateSourceFile(args.Where(arg => !arg.StartsWith("--", StringComparison.InvariantCulture)))
                     .OrderBy(file => file.FullName)
                     .ToList();
 
@@ -172,9 +169,11 @@ namespace MatroskaBatchToolBox
                             progressState.CompleteSourceFile(sourceFileId, actionResult);
                             progressState.WriteProgressText(PrintProgress);
                         }
-                        catch (Exception)
+                        catch (Exception ex)
                         {
                             // ここに到達することはないはず
+                            throw new Exception("internal error", ex);
+
                         }
                         finally
                         {
@@ -182,19 +181,27 @@ namespace MatroskaBatchToolBox
                     }
                 }
             }
+            catch (AggregateException ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine();
+                Console.WriteLine();
+                Console.WriteLine($"Fatal error occured.");
+                Console.ForegroundColor = ConsoleColor.White;
+                ExternalCommand.ReportAggregateException(ex);
+                Console.WriteLine();
+                Console.Beep();
+                Console.WriteLine("Press ENTER key to exit.");
+                Console.ReadLine();
+            }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine();
+                Console.WriteLine();
                 Console.WriteLine($"Fatal error occured.");
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine();
-                for (var e = ex; e is not null; e = e.InnerException)
-                {
-                    Console.WriteLine("-----");
-                    Console.WriteLine(ex.Message);
-                    Console.WriteLine(ex.StackTrace);
-                }
-                Console.WriteLine("-----");
+                ExternalCommand.ReportException(ex);
                 Console.WriteLine();
                 Console.Beep();
                 Console.WriteLine("Press ENTER key to exit.");
@@ -202,7 +209,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static IEnumerable<FileInfo> EnumerateSourceFile(IEnumerable<string> args, ActionMode actionMode)
+        private static IEnumerable<FileInfo> EnumerateSourceFile(IEnumerable<string> args)
         {
             foreach (var arg in args)
             {
@@ -213,7 +220,7 @@ namespace MatroskaBatchToolBox
                 try
                 {
                     file = new FileInfo(arg);
-                    if (!IsSourceFile(arg, actionMode) || !file.Exists || file.Length <= 0)
+                    if (!IsSourceFile(arg) || !file.Exists || file.Length <= 0)
                         file = null;
 
                 }
@@ -239,7 +246,7 @@ namespace MatroskaBatchToolBox
                 {
                     foreach (var childFile in directoryInfo.EnumerateFiles("*.*", SearchOption.AllDirectories))
                     {
-                        if (childFile is not null && IsSourceFile(childFile.FullName, actionMode) && childFile.Length > 0)
+                        if (childFile is not null && IsSourceFile(childFile.FullName) && childFile.Length > 0)
                         {
                             if (_cancelRequested)
                                 break;
@@ -251,13 +258,9 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static bool IsSourceFile(string sourceFilePath, ActionMode actionMode)
+        private static bool IsSourceFile(string sourceFilePath)
         {
             if ((Path.GetFileName(sourceFilePath) ?? ".").StartsWith(".", StringComparison.InvariantCulture))
-                return false;
-            if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFilePath)))
-                return false;
-            if (actionMode == ActionMode.NormalizeAudio && _normalizedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFilePath)))
                 return false;
             var extension = Path.GetExtension(sourceFilePath).ToUpperInvariant();
             return
@@ -290,7 +293,7 @@ namespace MatroskaBatchToolBox
 
                 if (!string.Equals(progressText, _previousProgressText, StringComparison.InvariantCulture))
                 {
-                    Console.Write($"  {progressText}        \r");
+                    Console.Write($"  {progressText}{_consoleEscapeSequenceForDeleteUntilEndOfLine}\r");
                     _previousProgressText = progressText;
                 }
             }

@@ -1,5 +1,5 @@
 {
   "FFmpegNormalizeCommandPath": "C:\\Users\\lunor\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\ffmpeg-normalize.exe",
   "AudioCodec": "libopus",
-  "DegreeOfParallelism": 1
+  "DegreeOfParallelism": 3
 }

@@ -181,9 +181,9 @@ namespace MatroskaBatchToolBox
                 throw new Exception($"ffmpeg failed. (exit code {exitCode})");
         }
 
-        public static void ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, FileInfo outFile, IProgress<double> progressReporter)
+        public static void ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
         {
-            var commandParameter = $"-y -i \"{inFile.FullName}\" -s {resolutionSpec} -c:a copy -c:s copy \"{outFile}\"";
+            var commandParameter = $"-y -i \"{inFile.FullName}\" -s {resolutionSpec} -aspect {aspectRateSpec} -c:a copy -c:s copy \"{outFile}\"";
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
             var exitCode =
@@ -281,6 +281,42 @@ namespace MatroskaBatchToolBox
             {
                 File.AppendAllLines(logFile.FullName, testLines);
             }
+        }
+
+        public static void ReportAggregateException(AggregateException ex)
+        {
+            ReportException(ex);
+            foreach (var ex2 in ex.InnerExceptions)
+                ReportException(ex2);
+        }
+
+        public static void ReportAggregateException(FileInfo logFile, AggregateException ex)
+        {
+            ReportException(logFile, ex);
+            foreach (var ex2 in ex.InnerExceptions)
+                ReportException(logFile, ex2);
+        }
+
+        public static void ReportException(Exception ex)
+        {
+            Console.WriteLine("----------");
+            Console.WriteLine(ex.Message);
+            Console.WriteLine(ex.StackTrace ?? "");
+            for (var innerEx = ex.InnerException; innerEx is not null; innerEx = innerEx.InnerException)
+            {
+                Console.WriteLine("----------");
+                Console.WriteLine(innerEx.Message);
+                Console.WriteLine(innerEx.StackTrace ?? "");
+            }
+            Console.WriteLine("----------");
+        }
+
+        public static void ReportException(FileInfo logFile, Exception ex)
+        {
+            Log(logFile, new[] { "----------", ex.Message, ex.StackTrace ?? "" });
+            for (var innerEx = ex.InnerException; innerEx is not null; innerEx = innerEx.InnerException)
+                Log(logFile, new[] { "----------", innerEx.Message, innerEx.StackTrace ?? "" });
+            Log(logFile, new[] { "----------" });
         }
 
         private static int ExecuteCommand(FileInfo programFile, FileInfo logFile, string args, Action<OutputStreamType, string>? OutputReader, Action<Process>? childProcessCcanceller)

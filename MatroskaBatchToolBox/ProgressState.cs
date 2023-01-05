@@ -139,7 +139,13 @@ namespace MatroskaBatchToolBox
             lock (this)
             {
                 if (!_processingSourceFiles.TryGetValue(sourceFieId, out SourceFileInfo? item))
-                    throw new Exception($"internal error (invalid {nameof(sourceFieId)})");
+                {
+                    // sourceFieId が変換中のソールファイルのものではない。
+                    // 本来ならエラーとするべきであるが、UpdateProgress は非同期に呼び出される可能性があるため、
+                    // 変換が完了して _processingSourceFiles の中に既に存在しないときに UpdateProgress が呼び出されることがある。
+                    // そのため、エラーにはせずに何もせずに復帰する。
+                    return;
+                }
                 item.Progress = progress;
 
                 var now = DateTime.UtcNow;

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -7,19 +9,25 @@ namespace MatroskaBatchToolBox
 {
     internal static class MatroskaAction
     {
+        private static readonly Regex _duplicatedFileNamePattern;
+        private static readonly Regex _normalizedFileNamePattern;
         private static readonly Regex _simpleCopyDirectoryNamePattern;
-        private static readonly Regex _simpleResolutionSpecPattern;
+        private static readonly Regex _resolutionSpecInParentDirectoryNamePattern;
         private static readonly Regex _resolutionSpecInFileNamePattern;
 
         static MatroskaAction()
         {
+            _duplicatedFileNamePattern = new Regex(@" \(\d+\)$", RegexOptions.Compiled);
+            _normalizedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]* )?)audio-normalized(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
             _simpleCopyDirectoryNamePattern = new Regex(@"^(\d+x\d+)==$", RegexOptions.Compiled);
-            _simpleResolutionSpecPattern = new Regex(@"^(\d+x\d+)$", RegexOptions.Compiled);
-            _resolutionSpecInFileNamePattern = new Regex(@"(?<prefix>\[([^\]]+ )?)(?<resolutionSpec>\d+x\d+)(?<suffix>( [^\]]+)?\])", RegexOptions.Compiled);
+            _resolutionSpecInParentDirectoryNamePattern = new Regex(@"^(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)(\s+(((?<acpectRateWidth>\d+)(to|：|:)(?<aspectRateHeight>\d+))|(?<aspectRate>\d+\.\d+)))?$", RegexOptions.Compiled);
+            _resolutionSpecInFileNamePattern = new Regex(@"(?<prefix>\[([^\]]* )?)(?<resolutionSpec>\d+x\d+)(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
         }
 
         public static ActionResult NormalizeMovieFile(FileInfo sourceFile, IProgress<double> progressReporter)
         {
+            var logFile = new FileInfo(sourceFile.FullName + ".log");
+            CleanUpLogFile(logFile);
             string codecName =
                 Settings.CurrentSettings.AudioCodec switch
                 {
@@ -31,24 +39,35 @@ namespace MatroskaBatchToolBox
                     Path.Combine(
                         sourceFile.DirectoryName ?? ".",
                         $"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{codecName} audio-normalized].mkv"));
-            var logFile = new FileInfo(sourceFile.FullName + ".log");
-            if (destinationFile.Exists)
-                return ActionResult.Skipped;
             var workingFile =
                 new FileInfo(
                     Path.Combine(destinationFile.DirectoryName ?? ".",
                     $".work.audio-normalize.{destinationFile.Name}"));
-            CleanUpLogFile(logFile);
             workingFile.Delete();
-            var success = false;
+            var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
             try
             {
+                if (_normalizedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                {
+                    // ファイル名に正規化されたマーク文字列があるので、何もせずに復帰する。
+                    return actionResult = ActionResult.Skipped;
+                }
+                if (destinationFile.Exists)
+                {
+                    // 出力先ファイルが既に存在しているので、何もせず復帰する。
+                    return actionResult = ActionResult.Skipped;
+                }
+                if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                {
+                    // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
+                    return actionResult = ActionResult.Failed;
+                }
                 ExternalCommand.NormalizeAudioFile(logFile, sourceFile, workingFile, progressReporter);
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\".", });
-                success = true;
-                return ActionResult.Success;
+                return actionResult = ActionResult.Success;
             }
             catch (AggregateException ex)
             {
@@ -57,8 +76,8 @@ namespace MatroskaBatchToolBox
                     destinationFile.Delete();
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
-                ReportAggregateException(logFile, ex);
-                return ActionResult.Failed;
+                ExternalCommand.ReportAggregateException(logFile, ex);
+                return actionResult = ActionResult.Failed;
             }
             catch (Exception ex)
             {
@@ -67,8 +86,8 @@ namespace MatroskaBatchToolBox
                     destinationFile.Delete();
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
-                ReportException(logFile, ex);
-                return ActionResult.Failed;
+                ExternalCommand.ReportException(logFile, ex);
+                return actionResult = ActionResult.Failed;
             }
             finally
             {
@@ -77,15 +96,21 @@ namespace MatroskaBatchToolBox
                     workingFile.Delete();
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
-                if (success)
+                switch (actionResult)
                 {
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The audio in movie file was successfully normalized.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
-                    FinalizeLogFile(logFile, "OK");
-                }
-                else
-                {
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to normalize the audio of the movie file.: \"{sourceFile.FullName}\"", });
-                    FinalizeLogFile(logFile, "NG");
+                    case ActionResult.Success:
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The audio in movie file was successfully normalized.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
+                        FinalizeLogFile(logFile, "OK");
+                        break;
+                    case ActionResult.Skipped:
+                        CleanUpLogFile(logFile);
+                        break;
+                    case ActionResult.Failed:
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to normalize the audio of the movie file.: \"{sourceFile.FullName}\"", });
+                        FinalizeLogFile(logFile, "NG");
+                        break;
+                    default:
+                        break;
                 }
             }
         }
@@ -95,8 +120,8 @@ namespace MatroskaBatchToolBox
             var parentDirectoryName = sourceFile.Directory?.Name ?? "";
             if (_simpleCopyDirectoryNamePattern.IsMatch(parentDirectoryName))
                 return ContertMovieFileToMatroska(sourceFile, progressReporter);
-            else if (_simpleResolutionSpecPattern.IsMatch(parentDirectoryName))
-                return ChangeResolutionOfMovieFile(sourceFile, progressReporter, parentDirectoryName);
+            else if (_resolutionSpecInParentDirectoryNamePattern.IsMatch(parentDirectoryName))
+                return ChangeResolutionOfMovieFile(sourceFile, parentDirectoryName, progressReporter);
             else
             {
                 // 処理することがないので、何もせず復帰する。
@@ -106,33 +131,38 @@ namespace MatroskaBatchToolBox
 
         private static ActionResult ContertMovieFileToMatroska(FileInfo sourceFile, IProgress<double> progressReporter)
         {
-            if (string.Equals(sourceFile.Extension, ".mkv", StringComparison.InvariantCultureIgnoreCase))
-            {
-                // 入力ファイルが既に .mkv 形式であるので、何もせず復帰する。
-                return ActionResult.Skipped;
-            }
-            var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", Path.GetFileNameWithoutExtension(sourceFile.Name) + ".mkv"));
-            if (destinationFile.Exists)
-            {
-                // 出力先ファイルが既に存在しているので、何もせず復帰する。
-                return ActionResult.Skipped;
-            }
             var logFile = new FileInfo(sourceFile.FullName + ".log");
+            CleanUpLogFile(logFile);
+            var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", Path.GetFileNameWithoutExtension(sourceFile.Name) + ".mkv"));
             var workingFile =
                 new FileInfo(
                     Path.Combine(destinationFile.DirectoryName ?? ".",
                     $".work.resize-resolution.{destinationFile.Name}"));
-            CleanUpLogFile(logFile);
             workingFile.Delete();
-            var success = false;
+            var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
             try
             {
+                if (string.Equals(sourceFile.Extension, ".mkv", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    // 入力ファイルが既に .mkv 形式であるので、何もせず復帰する。
+                    return actionResult = ActionResult.Skipped;
+                }
+                if (destinationFile.Exists)
+                {
+                    // 出力先ファイルが既に存在しているので、何もせず復帰する。
+                    return actionResult = ActionResult.Skipped;
+                }
+                if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                {
+                    // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
+                    return actionResult = ActionResult.Failed;
+                }
                 ExternalCommand.CopyMovieFile(logFile, sourceFile, workingFile, progressReporter);
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
-                success = true;
-                return ActionResult.Success;
+                return actionResult = ActionResult.Success;
             }
             catch (AggregateException ex)
             {
@@ -141,8 +171,8 @@ namespace MatroskaBatchToolBox
                     destinationFile.Delete();
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
-                ReportAggregateException(logFile, ex);
-                return ActionResult.Failed;
+                ExternalCommand.ReportAggregateException(logFile, ex);
+                return actionResult = ActionResult.Failed;
             }
             catch (Exception ex)
             {
@@ -151,8 +181,8 @@ namespace MatroskaBatchToolBox
                     destinationFile.Delete();
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
-                ReportException(logFile, ex);
-                return ActionResult.Failed;
+                ExternalCommand.ReportException(logFile, ex);
+                return actionResult = ActionResult.Failed;
             }
             finally
             {
@@ -161,51 +191,66 @@ namespace MatroskaBatchToolBox
                     workingFile.Delete();
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
-                if (success)
+                switch (actionResult)
                 {
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The movie file was successfully converted.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
-                    FinalizeLogFile(logFile, "OK");
-                }
-                else
-                {
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to convert the movie file.: \"{sourceFile.FullName}\"", });
-                    FinalizeLogFile(logFile, "NG");
+                    case ActionResult.Success:
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The movie file was successfully converted.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
+                        FinalizeLogFile(logFile, "OK");
+                        break;
+                    case ActionResult.Skipped:
+                        CleanUpLogFile(logFile);
+                        break;
+                    case ActionResult.Failed:
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to convert the movie file.: \"{sourceFile.FullName}\"", });
+                        FinalizeLogFile(logFile, "NG");
+                        break;
+                    default:
+                        break;
                 }
             }
         }
 
-        private static ActionResult ChangeResolutionOfMovieFile(FileInfo sourceFile, IProgress<double> progressReporter, string parentDirectoryName)
+        private static ActionResult ChangeResolutionOfMovieFile(FileInfo sourceFile, string resolutionSpecAndAspectRateSpecText, IProgress<double> progressReporter)
         {
-            var resolutionSpec = parentDirectoryName;
-            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile, resolutionSpec);
-            if (string.Equals(destinationFileName, sourceFile.Name, StringComparison.InvariantCultureIgnoreCase))
-            {
-                // 入力ファイルと出力ファイルのファイル名が一致しているので、何もせず復帰する。
-                return ActionResult.Skipped;
-            }
-            var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", destinationFileName));
-            if (destinationFile.Exists)
-            {
-                // 出力先ファイルが既に存在しているので、何もせず復帰する。
-                return ActionResult.Skipped;
-            }
             var logFile = new FileInfo(sourceFile.FullName + ".log");
+            CleanUpLogFile(logFile);
+            var (resolutionSpec, aspectRateSpec) = ParseResolutionSpecAndAspectRateSpec(resolutionSpecAndAspectRateSpecText);
+            if (resolutionSpec is null || aspectRateSpec is null)
+            {
+                // 親ディレクトの名前が解像度(およびアスペクト比の指定)ではないので、何もせず復帰する。
+                return ActionResult.Skipped;
+            }
+            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile, resolutionSpec);
+            var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", destinationFileName));
             var workingFile =
                 new FileInfo(
                     Path.Combine(destinationFile.DirectoryName ?? ".",
                     $".work.resize-resolution.{destinationFile.Name}"));
-            CleanUpLogFile(logFile);
-            logFile.Delete();
             workingFile.Delete();
-            var success = false;
+            var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
             try
             {
-                ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, workingFile, progressReporter);
+                if (string.Equals(destinationFileName, sourceFile.Name, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    // 入力ファイルと出力ファイルのファイル名が一致しているので、何もせず復帰する。
+                    return actionResult = ActionResult.Skipped;
+                }
+                if (destinationFile.Exists)
+                {
+                    // 出力先ファイルが既に存在しているので、何もせず復帰する。
+                    return actionResult = ActionResult.Skipped;
+                }
+                if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                {
+                    // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
+                    return actionResult = ActionResult.Failed;
+                }
+                ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, workingFile, progressReporter);
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
-                success = true;
-                return ActionResult.Success;
+                return actionResult = ActionResult.Success;
             }
             catch (AggregateException ex)
             {
@@ -214,8 +259,8 @@ namespace MatroskaBatchToolBox
                     destinationFile.Delete();
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
-                ReportAggregateException(logFile, ex);
-                return ActionResult.Failed;
+                ExternalCommand.ReportAggregateException(logFile, ex);
+                return actionResult = ActionResult.Failed;
             }
             catch (Exception ex)
             {
@@ -224,8 +269,8 @@ namespace MatroskaBatchToolBox
                     destinationFile.Delete();
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
-                ReportException(logFile, ex);
-                return ActionResult.Failed;
+                ExternalCommand.ReportException(logFile, ex);
+                return actionResult = ActionResult.Failed;
             }
             finally
             {
@@ -234,18 +279,68 @@ namespace MatroskaBatchToolBox
                     workingFile.Delete();
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
-                if (success)
+                switch (actionResult)
                 {
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The video resolution of the movie fie was successfully changed.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
-                    FinalizeLogFile(logFile, "OK");
-                }
-                else
-                {
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to change the video resolution of the movie file.: \"{sourceFile.FullName}\"", });
-                    FinalizeLogFile(logFile, "NG");
+                    case ActionResult.Success:
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The video resolution of the movie fie was successfully changed.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
+                        FinalizeLogFile(logFile, "OK");
+                        break;
+                    case ActionResult.Skipped:
+                        CleanUpLogFile(logFile);
+                        break;
+                    case ActionResult.Failed:
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to change the video resolution of the movie file.: \"{sourceFile.FullName}\"", });
+                        FinalizeLogFile(logFile, "NG");
+                        break;
+                    default:
+                        break;
                 }
             }
         }
+
+        private static (string? resolutionSpec, string? aspectRateSpec) ParseResolutionSpecAndAspectRateSpec(string resolutionSpecAndAspectRateSpecText)
+        {
+            var resolutionSpecMatch = _resolutionSpecInParentDirectoryNamePattern.Match(resolutionSpecAndAspectRateSpecText);
+            if (!resolutionSpecMatch.Success)
+                return (null, null);
+            var resolutionWidthText = resolutionSpecMatch.Groups["resolutionWidth"].Value;
+            var resolutionWidth = int.Parse(resolutionWidthText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+            if (resolutionWidth <= 0)
+                return (null, null);
+            var resolutionHeightText = resolutionSpecMatch.Groups["resolutionHeight"].Value;
+            var resolutionHeight = int.Parse(resolutionHeightText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+            if (resolutionHeight <= 0)
+                return (null, null);
+            if (resolutionSpecMatch.Groups["acpectRateWidth"].Success && resolutionSpecMatch.Groups["aspectRateHeight"].Success)
+            {
+                var aspectRateWidthText = resolutionSpecMatch.Groups["acpectRateWidth"].Value;
+                var aspectRateWidth = int.Parse(aspectRateWidthText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                if (aspectRateWidth <= 0)
+                    return (null, null);
+                var aspectRateHeightText = resolutionSpecMatch.Groups["aspectRateHeight"].Value;
+                var aspectRateHeight = int.Parse(aspectRateHeightText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                if (aspectRateHeight <= 0)
+                    return (null, null);
+                return ($"{resolutionWidth}x{resolutionHeight}", $"{aspectRateWidth}:{aspectRateHeight}");
+            }
+            else if (resolutionSpecMatch.Groups["aspectRate"].Success)
+            {
+                var aspectRateText = resolutionSpecMatch.Groups["aspectRate"].Value;
+                var aspectRate = double.Parse(aspectRateText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat);
+                if (aspectRate <= 0)
+                    return (null, null);
+                return ($"{resolutionWidth}x{resolutionHeight}", $"{aspectRateText}");
+            }
+            else
+            {
+                var gcd = ExtendedMath.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
+                var aspectRateWidth = resolutionWidth / gcd;
+                var aspectRateHeight = resolutionHeight / gcd;
+                return ($"{resolutionWidth}x{resolutionHeight}", $"{aspectRateWidth}:{aspectRateHeight}");
+            }
+        }
+
+
 
         private static string ReplaceResolutionSpecInFileName(FileInfo sourceFile, string resolutionSpec)
         {
@@ -340,21 +435,6 @@ namespace MatroskaBatchToolBox
                 Path.Combine(
                     logFile.DirectoryName ?? ".",
                     $"{Path.GetFileNameWithoutExtension(logFile.Name)}.{result}{logFile.Extension}");
-        }
-
-        private static void ReportAggregateException(FileInfo logFile, AggregateException ex)
-        {
-            ReportException(logFile, ex);
-            foreach (var ex2 in ex.InnerExceptions)
-                ReportException(logFile, ex2);
-        }
-
-        private static void ReportException(FileInfo logFile, Exception ex)
-        {
-            ExternalCommand.Log(logFile, new[] { "----------", ex.Message, ex.StackTrace ?? "" });
-            for (var innerEx = ex.InnerException; innerEx is not null; innerEx = innerEx.InnerException)
-                ExternalCommand.Log(logFile, new[] { "----------", innerEx.Message, innerEx.StackTrace ?? "" });
-            ExternalCommand.Log(logFile, new[] { "----------" });
         }
     }
 }
