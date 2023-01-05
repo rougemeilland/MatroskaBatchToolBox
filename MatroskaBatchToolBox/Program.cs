@@ -113,7 +113,6 @@ namespace MatroskaBatchToolBox
                     .OrderBy(file => file.FullName)
                     .ToList();
 
-
                 var progressState = new ProgressState(sourceFileList);
                 progressState.WriteProgressText(PrintProgress);
 

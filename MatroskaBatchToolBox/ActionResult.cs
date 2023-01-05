@@ -5,5 +5,6 @@
         Success,
         Skipped,
         Failed,
+        Cancelled,
     }
 }

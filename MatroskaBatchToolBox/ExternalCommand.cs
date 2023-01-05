@@ -13,6 +13,13 @@ namespace MatroskaBatchToolBox
 {
     internal static class ExternalCommand
     {
+        public enum ExternalCommandResult
+        {
+            Completed,
+            Cancelled,
+        }
+
+
         private enum OutputStreamType
         {
             StandardOutput,
@@ -22,6 +29,7 @@ namespace MatroskaBatchToolBox
         private const string _ffmpegPathEnvironmentVariableName = "FFMPEG_PATH";
         private static readonly object _loggingLockObject;
         private static readonly Regex _ffmpegNormalizeProgressPattern;
+        private static readonly Regex _logsToIgnoreInFFmpegNormalize;
         private static readonly Regex _moveStreamInfoPattern;
         private static readonly Regex _moveStreamInfoAudioDetailPattern;
         private static readonly Regex _audioChannelLayoutPattern;
@@ -33,24 +41,13 @@ namespace MatroskaBatchToolBox
         {
             _loggingLockObject = new object();
             _ffmpegNormalizeProgressPattern = new Regex(@"^(((?<phase>Stream)\s+(?<currentStream>\d+)/(?<totalStream>\d+))|(?<phase>Second Pass)|(?<phase>File)):\s+(?<Percentage>\d+)%\|", RegexOptions.Compiled);
+            _logsToIgnoreInFFmpegNormalize = new Regex(@"^(frame|fps|stream_\d+_\d+_q|bitrate|total_size|out_time_us|out_time_ms|out_time|dup_frames|drop_frames|speed|progress)=", RegexOptions.Compiled);
             _moveStreamInfoPattern = new Regex(@"^  Stream #0:(?<id>\d+)(?<language>\([^\)]+\))?: (?<streamType>Video|Audio|Subtitle): (?<detail>.*)$", RegexOptions.Compiled);
             _moveStreamInfoAudioDetailPattern = new Regex(@"^\s*(?<codec>[^ ,][^,]*[^ ,])\s*,\s*(?<samplingFrequency>[^ ,][^,]*[^ ,]) Hz\s*,\s*(?<channelLayout>[^ ,][^,]*[^ ,])\s*,", RegexOptions.Compiled);
             _audioChannelLayoutPattern = new Regex(@"(?<layoutType>[^\(]+)(\([^\)]+\))?", RegexOptions.Compiled);
             _ffmpegConversionDurationPattern = new Regex(@"\s*(Duration|DURATION)\s*:\s*(?<hours>\d+):(?<minutes>\d+):(?<seconds>[\d\.]+)", RegexOptions.Compiled);
             _ffmpegConversionProgressPattern = new Regex(@" time=(?<hours>\d+):(?<minutes>\d+):(?<seconds>[\d\.]+) ", RegexOptions.Compiled);
             _requestedCancellation = false;
-#if false
-#if DEBUG   
-            if (!_ffmpegConversionDurationPattern.IsMatch("  Duration: 00:17:01.25, start: 0.000000, bitrate: 1103 kb/s"))
-                throw new Exception();
-            if (!_ffmpegConversionDurationPattern.IsMatch("      DURATION        : 00:17:01.187000000"))
-                throw new Exception();
-            if (!_ffmpegConversionProgressPattern.IsMatch("frame=  291 fps=0.0 q=28.0 size=     244kB time=00:00:14.82 bitrate= 134.7kbits/s speed=  29x    "))
-                throw new Exception();
-            throw new Exception();
-#endif
-#endif
-
         }
 
         public static void AbortExternalCommands()
@@ -58,21 +55,23 @@ namespace MatroskaBatchToolBox
             _requestedCancellation = true;
         }
 
-        public static void NormalizeAudioFile(FileInfo logFile, FileInfo inFile, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult NormalizeAudioFile(FileInfo logFile, FileInfo inFile, FileInfo outFile, IProgress<double> progressReporter)
         {
             System.Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, Settings.CurrentSettings.FFmpegCommandFile.FullName);
             var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr -v -d --keep-loudness-range-target --audio-codec {Settings.CurrentSettings.AudioCodec}";
-            NormalizeAudioFile(logFile, commandParameter, progressReporter);
-        }
-
-        private static void NormalizeAudioFile(FileInfo logFile, string commandParameter, IProgress<double> progressReporter)
-        {
             var totalStream = 1;
-            var exitCode =
+            var (cancelled, exitCode) =
                 ExecuteCommand(
                     Settings.CurrentSettings.FFmpegNormalizeCommandFile,
                     logFile,
                     commandParameter,
+
+                    // ffmpeg-normalize 自体のエンコーディングはおそらくデフォルトエンコーディング (端末のローカルエンコーディング 日本のPCなら shift_jis) だが、
+                    // そこから呼び出される ffmpgのログは UTF-8になっている。
+                    // エンコーディングによって内容に差異が発生するのはパス名にASCII文字以外が含まれている場合ぐらいなので、とりあえず UTF-8にしておく。
+                    // したがって、音声の変換時に出力されるログの内容のうちパス名に関する部分は表示が乱れる可能性がある。
+                    Encoding.UTF8,
+
                     (type, text) =>
                     {
                         if (type != OutputStreamType.StandardError)
@@ -82,7 +81,9 @@ namespace MatroskaBatchToolBox
                         var match = _ffmpegNormalizeProgressPattern.Match(text);
                         if (!match.Success)
                         {
-                            Log(logFile, new[] { text });
+                            // 進行状況などで頻出して、かつトラブル分析用としては重要ではない項目はログに記録しない。
+                            if (!_logsToIgnoreInFFmpegNormalize.IsMatch(text))
+                                Log(logFile, new[] { text });
                             return;
                         }
                         var phaseText = match.Groups["phase"].Value;
@@ -152,58 +153,69 @@ namespace MatroskaBatchToolBox
                             }
                         }
                     });
+            if (cancelled)
+            {
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg-normalize aborted at user request." });
+                return ExternalCommandResult.Cancelled;
+            }
+            Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg-normalize exited with exit code {exitCode}." });
             if (exitCode != 0)
-                throw new Exception("Failed in ffmpeg-normalize");
+                throw new Exception($"Failed in ffmpeg-normalize. (exit code: {exitCode})");
+            return ExternalCommandResult.Completed;
         }
 
-        public static void CopyMovieFile(FileInfo logFile, FileInfo inFile, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult CopyMovieFile(FileInfo logFile, FileInfo inFile, FileInfo outFile, IProgress<double> progressReporter)
         {
             var commandParameter = $"-y -i \"{inFile.FullName}\" -c:v copy -c:a copy -c:s copy \"{outFile}\"";
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
-            var exitCode =
+            var (cancelled, exitCode) =
                 ExecuteCommand(
                     Settings.CurrentSettings.FFmpegCommandFile,
                     logFile,
                     commandParameter,
+                    Encoding.UTF8,
                     (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, progressReporter),
                     proc =>
                     {
                         proc.StandardInput.Write("q");
                     });
-            if (detectedToQuit)
+            if (detectedToQuit || cancelled)
             {
                 Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
-                throw new Exception("ffmpeg aborted at user request.");
+                return ExternalCommandResult.Cancelled;
             }
             Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
             if (exitCode != 0)
                 throw new Exception($"ffmpeg failed. (exit code {exitCode})");
+            return ExternalCommandResult.Completed;
         }
 
-        public static void ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
         {
             var commandParameter = $"-y -i \"{inFile.FullName}\" -s {resolutionSpec} -aspect {aspectRateSpec} -c:a copy -c:s copy \"{outFile}\"";
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
-            var exitCode =
+            var (cancelled, exitCode) =
                 ExecuteCommand(
                     Settings.CurrentSettings.FFmpegCommandFile,
                     logFile,
                     commandParameter,
+                    Encoding.UTF8,
                     (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, progressReporter),
                     proc =>
                     {
                         proc.StandardInput.Write("q");
                     });
-            if (detectedToQuit)
+            if (detectedToQuit || cancelled)
             {
                 Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
-                throw new Exception("ffmpeg aborted at user request.");
+                return ExternalCommandResult.Cancelled;
             }
             Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
             if (exitCode != 0)
                 throw new Exception($"ffmpeg failed. (exit code {exitCode})");
+            return ExternalCommandResult.Completed;
         }
 
         private static void ProcessFFmpegOutput(FileInfo logFile, string lineText, ref bool detectedToQuit, ref double maximumDurationSeconds, IProgress<double> progressReporter)
@@ -320,7 +332,7 @@ namespace MatroskaBatchToolBox
             Log(logFile, new[] { "----------" });
         }
 
-        private static int ExecuteCommand(FileInfo programFile, FileInfo logFile, string args, Action<OutputStreamType, string>? OutputReader, Action<Process>? childProcessCcanceller)
+        private static (bool cancelled, int exitCode) ExecuteCommand(FileInfo programFile, FileInfo logFile, string args, Encoding intputOutputEncoding, Action<OutputStreamType, string>? OutputReader, Action<Process>? childProcessCcanceller)
         {
             var info =
                 new ProcessStartInfo
@@ -331,7 +343,9 @@ namespace MatroskaBatchToolBox
                     RedirectStandardError = true,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
-                    StandardErrorEncoding = Encoding.UTF8,
+                    StandardInputEncoding = intputOutputEncoding,
+                    StandardOutputEncoding = intputOutputEncoding,
+                    StandardErrorEncoding = intputOutputEncoding,
                     UseShellExecute = false,
                     WindowStyle = ProcessWindowStyle.Hidden,
                 };
@@ -342,7 +356,7 @@ namespace MatroskaBatchToolBox
             var process = Process.Start(info);
             if (process is null)
                 throw new Exception("Could not start process");
-
+            var cancelled = false;
             var cancellationWatcherTask =
                 Task.Run(() =>
                 {
@@ -365,6 +379,10 @@ namespace MatroskaBatchToolBox
                             catch (Exception)
                             {
                             }
+                            finally
+                            {
+                                cancelled = true;
+                            }
                         }
                     }
                 });
@@ -386,7 +404,7 @@ namespace MatroskaBatchToolBox
             standardOutputReaderTask.Wait();
             cancellationWatcherTask.Wait();
             process.WaitForExit();
-            return process.ExitCode;
+            return (cancelled, process.ExitCode);
         }
 
         private static void ProcessChildOutput(object lockObject, Action<OutputStreamType, string>? OutputReader, OutputStreamType streamType, StreamReader streamReader)

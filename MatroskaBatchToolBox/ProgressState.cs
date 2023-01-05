@@ -173,8 +173,18 @@ namespace MatroskaBatchToolBox
                     throw new Exception($"internal error (invalid {nameof(sourceFieId)})");
                 _processedSourceFiles[actionResult].Add(item);
                 _processingSourceFiles.Remove(sourceFieId);
-                if (actionResult == ActionResult.Success || actionResult == ActionResult.Failed)
-                    _totalLengthOfProcessedSourceFiles += item.FileLength;
+                switch (actionResult)
+                {
+                    case ActionResult.Success:
+                    case ActionResult.Failed:
+                        _totalLengthOfProcessedSourceFiles += item.FileLength;
+                        break;
+                    case ActionResult.Skipped:
+                    case ActionResult.Cancelled:
+                    default:
+                        // NOP
+                        break;
+                }
 #if DEBUG
                 {
                     var totalLength1 = _processedSourceFiles[ActionResult.Success].Sum(item => item.FileLength);

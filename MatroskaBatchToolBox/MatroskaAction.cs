@@ -64,7 +64,8 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
-                ExternalCommand.NormalizeAudioFile(logFile, sourceFile, workingFile, progressReporter);
+                if (ExternalCommand.NormalizeAudioFile(logFile, sourceFile, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\".", });
                 return actionResult = ActionResult.Success;
@@ -108,6 +109,9 @@ namespace MatroskaBatchToolBox
                     case ActionResult.Failed:
                         ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to normalize the audio of the movie file.: \"{sourceFile.FullName}\"", });
                         FinalizeLogFile(logFile, "NG");
+                        break;
+                    case ActionResult.Cancelled:
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie audio normalization was interrupted by the user.: \"{sourceFile.FullName}\"", });
                         break;
                     default:
                         break;
@@ -159,7 +163,8 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
-                ExternalCommand.CopyMovieFile(logFile, sourceFile, workingFile, progressReporter);
+                if (ExternalCommand.CopyMovieFile(logFile, sourceFile, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
                 return actionResult = ActionResult.Success;
@@ -204,6 +209,9 @@ namespace MatroskaBatchToolBox
                         ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to convert the movie file.: \"{sourceFile.FullName}\"", });
                         FinalizeLogFile(logFile, "NG");
                         break;
+                    case ActionResult.Cancelled:
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie file conversion was interrupted by the user.: \"{sourceFile.FullName}\"", });
+                        break;
                     default:
                         break;
                 }
@@ -247,7 +255,8 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
-                ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, workingFile, progressReporter);
+                if (ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
                 return actionResult = ActionResult.Success;
@@ -291,6 +300,9 @@ namespace MatroskaBatchToolBox
                     case ActionResult.Failed:
                         ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to change the video resolution of the movie file.: \"{sourceFile.FullName}\"", });
                         FinalizeLogFile(logFile, "NG");
+                        break;
+                    case ActionResult.Cancelled:
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Changing the video resolution of the movie file was interrupted by the user.: \"{sourceFile.FullName}\"", });
                         break;
                     default:
                         break;
