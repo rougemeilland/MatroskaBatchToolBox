@@ -237,6 +237,7 @@ namespace MatroskaBatchToolBox
 
         public void CheckCompletion()
         {
+
 #if DEBUG
             {
                 if (_unprocessedSourceFiles.Any())
@@ -260,6 +261,9 @@ namespace MatroskaBatchToolBox
                 _totalLengthOfUnprocessedSourceFiles +
                 _processingSourceFiles.Values.Sum(sourceFile => sourceFile.FileLength) +
                 _totalLengthOfProcessedSourceFiles;
+
+            if (totalOfSourceFileLength <= 0)
+                return 0;
 
             var totalOfProcessedSourceFileLength =
                 _processingSourceFiles.Values.Sum(sourceFile => sourceFile.FileLength * sourceFile.Progress) +

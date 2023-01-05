@@ -5,7 +5,7 @@ VisualStudioVersion = 17.4.33205.214
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MatroskaBatchToolBox", "MatroskaBatchToolBox\MatroskaBatchToolBox.csproj", "{E04D65E4-FE0D-4D24-BE4E-E90D302BE994}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Experiment", "Experiment\Experiment.csproj", "{6BEB6077-E905-4754-9B95-FD9E8CD95F1C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Experiment", "Experiment\Experiment.csproj", "{6BEB6077-E905-4754-9B95-FD9E8CD95F1C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
