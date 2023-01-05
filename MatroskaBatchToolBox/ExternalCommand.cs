@@ -61,7 +61,7 @@ namespace MatroskaBatchToolBox
         public static void NormalizeAudioFile(FileInfo logFile, FileInfo inFile, FileInfo outFile, IProgress<double> progressReporter)
         {
             System.Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, Settings.CurrentSettings.FFmpegCommandFile.FullName);
-            var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr --keep-loudness-range-target --audio-codec {Settings.CurrentSettings.AudioCodec}";
+            var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr -v -d --keep-loudness-range-target --audio-codec {Settings.CurrentSettings.AudioCodec}";
             NormalizeAudioFile(logFile, commandParameter, progressReporter);
         }
 
