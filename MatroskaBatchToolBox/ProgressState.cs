@@ -86,7 +86,8 @@ namespace MatroskaBatchToolBox
             {
                 { ActionResult.Success, new List<SourceFileInfo>() },
                 { ActionResult.Skipped, new List<SourceFileInfo>() },
-                { ActionResult.Failed, new List<SourceFileInfo>() }
+                { ActionResult.Failed, new List<SourceFileInfo>() },
+                { ActionResult.Cancelled, new List<SourceFileInfo>() }
             };
             _totalLengthOfProcessedSourceFiles = 0;
             _progressHistory = new LinkedList<ProgressHistoryElement>();
