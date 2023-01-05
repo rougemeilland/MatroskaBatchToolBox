@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -22,7 +21,6 @@ namespace MatroskaBatchToolBox
 
         private const string _optionStringNormalizeAudio = "--normalize-audio";
         private const string _optionStringResizeResolution = "--change-resolution";
-        private const string _consoleEscapeSequenceForDeleteUntilEndOfLine = "\x1b[K";
         private static readonly string _applicationUniqueId;
         private static readonly object _lockConsoleObject;
         private static readonly TimeSpan _maximumTimeForProgressUpdate;
@@ -91,6 +89,7 @@ namespace MatroskaBatchToolBox
                             lock (_lockConsoleObject)
                             {
                                 _cancelRequested = true;
+                                Console.CursorVisible = true;
                                 Console.WriteLine();
                                 Console.WriteLine();
                                 var color = Console.ForegroundColor;
@@ -138,6 +137,7 @@ namespace MatroskaBatchToolBox
                     _completed = true;
                 }
 
+                Console.CursorVisible = true;
                 Console.WriteLine();
                 Console.WriteLine();
                 Console.Beep();
@@ -183,9 +183,10 @@ namespace MatroskaBatchToolBox
             }
             catch (AggregateException ex)
             {
+                Console.CursorVisible = true;
+                Console.WriteLine();
+                Console.WriteLine();
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine();
-                Console.WriteLine();
                 Console.WriteLine($"Fatal error occured.");
                 Console.ForegroundColor = ConsoleColor.White;
                 ExternalCommand.ReportAggregateException(ex);
@@ -196,9 +197,10 @@ namespace MatroskaBatchToolBox
             }
             catch (Exception ex)
             {
+                Console.CursorVisible = true;
+                Console.WriteLine();
+                Console.WriteLine();
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine();
-                Console.WriteLine();
                 Console.WriteLine($"Fatal error occured.");
                 Console.ForegroundColor = ConsoleColor.White;
                 ExternalCommand.ReportException(ex);
@@ -287,13 +289,18 @@ namespace MatroskaBatchToolBox
 
                 if (_cancelRequested)
                 {
+                    Console.CursorVisible = false;
                     Console.Write(".");
                     return;
                 }
 
                 if (!string.Equals(progressText, _previousProgressText, StringComparison.InvariantCulture))
                 {
-                    Console.Write($"  {progressText}{_consoleEscapeSequenceForDeleteUntilEndOfLine}\r");
+                    Console.CursorVisible = false;
+                    Console.Write($"  {progressText}");
+                    var (leftPos, topPos) = Console.GetCursorPosition();
+                    Console.Write(new string(' ', Console.WindowWidth - leftPos));
+                    Console.SetCursorPosition(0, topPos);
                     _previousProgressText = progressText;
                 }
             }

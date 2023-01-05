@@ -299,6 +299,7 @@ namespace MatroskaBatchToolBox
 
         public static void ReportException(Exception ex)
         {
+            Console.CursorVisible = true;
             Console.WriteLine("----------");
             Console.WriteLine(ex.Message);
             Console.WriteLine(ex.StackTrace ?? "");
