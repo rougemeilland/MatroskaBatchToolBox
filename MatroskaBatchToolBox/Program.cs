@@ -25,6 +25,7 @@ namespace MatroskaBatchToolBox
         private static readonly object _lockConsoleObject;
         private static readonly TimeSpan _maximumTimeForProgressUpdate;
         private static string _previousProgressText;
+        private static int _previousProgressTextLengthOnConsole;
         private static bool _cancelRequested;
         private static bool _completed;
 
@@ -34,6 +35,7 @@ namespace MatroskaBatchToolBox
             _lockConsoleObject = new object();
             _maximumTimeForProgressUpdate = TimeSpan.FromMinutes(1);
             _previousProgressText = "";
+            _previousProgressTextLengthOnConsole = 0;
             _cancelRequested = false;
             _completed = false;
         }
@@ -297,11 +299,15 @@ namespace MatroskaBatchToolBox
                 if (!string.Equals(progressText, _previousProgressText, StringComparison.InvariantCulture))
                 {
                     Console.CursorVisible = false;
+                    var (leftPos0, topPos0) = Console.GetCursorPosition();
                     Console.Write($"  {progressText}");
-                    var (leftPos, topPos) = Console.GetCursorPosition();
-                    Console.Write(new string(' ', Console.WindowWidth - leftPos));
-                    Console.SetCursorPosition(0, topPos);
+                    var (leftPos1, topPos1) = Console.GetCursorPosition();
+                    var currentProgressTextLength = (leftPos1 - leftPos0) + (topPos1 - topPos0) * Console.WindowWidth;
+                    if (_previousProgressTextLengthOnConsole > currentProgressTextLength)
+                        Console.Write(new string(' ', _previousProgressTextLengthOnConsole - currentProgressTextLength));
+                    Console.SetCursorPosition(leftPos0, topPos0);
                     _previousProgressText = progressText;
+                    _previousProgressTextLengthOnConsole = currentProgressTextLength;
                 }
             }
         }

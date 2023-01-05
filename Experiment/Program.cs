@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,39 +11,25 @@ namespace Experiment
     {
         public static void Main(string[] args)
         {
-
-            var str = string.Concat(Enumerable.Repeat("あ", 30));
-            //var str = string.Concat(Enumerable.Repeat("𩸽", 30));
-
-            // 方法1:
-            Console.WriteLine($"方法1: 以下の「{str[0]}」の列は消えていますか？");
-            Console.WriteLine($"{str}\r\x1b[K");
-            Console.WriteLine(new string(' ', 80));
+            Console.WriteLine("x が伸び縮みします。");
             Console.WriteLine();
 
-            // 方法2:
-            Console.WriteLine($"方法2: 以下の「{str[0]}」の列は消えていますか？");
-            Console.WriteLine($"{str}\r{new string(' ', Console.WindowWidth)}");
-            Console.WriteLine(new string(' ', 80));
-            Console.WriteLine();
-
-            // 方法3:
-            Console.WriteLine($"方法3: 以下の「{str[0]}」の列は消えていますか？");
-            Console.WriteLine($"{str}{new string('\b', str.Length)}");
-            Console.WriteLine(new string(' ', 80));
-            Console.WriteLine();
-
-            // 方法4:
-            var si = new StringInfo(str);
-            Console.WriteLine($"方法3: 以下の「{str[0]}」の列は消えていますか？");
-            Console.WriteLine($"{str}{new string('\b', si.LengthInTextElements)}");
-            Console.WriteLine(new string(' ', 80));
-            Console.WriteLine();
-
-
-            Console.Beep();
-            Console.WriteLine("ENTERを押すと終了します。");
-            Console.ReadLine();
+            var _previousTextLength = 0;
+            while (true)
+            {
+                foreach (var textLength in new[] { -10, -7, -4, -1, 2, 5, 8, 11, 8, 5, 2, -1, -4, -7 })
+                {
+                    var (leftPos0, topPos0) = Console.GetCursorPosition();
+                    Console.Write(new string('x', Console.WindowWidth + textLength));
+                    var (leftPos1, topPos1) = Console.GetCursorPosition();
+                    var currentProgressTextLength = (leftPos1 - leftPos0) + (topPos1 - topPos0) * Console.WindowWidth;
+                    if (_previousTextLength > currentProgressTextLength)
+                        Console.Write(new string(' ', _previousTextLength - currentProgressTextLength));
+                    Console.SetCursorPosition(leftPos0, topPos0);
+                    _previousTextLength = currentProgressTextLength;
+                    Thread.Sleep(500);
+                }
+            }
         }
     }
 }
