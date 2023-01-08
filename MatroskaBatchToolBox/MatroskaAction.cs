@@ -28,11 +28,16 @@ namespace MatroskaBatchToolBox
         {
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
+            var destinationFileEncodedByOpus = MakeDestinationFilePath(sourceFile,  AudioCodeType.Opus);
+            var destinationFileEncodedByVorbis = MakeDestinationFilePath(sourceFile, AudioCodeType.Vorbis);
+            if (destinationFileEncodedByOpus.Exists || destinationFileEncodedByVorbis.Exists)
+                return ActionResult.Skipped;
             var (actionResult, audioCodecIsNotSupported)
                 = NormalizeMovieFile(
                     sourceFile,
                     logFile,
                     AudioCodeType.Opus,
+                    destinationFileEncodedByOpus,
                     new Progress<double>(progress => progressReporter.Report((progress + 0) / 2)));
             if (audioCodecIsNotSupported)
             {
@@ -43,20 +48,25 @@ namespace MatroskaBatchToolBox
                         sourceFile,
                         logFile,
                         AudioCodeType.Vorbis,
+                        destinationFileEncodedByVorbis,
                     new Progress<double>(progress => progressReporter.Report((progress + 1) / 2)));
             }
             if (audioCodecIsNotSupported)
                 return ActionResult.Failed;
             return actionResult;
+
+            static FileInfo MakeDestinationFilePath(FileInfo sourceFile, AudioCodeType audioCodec)
+            {
+                return
+                    new FileInfo(
+                        Path.Combine(
+                            sourceFile.DirectoryName ?? ".",
+                            $"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{audioCodec} audio-normalized].mkv"));
+            }
         }
 
-        private static (ActionResult actionResult, bool audioCodecIsNotSupported) NormalizeMovieFile(FileInfo sourceFile, FileInfo logFile, AudioCodeType audioCodec, IProgress<double> progressReporter)
+        private static (ActionResult actionResult, bool audioCodecIsNotSupported) NormalizeMovieFile(FileInfo sourceFile, FileInfo logFile, AudioCodeType audioCodec, FileInfo destinationFile, IProgress<double> progressReporter)
         {
-            var destinationFile =
-                new FileInfo(
-                    Path.Combine(
-                        sourceFile.DirectoryName ?? ".",
-                        $"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{audioCodec} audio-normalized].mkv"));
             var workingFile =
                 new FileInfo(
                     Path.Combine(destinationFile.DirectoryName ?? ".",
