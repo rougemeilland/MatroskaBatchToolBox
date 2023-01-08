@@ -164,12 +164,14 @@ namespace MatroskaBatchToolBox
                         try
                         {
                             var actionResult =
-                                actionMode switch
+                                sourceFile.Exists
+                                ? actionMode switch
                                 {
                                     ActionMode.NormalizeAudio => MatroskaAction.NormalizeMovieFile(sourceFile, progress),
                                     ActionMode.ResizeVideo => MatroskaAction.ResizeMovieFile(sourceFile, progress),
                                     _ => ActionResult.Skipped,
-                                };
+                                }
+                                : ActionResult.Skipped;
                             progressState.CompleteSourceFile(sourceFileId, actionResult);
                             progressState.WriteProgressText(PrintProgress);
                         }
