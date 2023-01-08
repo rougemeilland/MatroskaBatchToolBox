@@ -28,17 +28,35 @@ namespace MatroskaBatchToolBox
         {
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
-            string codecName =
-                Settings.CurrentSettings.AudioCodec switch
-                {
-                    "libopus" => "Opus",
-                    _ => throw new Exception($"audio codec '{Settings.CurrentSettings.AudioCodec}' is not supported."),
-                };
+            var (actionResult, audioCodecIsNotSupported)
+                = NormalizeMovieFile(
+                    sourceFile,
+                    logFile,
+                    AudioCodeType.Opus,
+                    new Progress<double>(progress => progressReporter.Report((progress + 0) / 2)));
+            if (audioCodecIsNotSupported)
+            {
+                CleanUpLogFile(logFile);
+                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to normalize the audio of the video with libopus, so normalize with libvorbis instead.: \"{sourceFile.FullName}\"", });
+                (actionResult, audioCodecIsNotSupported) =
+                    NormalizeMovieFile(
+                        sourceFile,
+                        logFile,
+                        AudioCodeType.Vorbis,
+                    new Progress<double>(progress => progressReporter.Report((progress + 1) / 2)));
+            }
+            if (audioCodecIsNotSupported)
+                return ActionResult.Failed;
+            return actionResult;
+        }
+
+        private static (ActionResult actionResult, bool audioCodecIsNotSupported) NormalizeMovieFile(FileInfo sourceFile, FileInfo logFile, AudioCodeType audioCodec, IProgress<double> progressReporter)
+        {
             var destinationFile =
                 new FileInfo(
                     Path.Combine(
                         sourceFile.DirectoryName ?? ".",
-                        $"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{codecName} audio-normalized].mkv"));
+                        $"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{audioCodec} audio-normalized].mkv"));
             var workingFile =
                 new FileInfo(
                     Path.Combine(destinationFile.DirectoryName ?? ".",
@@ -51,24 +69,32 @@ namespace MatroskaBatchToolBox
                 if (_normalizedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
                 {
                     // ファイル名に正規化されたマーク文字列があるので、何もせずに復帰する。
-                    return actionResult = ActionResult.Skipped;
+                    return (actionResult = ActionResult.Skipped, false);
                 }
                 if (destinationFile.Exists)
                 {
                     // 出力先ファイルが既に存在しているので、何もせず復帰する。
-                    return actionResult = ActionResult.Skipped;
+                    return (actionResult = ActionResult.Skipped, false);
                 }
                 if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
                 {
                     // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
-                    return actionResult = ActionResult.Failed;
+                    return (actionResult = ActionResult.Failed, false);
                 }
-                if (ExternalCommand.NormalizeAudioFile(logFile, sourceFile, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
-                    return actionResult = ActionResult.Cancelled;
+                switch (ExternalCommand.NormalizeAudioFile(logFile, sourceFile, audioCodec, workingFile, progressReporter))
+                {
+                    case ExternalCommand.ExternalCommandResult.NotSupported:
+                        return (actionResult = ActionResult.Failed, true);
+                    case ExternalCommand.ExternalCommandResult.Cancelled:
+                        return (actionResult = ActionResult.Cancelled, false);
+                    case ExternalCommand.ExternalCommandResult.Completed:
+                    default:
+                        break;
+                }
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\".", });
-                return actionResult = ActionResult.Success;
+                return (actionResult = ActionResult.Success, false);
             }
             catch (AggregateException ex)
             {
@@ -78,7 +104,7 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
                 ExternalCommand.ReportAggregateException(logFile, ex);
-                return actionResult = ActionResult.Failed;
+                return (actionResult = ActionResult.Failed, false);
             }
             catch (Exception ex)
             {
@@ -88,7 +114,7 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
                 ExternalCommand.ReportException(logFile, ex);
-                return actionResult = ActionResult.Failed;
+                return (actionResult = ActionResult.Failed, false);
             }
             finally
             {
@@ -107,7 +133,7 @@ namespace MatroskaBatchToolBox
                         CleanUpLogFile(logFile);
                         break;
                     case ActionResult.Failed:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to normalize the audio of the movie file.: \"{sourceFile.FullName}\"", });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Failed to normalize the audio of the movie file.: \"{sourceFile.FullName}\"", });
                         FinalizeLogFile(logFile, "NG");
                         break;
                     case ActionResult.Cancelled:
@@ -206,7 +232,7 @@ namespace MatroskaBatchToolBox
                         CleanUpLogFile(logFile);
                         break;
                     case ActionResult.Failed:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to convert the movie file.: \"{sourceFile.FullName}\"", });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Failed to convert the movie file.: \"{sourceFile.FullName}\"", });
                         FinalizeLogFile(logFile, "NG");
                         break;
                     case ActionResult.Cancelled:
@@ -298,7 +324,7 @@ namespace MatroskaBatchToolBox
                         CleanUpLogFile(logFile);
                         break;
                     case ActionResult.Failed:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to change the video resolution of the movie file.: \"{sourceFile.FullName}\"", });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Failed to change the video resolution of the movie file.: \"{sourceFile.FullName}\"", });
                         FinalizeLogFile(logFile, "NG");
                         break;
                     case ActionResult.Cancelled:

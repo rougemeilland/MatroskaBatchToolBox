@@ -13,12 +13,10 @@ namespace MatroskaBatchToolBox
             public SettingsContainer()
             {
                 FFmpegNormalizeCommandPath = null;
-                AudioCodec = null;
                 DegreeOfParallelism = null;
             }
 
             public string? FFmpegNormalizeCommandPath { get; set; }
-            public string? AudioCodec { get; set; }
             public int? DegreeOfParallelism { get; set; }
         }
 
@@ -79,14 +77,12 @@ namespace MatroskaBatchToolBox
                 throw new Exception(); // can't reach here
             }
 
-            var audioCodec = settings.AudioCodec ?? "libopus";
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
             CurrentSettings =
                 new Settings(
                     ffmpegNormalizeCommandFile,
                     ffmpegCommandFile,
                     ffprobeCommandFile,
-                    audioCodec,
                     degreeOfParallelism);
         }
 
@@ -104,19 +100,17 @@ namespace MatroskaBatchToolBox
             Environment.Exit(1);
         }
 
-        private Settings(FileInfo fFmpegNormalizeCommandFile, FileInfo fFmpegCommandFile, FileInfo fFprobeCommandFile, string audioCodec, int degreeOfParallelism)
+        private Settings(FileInfo fFmpegNormalizeCommandFile, FileInfo fFmpegCommandFile, FileInfo fFprobeCommandFile, int degreeOfParallelism)
         {
             FFmpegNormalizeCommandFile = fFmpegNormalizeCommandFile;
             FFmpegCommandFile = fFmpegCommandFile;
             FFprobeCommandFile = fFprobeCommandFile;
-            AudioCodec = audioCodec;
             DegreeOfParallelism = degreeOfParallelism;
         }
 
         public FileInfo FFmpegNormalizeCommandFile { get;private set; }
         public FileInfo FFmpegCommandFile { get; private set; }
         public FileInfo FFprobeCommandFile { get; private set; }
-        public string AudioCodec { get; private set; }
         public int DegreeOfParallelism { get; private set; }
         public static Settings CurrentSettings { get; private set; }
     }

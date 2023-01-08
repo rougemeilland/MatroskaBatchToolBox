@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -17,8 +16,8 @@ namespace MatroskaBatchToolBox
         {
             Completed,
             Cancelled,
+            NotSupported,
         }
-
 
         private enum OutputStreamType
         {
@@ -30,6 +29,7 @@ namespace MatroskaBatchToolBox
         private static readonly object _loggingLockObject;
         private static readonly Regex _ffmpegNormalizeProgressPattern;
         private static readonly Regex _logsToIgnoreInFFmpegNormalize;
+        private static readonly Regex _libopusNotAvailableOnFFmpegNormalizeInLogs;
         private static readonly Regex _moveStreamInfoPattern;
         private static readonly Regex _moveStreamInfoAudioDetailPattern;
         private static readonly Regex _audioChannelLayoutPattern;
@@ -42,6 +42,7 @@ namespace MatroskaBatchToolBox
             _loggingLockObject = new object();
             _ffmpegNormalizeProgressPattern = new Regex(@"^(((?<phase>Stream)\s+(?<currentStream>\d+)/(?<totalStream>\d+))|(?<phase>Second Pass)|(?<phase>File)):\s+(?<Percentage>\d+)%\|", RegexOptions.Compiled);
             _logsToIgnoreInFFmpegNormalize = new Regex(@"^(frame|fps|stream_\d+_\d+_q|bitrate|total_size|out_time_us|out_time_ms|out_time|dup_frames|drop_frames|speed|progress)=", RegexOptions.Compiled);
+            _libopusNotAvailableOnFFmpegNormalizeInLogs = new Regex(@"^\[libopus @ [0-9a-fA-F]+\] Invalid channel layout 5.1\(side\) for specified mapping family -1\.", RegexOptions.Compiled);
             _moveStreamInfoPattern = new Regex(@"^  Stream #0:(?<id>\d+)(?<language>\([^\)]+\))?: (?<streamType>Video|Audio|Subtitle): (?<detail>.*)$", RegexOptions.Compiled);
             _moveStreamInfoAudioDetailPattern = new Regex(@"^\s*(?<codec>[^ ,][^,]*[^ ,])\s*,\s*(?<samplingFrequency>[^ ,][^,]*[^ ,]) Hz\s*,\s*(?<channelLayout>[^ ,][^,]*[^ ,])\s*,", RegexOptions.Compiled);
             _audioChannelLayoutPattern = new Regex(@"(?<layoutType>[^\(]+)(\([^\)]+\))?", RegexOptions.Compiled);
@@ -55,11 +56,19 @@ namespace MatroskaBatchToolBox
             _requestedCancellation = true;
         }
 
-        public static ExternalCommandResult NormalizeAudioFile(FileInfo logFile, FileInfo inFile, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult NormalizeAudioFile(FileInfo logFile, FileInfo inFile, AudioCodeType codec, FileInfo outFile, IProgress<double> progressReporter)
         {
-            System.Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, Settings.CurrentSettings.FFmpegCommandFile.FullName);
-            var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr -v -d --keep-loudness-range-target --audio-codec {Settings.CurrentSettings.AudioCodec}";
+            Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, Settings.CurrentSettings.FFmpegCommandFile.FullName);
+            var codecSpec =
+                codec switch
+                {
+                    AudioCodeType.Opus => "libopus",
+                    AudioCodeType.Vorbis => "libvorbis",
+                    _ => throw new Exception($"Specified unsupported codec '{codec}'"),
+                };
+            var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr -v -d --keep-loudness-range-target --audio-codec {codecSpec}";
             var totalStream = 1;
+            var isNotAvailableCodec = false;
             var (cancelled, exitCode) =
                 ExecuteCommand(
                     Settings.CurrentSettings.FFmpegNormalizeCommandFile,
@@ -78,6 +87,12 @@ namespace MatroskaBatchToolBox
                             return;
                         if (string.IsNullOrEmpty(text))
                             return;
+                        if (codec == AudioCodeType.Opus && _libopusNotAvailableOnFFmpegNormalizeInLogs.IsMatch(text))
+                        {
+                            // libopus が一部のチャネルレイアウトをサポートしていないために発生する
+                            isNotAvailableCodec = true;
+                            return;
+                        }
                         var match = _ffmpegNormalizeProgressPattern.Match(text);
                         if (!match.Success)
                         {
@@ -159,6 +174,11 @@ namespace MatroskaBatchToolBox
                 return ExternalCommandResult.Cancelled;
             }
             Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg-normalize exited with exit code {exitCode}." });
+            if (isNotAvailableCodec)
+            {
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: The specified movie's audio was not supported by libopus." });
+                return ExternalCommandResult.NotSupported;
+            }
             if (exitCode != 0)
                 throw new Exception($"Failed in ffmpeg-normalize. (exit code: {exitCode})");
             return ExternalCommandResult.Completed;
