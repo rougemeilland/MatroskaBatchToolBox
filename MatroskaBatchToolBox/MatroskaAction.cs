@@ -19,7 +19,7 @@ namespace MatroskaBatchToolBox
         {
             _duplicatedFileNamePattern = new Regex(@" \(\d+\)$", RegexOptions.Compiled);
             _normalizedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]* )?)audio-normalized(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
-            _simpleCopyDirectoryNamePattern = new Regex(@"^(\d+x\d+)==$", RegexOptions.Compiled);
+            _simpleCopyDirectoryNamePattern = new Regex(@"^(?<resolutionSpec>\d+x\d+)==$", RegexOptions.Compiled);
             _resolutionSpecInParentDirectoryNamePattern = new Regex(@"^(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)(\s+(((?<acpectRateWidth>\d+)(to|：|:)(?<aspectRateHeight>\d+))|(?<aspectRate>\d+\.\d+)))?$", RegexOptions.Compiled);
             _resolutionSpecInFileNamePattern = new Regex(@"(?<prefix>\[([^\]]* )?)(?<resolutionSpec>\d+x\d+)(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
         }
@@ -159,7 +159,7 @@ namespace MatroskaBatchToolBox
         {
             var parentDirectoryName = sourceFile.Directory?.Name ?? "";
             if (_simpleCopyDirectoryNamePattern.IsMatch(parentDirectoryName))
-                return ContertMovieFileToMatroska(sourceFile, progressReporter);
+                return ContertMovieFileToMatroska(sourceFile, parentDirectoryName, progressReporter);
             else if (_resolutionSpecInParentDirectoryNamePattern.IsMatch(parentDirectoryName))
                 return ChangeResolutionOfMovieFile(sourceFile, parentDirectoryName, progressReporter);
             else
@@ -169,11 +169,17 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static ActionResult ContertMovieFileToMatroska(FileInfo sourceFile, IProgress<double> progressReporter)
+        private static ActionResult ContertMovieFileToMatroska(FileInfo sourceFile, string parentDirectoryName, IProgress<double> progressReporter)
         {
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
-            var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", Path.GetFileNameWithoutExtension(sourceFile.Name) + ".mkv"));
+            var resolutionSpecMatch = _simpleCopyDirectoryNamePattern.Match(parentDirectoryName);
+            if (!resolutionSpecMatch.Success)
+                throw new Exception("internal error");
+            var resolutionTextInParentDirectory = resolutionSpecMatch.Groups["resolutionSpec"].Value;
+            // ファイル名に解像度指定が見つからない場合は追加する
+            var additionalResolutionSpec = _resolutionSpecInParentDirectoryNamePattern.IsMatch(sourceFile.Name) ? "" : $" [{resolutionTextInParentDirectory}]";
+            var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", $"{Path.GetFileNameWithoutExtension(sourceFile.Name)}{additionalResolutionSpec}.mkv"));
             var workingFile =
                 new FileInfo(
                     Path.Combine(destinationFile.DirectoryName ?? ".",
@@ -183,6 +189,16 @@ namespace MatroskaBatchToolBox
             FileInfo? actualDestinationFilePath = null;
             try
             {
+                if (_resolutionSpecInParentDirectoryNamePattern.Matches(sourceFile.Name)
+                    .Where(match => !string.Equals(match.Groups["resolutionSpec"].Value, resolutionTextInParentDirectory, StringComparison.InvariantCulture))
+                    .Any())
+                {
+                    // 入力ファイル名中に解像度表示が少なくとも1つ存在して、かつそれらの中に親ディレクトリで指定されている解像度指定と異なるものがあった場合
+
+                    // 利用者のミスの可能性があるため、エラーログを残して変換はしない。
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The resolution notation in the input filename does not match the resolution specified in the parent directory.: \"{sourceFile.FullName}\"", });
+                    return ActionResult.Failed;
+                }
                 if (string.Equals(sourceFile.Extension, ".mkv", StringComparison.InvariantCultureIgnoreCase))
                 {
                     // 入力ファイルが既に .mkv 形式であるので、何もせず復帰する。
