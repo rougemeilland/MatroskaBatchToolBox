@@ -130,7 +130,7 @@ namespace MatroskaBatchToolBox
 
                         // この時点で、 phase は完了しているフェーズの数、 totalStream + 1 は全フェーズの数、現在のフェーズの完了状況(%)は percentage
                         var progress = (phase + percentage / 100.0) / (totalStream + 1);
-#if DEBUG
+#if DEBUG && false
                         if (progress < 0)
                             throw new Exception();
                         if (progress > 1.0)
@@ -369,7 +369,7 @@ namespace MatroskaBatchToolBox
                     UseShellExecute = false,
                     WindowStyle = ProcessWindowStyle.Hidden,
                 };
-#if DEBUG
+#if DEBUG && false
             System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: A child process has been started.: \"{info.FileName}\" {info.Arguments}");
 #endif
             Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: A child process has been started.: \"{info.FileName}\" {info.Arguments}" });
@@ -385,13 +385,13 @@ namespace MatroskaBatchToolBox
                         while (!_requestedCancellation && !process.WaitForExit(1000)) ;
                         if (_requestedCancellation)
                         {
-#if DEBUG
+#if DEBUG && false
                             System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: Detected cancellation for \"{info.FileName}\"({process.Id}).");
 #endif
                             try
                             {
                                 childProcessCcanceller(process);
-#if DEBUG
+#if DEBUG && false
                                 System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: Requested to cancel child process \"{info.FileName}\"({process.Id}).");
 #endif
                                 process.WaitForExit();
@@ -445,7 +445,7 @@ namespace MatroskaBatchToolBox
                         if (length <= 0)
                             break;
                         cache = cache + new string(buffer, 0, length);
-#if DEBUG
+#if DEBUG && false
                         System.Diagnostics.Debug.Write(new string(buffer, 0, buffer.Length));
 #endif
                         lock (lockObject)

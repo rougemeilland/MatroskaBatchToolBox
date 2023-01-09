@@ -33,7 +33,7 @@ namespace MatroskaBatchToolBox
             // 最大公約数が求まるまで繰り返す。
             while (true)
             {
-#if DEBUG
+#if DEBUG && false
                 if (u == 0 || v == 0)
                 {
                     // このルートへの到達はあり得ないはず。

@@ -93,7 +93,7 @@ namespace MatroskaBatchToolBox
             _progressHistory = new LinkedList<ProgressHistoryElement>();
             _firstDateTime = DateTime.UtcNow;
             _progressHistory.AddLast(new LinkedListNode<ProgressHistoryElement>(new ProgressHistoryElement(_firstDateTime, 0.0)));
-#if DEBUG
+#if DEBUG && false
             System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)} object created. Total length of source files = {_totalLengthOfUnprocessedSourceFiles:N} bytes.");
 #endif
         }
@@ -110,7 +110,7 @@ namespace MatroskaBatchToolBox
                     sourceFieId = item.UniqueId;
                     sourceFile = item.File;
                     _totalLengthOfUnprocessedSourceFiles -= item.FileLength;
-#if DEBUG
+#if DEBUG && false
                     {
                         var totalLength1 = _unprocessedSourceFiles.Sum(item => item.FileLength);
                         var totalLength2 = _totalLengthOfUnprocessedSourceFiles;
@@ -118,7 +118,7 @@ namespace MatroskaBatchToolBox
                             throw new Exception();
                     }
 #endif
-#if DEBUG
+#if DEBUG && false
                     System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)}.{nameof(TryGetNextSourceFile)}() => sourceFieId={sourceFieId}, sourceFile=\"{item.File.FullName}\"({item.FileLength:N} bytes)");
 #endif
                     return true;
@@ -149,18 +149,18 @@ namespace MatroskaBatchToolBox
                 }
                 item.Progress = progress;
 
+                var totalProgress = GetProgressValue();
                 var now = DateTime.UtcNow;
-
                 if (_progressHistory.Last is not null &&
-                    progress - _progressHistory.Last.Value.Percentage >= _minimumPercentageDifferenceForValidHistoryItem)
+                    totalProgress - _progressHistory.Last.Value.Percentage >= _minimumPercentageDifferenceForValidHistoryItem)
                 {
-                    _progressHistory.AddLast(new LinkedListNode<ProgressHistoryElement>(new ProgressHistoryElement(now, GetProgressValue())));
+                    _progressHistory.AddLast(new LinkedListNode<ProgressHistoryElement>(new ProgressHistoryElement(now, totalProgress)));
                     var historyItemLowerLimit = now - _maximumHistoryIntervalForValidHistoryItem;
                     while (_progressHistory.First is not null && _progressHistory.First.Value.DateTime < historyItemLowerLimit)
                         _progressHistory.RemoveFirst();
                 }
 
-#if DEBUG
+#if DEBUG && false
                 System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)}.{nameof(UpdateProgress)}({nameof(sourceFieId)}={sourceFieId}, {nameof(progress)}={progress:F6})");
 #endif
             }
@@ -186,7 +186,7 @@ namespace MatroskaBatchToolBox
                         // NOP
                         break;
                 }
-#if DEBUG
+#if DEBUG && false
                 {
                     var totalLength1 = _processedSourceFiles[ActionResult.Success].Sum(item => item.FileLength);
                     var totalLength2 = _processedSourceFiles[ActionResult.Failed].Sum(item => item.FileLength);
@@ -195,7 +195,7 @@ namespace MatroskaBatchToolBox
                         throw new Exception();
                 }
 #endif
-#if DEBUG
+#if DEBUG && false
                 System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)}.{nameof(CompleteSourceFile)}({nameof(sourceFieId)}={sourceFieId}, {nameof(actionResult)}={actionResult}");
 #endif
             }
@@ -208,6 +208,7 @@ namespace MatroskaBatchToolBox
             double latestPercentage;
             DateTime latestDateTime;
             double progressValue;
+            var now = DateTime.UtcNow;
             lock (this)
             {
                 if (_progressHistory.First is null)
@@ -219,10 +220,14 @@ namespace MatroskaBatchToolBox
                 latestDateTime = _progressHistory.Last.Value.DateTime;
                 latestPercentage = _progressHistory.Last.Value.Percentage;
                 progressValue = GetProgressValue();
+#if DEBUG
+                System.Diagnostics.Debug.WriteLine($"WriteProgressText: Histories={_progressHistory.Count}, maxElapsedTime={(latestDateTime - _firstDateTime).TotalSeconds:F3}s");
+#endif
             }
 
             var elapsedTime = latestDateTime - _firstDateTime;
             var percentText = (progressValue * 100).ToString("F2");
+            var elapsedTimeFromNow = now - _firstDateTime;
 
             if (elapsedTime < _minimumHistoryIntervalForFinishTimeCalculation || latestPercentage < _minimumPercentageForFinishTimeCalculation)
             {
@@ -230,26 +235,26 @@ namespace MatroskaBatchToolBox
                     string.Format(
                         Resource.ProgressFormat1Text,
                         percentText,
-                        FormatTimeSpanFriendly(elapsedTime)));
+                        FormatTimeSpanFriendly(elapsedTimeFromNow)));
             }
             else
             {
-                var remainTime = (latestDateTime - oldDateTime).Multiply((1.0 - latestPercentage) / (latestPercentage - oldPercentage));
-                var untilDateTime = latestDateTime + remainTime;
+                var remainTime = (now - oldDateTime).Multiply((1.0 - latestPercentage) / (latestPercentage - oldPercentage));
+                var untilDateTime = now + remainTime;
                 consoleWriter(
                     string.Format(
                         Resource.ProgressFormat2Text,
                         percentText,
-                        FormatTimeSpanFriendly(elapsedTime),
+                        FormatTimeSpanFriendly(elapsedTimeFromNow),
                         FormatTimeSpanFriendly(remainTime),
-                        FormatDateTimeFriendly(untilDateTime.ToLocalTime(), latestDateTime.ToLocalTime())));
+                        FormatDateTimeFriendly(untilDateTime.ToLocalTime(), now.ToLocalTime())));
             }
         }
 
         public void CheckCompletion()
         {
 
-#if DEBUG
+#if DEBUG && false
             {
                 if (_unprocessedSourceFiles.Any())
                     throw new Exception("internal error");
@@ -280,13 +285,13 @@ namespace MatroskaBatchToolBox
                 _processingSourceFiles.Values.Sum(sourceFile => sourceFile.FileLength * sourceFile.Progress) +
                 _totalLengthOfProcessedSourceFiles;
 
-#if DEBUG
+#if DEBUG && false
             if (totalOfProcessedSourceFileLength > totalOfSourceFileLength)
                 throw new Exception($"{nameof(totalOfProcessedSourceFileLength)} > {nameof(totalOfSourceFileLength)}: {nameof(totalOfProcessedSourceFileLength)} = {totalOfProcessedSourceFileLength}, {nameof(totalOfSourceFileLength)} = {totalOfSourceFileLength}");
 #endif
 
             var progress = totalOfProcessedSourceFileLength / totalOfSourceFileLength;
-#if DEBUG
+#if DEBUG && false
             System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)}.{nameof(GetProgressValue)}() => {progress:F6}");
 #endif
             return progress;
