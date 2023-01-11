@@ -8,6 +8,8 @@ namespace MatroskaBatchToolBox
 {
     internal static class MatroskaAction
     {
+        private const string _videoEncoderName = "libaom-av1";
+        private const string _videoFormatName = "AV1";
         private const string _convertModeSymbolPatternText = @"(?<convertMode>==)";
         private const string _resolutionPatternText = @"(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)";
         private const string _separaterBetweenResolutionSpecAndAspectRatePatternText = @" +|\-|_";
@@ -82,8 +84,8 @@ namespace MatroskaBatchToolBox
         {
             var workingFile =
                 new FileInfo(
-                    Path.Combine(destinationFile.DirectoryName ?? ".",
-                    $".work.audio-normalize.{destinationFile.Name}"));
+                    Path.Combine(sourceFile.DirectoryName ?? ".",
+                    $".work.audio-normalize.{sourceFile.Name}"));
             workingFile.Delete();
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
@@ -155,7 +157,13 @@ namespace MatroskaBatchToolBox
             {
                 if (workingFile.Exists)
                 {
-                    workingFile.Delete();
+                    try
+                    {
+                        workingFile.Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
                 switch (actionResult)
@@ -209,11 +217,11 @@ namespace MatroskaBatchToolBox
                         sourceFile.DirectoryName ?? ".",
                         resolutionSpec is null
                             ? $"{Path.GetFileNameWithoutExtension(sourceFile.Name)}.mkv"
-                            : ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem)));
+                            : ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem, null)));
             var workingFile =
                 new FileInfo(
-                    Path.Combine(destinationFile.DirectoryName ?? ".",
-                    $".work.resize-resolution.{destinationFile.Name}"));
+                    Path.Combine(sourceFile.DirectoryName ?? ".",
+                    $".work.resize-resolution.{sourceFile.Name}"));
             workingFile.Delete();
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
@@ -277,7 +285,13 @@ namespace MatroskaBatchToolBox
             {
                 if (workingFile.Exists)
                 {
-                    workingFile.Delete();
+                    try
+                    {
+                        workingFile.Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
                 switch (actionResult)
@@ -312,12 +326,12 @@ namespace MatroskaBatchToolBox
                 // 親ディレクトの名前が解像度(およびアスペクト比の指定)ではないので、何もせず復帰する。
                 return ActionResult.Skipped;
             }
-            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem);
+            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem, $"{_videoFormatName} crf{Settings.CurrentSettings.AV1QualityFactor}");
             var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", destinationFileName));
             var workingFile =
                 new FileInfo(
-                    Path.Combine(destinationFile.DirectoryName ?? ".",
-                    $".work.resize-resolution.{destinationFile.Name}"));
+                    Path.Combine(sourceFile.DirectoryName ?? ".",
+                    $".work.resize-resolution.{sourceFile.Name}"));
             workingFile.Delete();
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
@@ -339,7 +353,7 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
-                if (ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                if (ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, _videoEncoderName, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                     return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
@@ -381,7 +395,13 @@ namespace MatroskaBatchToolBox
             {
                 if (workingFile.Exists)
                 {
-                    workingFile.Delete();
+                    try
+                    {
+                        workingFile.Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
                 switch (actionResult)
@@ -497,14 +517,17 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static string ReplaceResolutionSpecInFileName(string sourceFileName, string resolutionSpec, string? aspectRateSpecOnFileSystem)
+        private static string ReplaceResolutionSpecInFileName(string sourceFileName, string resolutionSpec, string? aspectRateSpecOnFileSystem, string? encoderDescription)
         {
             var resolutionAndAspectRateSpec = aspectRateSpecOnFileSystem is null ? resolutionSpec : $"{resolutionSpec} {aspectRateSpecOnFileSystem}";
             if (string.IsNullOrEmpty(resolutionAndAspectRateSpec))
             {
                 // 解像度とアスペクト比が共に指定されていない場合
 
-                return Path.GetFileNameWithoutExtension(sourceFileName) + ".mkv";
+                return
+                    encoderDescription is null
+                    ? $"{Path.GetFileNameWithoutExtension(sourceFileName)}.mkv"
+                    : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription}].mkv";
             }
             var matches = _resolutionAndAspectRateSpecInFileNamePattern.Matches(sourceFileName);
             if (matches.Count == 1)
@@ -512,7 +535,7 @@ namespace MatroskaBatchToolBox
                 // 入力元ファイル名に解像度・アスペクト比指定がただ一つだけある場合
 
                 // 入力ファイル名のの解像度・アスペクト比指定を変換先の解像度・アスペクト比指定に置き換える
-                return
+                var replacedFileName =
                     _resolutionAndAspectRateSpecInFileNamePattern.Replace(
                         Path.GetFileNameWithoutExtension(sourceFileName),
                         match =>
@@ -520,8 +543,11 @@ namespace MatroskaBatchToolBox
                             var prefix = match.Groups["prefix"].Value;
                             var suffix = match.Groups["suffix"].Value;
                             return prefix + resolutionAndAspectRateSpec + suffix;
-                        })
-                    + ".mkv";
+                        });
+                return
+                    encoderDescription is null
+                    ? $"{replacedFileName}.mkv"
+                    : $"{replacedFileName} [{encoderDescription}].mkv";
 
             }
             else if (matches.Count > 1)
@@ -532,7 +558,10 @@ namespace MatroskaBatchToolBox
                     // 入力ファイル名の解像度指定の中に、変換先の解像度指定に一致するものが一つでもある場合
 
                     // 入力ファイル名に解像度指定を新たに付加せずに返す。
-                    return $"{Path.GetFileNameWithoutExtension(sourceFileName)}.mkv";
+                    return
+                        encoderDescription is null
+                        ? $"{Path.GetFileNameWithoutExtension(sourceFileName)}.mkv"
+                        : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription}].mkv";
 
                 }
                 else
@@ -540,7 +569,10 @@ namespace MatroskaBatchToolBox
                     // 入力ファイル名の解像度指定の中に、変換先の解像度指定に一致するものが一つもない場合
 
                     // ファイル名の解像度指定の置換を行うと利用者が意図しない問題が発生する可能性があるため、新たな解像度指定をファイル名の末尾に付加するに留める。
-                    return $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRateSpec}].mkv";
+                    return
+                        encoderDescription is null
+                        ? $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRateSpec}].mkv"
+                        : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription} {resolutionAndAspectRateSpec}].mkv";
                 }
             }
             else
@@ -548,7 +580,10 @@ namespace MatroskaBatchToolBox
                 // 入力元ファイルの名前に解像度指定が一つもない場合
 
                 // 解像度指定をファイル名の末尾に付加する。
-                return $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRateSpec}].mkv";
+                return
+                    encoderDescription is null
+                    ? $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRateSpec}].mkv"
+                    : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription} {resolutionAndAspectRateSpec}].mkv";
             }
         }
 
@@ -572,6 +607,10 @@ namespace MatroskaBatchToolBox
                         return new FileInfo(actualDestinationFilePath);
                     }
                 }
+                catch (FileNotFoundException ex)
+                {
+                    throw new Exception("The source file was lost for some reason.", ex);
+                }
                 catch (IOException)
                 {
                 }
@@ -581,9 +620,15 @@ namespace MatroskaBatchToolBox
 
         private static void CleanUpLogFile(FileInfo logFile)
         {
-            logFile.Delete();
-            File.Delete(ConstructLogFilePath(logFile, "OK"));
-            File.Delete(ConstructLogFilePath(logFile, "NG"));
+            try
+            {
+                logFile.Delete();
+                File.Delete(ConstructLogFilePath(logFile, "OK"));
+                File.Delete(ConstructLogFilePath(logFile, "NG"));
+            }
+            catch (Exception)
+            {
+            }
         }
 
         private static void FinalizeLogFile(FileInfo logFile, string result)

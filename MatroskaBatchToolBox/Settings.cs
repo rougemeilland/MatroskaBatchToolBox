@@ -13,10 +13,14 @@ namespace MatroskaBatchToolBox
             public SettingsContainer()
             {
                 FFmpegNormalizeCommandPath = null;
+                AV1QualityFactor = null;
+                AV1EncoderOptionOnResize = null;
                 DegreeOfParallelism = null;
             }
 
             public string? FFmpegNormalizeCommandPath { get; set; }
+            public int? AV1QualityFactor { get; set; }
+            public string? AV1EncoderOptionOnResize { get; set; }
             public int? DegreeOfParallelism { get; set; }
         }
 
@@ -32,23 +36,14 @@ namespace MatroskaBatchToolBox
                 throw new Exception("Failed to parse 'settings.json'.");
 
             FileInfo? ffmpegCommandFile = null;
-            FileInfo? ffprobeCommandFile = null;
             foreach (var executableFile in new DirectoryInfo(Path.GetDirectoryName(typeof(Settings).Assembly.Location) ?? ".").EnumerateFiles())
             {
                 if (Regex.IsMatch(executableFile.Name, @"^ffmpeg(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
                     ffmpegCommandFile = executableFile;
-                if (Regex.IsMatch(executableFile.Name, @"^ffprobe(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-                    ffprobeCommandFile = executableFile;
             }
             if (ffmpegCommandFile is null)
             {
                 var message = $"'ffmpeg' is not installed.";
-                PrintFatalMessage(message);
-                throw new Exception(); // can't reach here
-            }
-            if (ffprobeCommandFile is null)
-            {
-                var message = $"'ffprobe' is not installed..";
                 PrintFatalMessage(message);
                 throw new Exception(); // can't reach here
             }
@@ -77,13 +72,16 @@ namespace MatroskaBatchToolBox
                 throw new Exception(); // can't reach here
             }
 
+            var av1QualityFactor = settings.AV1QualityFactor ?? 23;
+            var av1EncoderOptionOnResize = settings.AV1EncoderOptionOnResize;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
             CurrentSettings =
                 new Settings(
                     ffmpegNormalizeCommandFile,
                     ffmpegCommandFile,
-                    ffprobeCommandFile,
-                    degreeOfParallelism);
+                    av1QualityFactor,
+                    av1EncoderOptionOnResize,
+                    degreeOfParallelism: degreeOfParallelism);
         }
 
         private static void PrintFatalMessage(string message)
@@ -100,17 +98,19 @@ namespace MatroskaBatchToolBox
             Environment.Exit(1);
         }
 
-        private Settings(FileInfo fFmpegNormalizeCommandFile, FileInfo fFmpegCommandFile, FileInfo fFprobeCommandFile, int degreeOfParallelism)
+        private Settings(FileInfo ffmpegNormalizeCommandFile, FileInfo ffmpegCommandFile, int av1QualityFactor, string? av1EncoderOptionOnResize, int degreeOfParallelism)
         {
-            FFmpegNormalizeCommandFile = fFmpegNormalizeCommandFile;
-            FFmpegCommandFile = fFmpegCommandFile;
-            FFprobeCommandFile = fFprobeCommandFile;
+            FFmpegNormalizeCommandFile = ffmpegNormalizeCommandFile;
+            FFmpegCommandFile = ffmpegCommandFile;
+            AV1QualityFactor = av1QualityFactor;
+            AV1EncoderOptionOnResize = av1EncoderOptionOnResize;
             DegreeOfParallelism = degreeOfParallelism;
         }
 
         public FileInfo FFmpegNormalizeCommandFile { get;private set; }
         public FileInfo FFmpegCommandFile { get; private set; }
-        public FileInfo FFprobeCommandFile { get; private set; }
+        public int AV1QualityFactor { get; private set; }
+        public string? AV1EncoderOptionOnResize { get; private set; }
         public int DegreeOfParallelism { get; private set; }
         public static Settings CurrentSettings { get; private set; }
     }

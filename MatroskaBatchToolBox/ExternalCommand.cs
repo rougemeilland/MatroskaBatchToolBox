@@ -217,16 +217,31 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        public static ExternalCommandResult ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, string encoder, FileInfo outFile, IProgress<double> progressReporter)
         {
-            var commandParameter = $"-y -i \"{inFile.FullName}\" -s {resolutionSpec} -aspect {aspectRateSpec} -c:a copy -c:s copy \"{outFile}\"";
+            var commandParameter = new StringBuilder();
+            commandParameter.Append("-y");
+            commandParameter.Append($" -i \"{inFile.FullName}\"");
+            commandParameter.Append($" -s {resolutionSpec}");
+            commandParameter.Append($" -aspect {aspectRateSpec}");
+            commandParameter.Append($" -c:v {encoder}");
+            commandParameter.Append(" -c:a copy");
+            commandParameter.Append(" -c:s copy");
+            commandParameter.Append(" -pix_fmt yuv420p");
+            commandParameter.Append($" -crf {Settings.CurrentSettings.AV1QualityFactor}");
+            commandParameter.Append(" -b:v 0");
+            commandParameter.Append(" -row-mt 1");
+            commandParameter.Append(" -g 240");
+            if (!string.IsNullOrEmpty(Settings.CurrentSettings.AV1EncoderOptionOnResize))
+                commandParameter.Append($" {Settings.CurrentSettings.AV1EncoderOptionOnResize.Trim()}");
+            commandParameter.Append($" \"{outFile}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
             var (cancelled, exitCode) =
                 ExecuteCommand(
                     Settings.CurrentSettings.FFmpegCommandFile,
                     logFile,
-                    commandParameter,
+                    commandParameter.ToString(),
                     Encoding.UTF8,
                     (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, progressReporter),
                     proc =>

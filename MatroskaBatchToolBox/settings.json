@@ -1,4 +1,6 @@
 {
   "FFmpegNormalizeCommandPath": "C:\\Users\\lunor\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\ffmpeg-normalize.exe",
+  "AV1QualityFactor": 23,
+  "AV1EncoderOptionOnResize": " -cpu-used 5 -threads 2 -tile-columns 2 -tile-rows 1",
   "DegreeOfParallelism": 3
 }
