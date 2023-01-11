@@ -184,16 +184,22 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        public static ExternalCommandResult CopyMovieFile(FileInfo logFile, FileInfo inFile, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ConvertMovieFile(FileInfo logFile, FileInfo inFile, string? aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
         {
-            var commandParameter = $"-y -i \"{inFile.FullName}\" -c:v copy -c:a copy -c:s copy \"{outFile}\"";
+            var commandParameter = new StringBuilder();
+            commandParameter.Append("-y");
+            commandParameter.Append($" -i \"{inFile.FullName}\"");
+            if (aspectRateSpec is not null)
+                commandParameter.Append($" -aspect {aspectRateSpec}");
+            commandParameter.Append(" -c:v copy -c:a copy -c:s copy");
+            commandParameter.Append($" \"{outFile.FullName}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
             var (cancelled, exitCode) =
                 ExecuteCommand(
                     Settings.CurrentSettings.FFmpegCommandFile,
                     logFile,
-                    commandParameter,
+                    commandParameter.ToString(),
                     Encoding.UTF8,
                     (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, progressReporter),
                     proc =>

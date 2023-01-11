@@ -44,7 +44,7 @@ namespace MatroskaBatchToolBox
                 {
                     // u == v の場合
 
-                    // GCD を u として復帰
+                    // u を k ビットだけ左シフトした値を GCD として復帰
                     return u << k;
                 }
                 if (u < v)

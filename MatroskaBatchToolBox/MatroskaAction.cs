@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Globalization;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -9,19 +8,33 @@ namespace MatroskaBatchToolBox
 {
     internal static class MatroskaAction
     {
+        private const string _convertModeSymbolPatternText = @"(?<convertMode>==)";
+        private const string _resolutionPatternText = @"(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)";
+        private const string _separaterBetweenResolutionSpecAndAspectRatePatternText = @" +|\-|_";
+        private const string _aspectRatePatternText = @"((?<aspectRateWidth>\d+)(?<aspectRateSeparater>to|：|:)(?<aspectRateHeight>\d+))|(?<aspectRateValue>\d+\.\d+)";
         private static readonly Regex _duplicatedFileNamePattern;
         private static readonly Regex _normalizedFileNamePattern;
-        private static readonly Regex _simpleCopyDirectoryNamePattern;
-        private static readonly Regex _resolutionSpecInParentDirectoryNamePattern;
-        private static readonly Regex _resolutionSpecInFileNamePattern;
+        private static readonly Regex _startsWithConvertModeSymbolPattern;
+        private static readonly Regex _startsWithResolutionSpecPattern;
+        private static readonly Regex _startsWithSeparaterBetweenResolutionSpecAndAspectRatePattern;
+        private static readonly Regex _startsWithAspectRateSpecPattern;
+        private static readonly Regex _resolutionAndAspectRateSpecInFileNamePattern;
 
         static MatroskaAction()
         {
             _duplicatedFileNamePattern = new Regex(@" \(\d+\)$", RegexOptions.Compiled);
-            _normalizedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]* )?)audio-normalized(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
-            _simpleCopyDirectoryNamePattern = new Regex(@"^(?<resolutionSpec>\d+x\d+)==$", RegexOptions.Compiled);
-            _resolutionSpecInParentDirectoryNamePattern = new Regex(@"^(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)(\s+(((?<acpectRateWidth>\d+)(to|：|:)(?<aspectRateHeight>\d+))|(?<aspectRate>\d+\.\d+)))?$", RegexOptions.Compiled);
-            _resolutionSpecInFileNamePattern = new Regex(@"(?<prefix>\[([^\]]* )?)(?<resolutionSpec>\d+x\d+)(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
+            _normalizedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]*? )?)audio-normalized(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
+            _startsWithConvertModeSymbolPattern = new Regex($"^({_convertModeSymbolPatternText})", RegexOptions.Compiled);
+            _startsWithResolutionSpecPattern = new Regex($"^({_resolutionPatternText})", RegexOptions.Compiled);
+            _startsWithSeparaterBetweenResolutionSpecAndAspectRatePattern = new Regex($"^({_separaterBetweenResolutionSpecAndAspectRatePatternText})", RegexOptions.Compiled);
+            _startsWithAspectRateSpecPattern = new Regex($"^({_aspectRatePatternText})", RegexOptions.Compiled);
+            var groupNamePattern = new Regex(@"\?<[^>]+>");
+            var resolutionPatternTextWithoutGroup = groupNamePattern.Replace(_resolutionPatternText, "");
+            var aspectRatePatternTextWithoutGroup = groupNamePattern.Replace(_aspectRatePatternText, "");
+            _resolutionAndAspectRateSpecInFileNamePattern =
+                new Regex(
+                    $"(?<prefix>\\[([^\\]]*? )?)(?<resolutionAndAspectRateSpec>({resolutionPatternTextWithoutGroup})( ({aspectRatePatternTextWithoutGroup}))?)(?<suffix>( [^\\]]*)?\\])",
+                    RegexOptions.Compiled);
         }
 
         public static ActionResult NormalizeMovieFile(FileInfo sourceFile, IProgress<double> progressReporter)
@@ -110,7 +123,13 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    destinationFile.Delete();
+                    try
+                    {
+                        destinationFile.Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
                 ExternalCommand.ReportAggregateException(logFile, ex);
@@ -120,7 +139,13 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    destinationFile.Delete();
+                    try
+                    {
+                        destinationFile.Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
                 ExternalCommand.ReportException(logFile, ex);
@@ -157,29 +182,34 @@ namespace MatroskaBatchToolBox
 
         public static ActionResult ResizeMovieFile(FileInfo sourceFile, IProgress<double> progressReporter)
         {
-            var parentDirectoryName = sourceFile.Directory?.Name ?? "";
-            if (_simpleCopyDirectoryNamePattern.IsMatch(parentDirectoryName))
-                return ContertMovieFileToMatroska(sourceFile, parentDirectoryName, progressReporter);
-            else if (_resolutionSpecInParentDirectoryNamePattern.IsMatch(parentDirectoryName))
-                return ChangeResolutionOfMovieFile(sourceFile, parentDirectoryName, progressReporter);
+            var conversionSpec = sourceFile.Directory?.Name ?? "";
+            var match = _startsWithConvertModeSymbolPattern.Match(conversionSpec);
+            if (match.Success)
+            {
+                // 親ディレクトリ名に単純変換の指示があった場合、単純変換を実行する。
+                return ContertMovieFileToMatroska(sourceFile, conversionSpec[match.Length..], progressReporter);
+            }
             else
             {
-                // 処理することがないので、何もせず復帰する。
-                return ActionResult.Skipped;
+                // 親ディレクトリ名に単純変換の指示がなかった場合、解像度変更を実行を試みる。
+                return ChangeResolutionOfMovieFile(sourceFile, conversionSpec, progressReporter);
             }
         }
 
-        private static ActionResult ContertMovieFileToMatroska(FileInfo sourceFile, string parentDirectoryName, IProgress<double> progressReporter)
+        private static ActionResult ContertMovieFileToMatroska(FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
-            var resolutionSpecMatch = _simpleCopyDirectoryNamePattern.Match(parentDirectoryName);
-            if (!resolutionSpecMatch.Success)
-                throw new Exception("internal error");
-            var resolutionTextInParentDirectory = resolutionSpecMatch.Groups["resolutionSpec"].Value;
-            // ファイル名に解像度指定が見つからない場合は追加する
-            var additionalResolutionSpec = _resolutionSpecInParentDirectoryNamePattern.IsMatch(sourceFile.Name) ? "" : $" [{resolutionTextInParentDirectory}]";
-            var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", $"{Path.GetFileNameWithoutExtension(sourceFile.Name)}{additionalResolutionSpec}.mkv"));
+            var (isParsedSuccessfully, resolutionSpec, aspectRateSpec, aspectRateSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
+            if (!isParsedSuccessfully)
+                return ActionResult.Skipped;
+            var destinationFile =
+                new FileInfo(
+                    Path.Combine(
+                        sourceFile.DirectoryName ?? ".",
+                        resolutionSpec is null
+                            ? $"{Path.GetFileNameWithoutExtension(sourceFile.Name)}.mkv"
+                            : ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem)));
             var workingFile =
                 new FileInfo(
                     Path.Combine(destinationFile.DirectoryName ?? ".",
@@ -189,19 +219,9 @@ namespace MatroskaBatchToolBox
             FileInfo? actualDestinationFilePath = null;
             try
             {
-                if (_resolutionSpecInParentDirectoryNamePattern.Matches(sourceFile.Name)
-                    .Where(match => !string.Equals(match.Groups["resolutionSpec"].Value, resolutionTextInParentDirectory, StringComparison.InvariantCulture))
-                    .Any())
+                if (string.Equals(sourceFile.Name, destinationFile.Name, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    // 入力ファイル名中に解像度表示が少なくとも1つ存在して、かつそれらの中に親ディレクトリで指定されている解像度指定と異なるものがあった場合
-
-                    // 利用者のミスの可能性があるため、エラーログを残して変換はしない。
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The resolution notation in the input filename does not match the resolution specified in the parent directory.: \"{sourceFile.FullName}\"", });
-                    return ActionResult.Failed;
-                }
-                if (string.Equals(sourceFile.Extension, ".mkv", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    // 入力ファイルが既に .mkv 形式であるので、何もせず復帰する。
+                    // 出力ファイル名が入力ファイル名と同じなので、既に変換済みとみなして、何もせず復帰する。
                     return actionResult = ActionResult.Skipped;
                 }
                 if (destinationFile.Exists)
@@ -215,7 +235,7 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
-                if (ExternalCommand.CopyMovieFile(logFile, sourceFile, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                if (ExternalCommand.ConvertMovieFile(logFile, sourceFile, aspectRateSpec, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                     return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
@@ -225,7 +245,13 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    destinationFile.Delete();
+                    try
+                    {
+                        destinationFile.Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
                 ExternalCommand.ReportAggregateException(logFile, ex);
@@ -235,7 +261,13 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    destinationFile.Delete();
+                    try
+                    {
+                        destinationFile.Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
                 ExternalCommand.ReportException(logFile, ex);
@@ -270,17 +302,17 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static ActionResult ChangeResolutionOfMovieFile(FileInfo sourceFile, string resolutionSpecAndAspectRateSpecText, IProgress<double> progressReporter)
+        private static ActionResult ChangeResolutionOfMovieFile(FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
-            var (resolutionSpec, aspectRateSpec) = ParseResolutionSpecAndAspectRateSpec(resolutionSpecAndAspectRateSpecText);
-            if (resolutionSpec is null || aspectRateSpec is null)
+            var (isParsedSuccessfully, resolutionSpec, aspectRateSpec, aspectRateSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
+            if (!isParsedSuccessfully || resolutionSpec is null || aspectRateSpec is null)
             {
                 // 親ディレクトの名前が解像度(およびアスペクト比の指定)ではないので、何もせず復帰する。
                 return ActionResult.Skipped;
             }
-            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile, resolutionSpec);
+            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem);
             var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", destinationFileName));
             var workingFile =
                 new FileInfo(
@@ -317,7 +349,13 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    destinationFile.Delete();
+                    try
+                    {
+                        destinationFile.Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
                 ExternalCommand.ReportAggregateException(logFile, ex);
@@ -327,7 +365,13 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    destinationFile.Delete();
+                    try
+                    {
+                        destinationFile.Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
                 ExternalCommand.ReportException(logFile, ex);
@@ -362,66 +406,120 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static (string? resolutionSpec, string? aspectRateSpec) ParseResolutionSpecAndAspectRateSpec(string resolutionSpecAndAspectRateSpecText)
+        private static (bool success, string? resolutionSpec, string? aspectRateSpec, string? aspectRateSpecOnFileSystem) ParseConversionSpecText(string conversionSpec)
         {
-            var resolutionSpecMatch = _resolutionSpecInParentDirectoryNamePattern.Match(resolutionSpecAndAspectRateSpecText);
+            var resolutionSpecMatch = _startsWithResolutionSpecPattern.Match(conversionSpec);
+            if (conversionSpec.Length <= 0)
+                return (true, null, null, null);
             if (!resolutionSpecMatch.Success)
-                return (null, null);
-            var resolutionWidthText = resolutionSpecMatch.Groups["resolutionWidth"].Value;
-            var resolutionWidth = int.Parse(resolutionWidthText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-            if (resolutionWidth <= 0)
-                return (null, null);
-            var resolutionHeightText = resolutionSpecMatch.Groups["resolutionHeight"].Value;
-            var resolutionHeight = int.Parse(resolutionHeightText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-            if (resolutionHeight <= 0)
-                return (null, null);
-            if (resolutionSpecMatch.Groups["acpectRateWidth"].Success && resolutionSpecMatch.Groups["aspectRateHeight"].Success)
             {
-                var aspectRateWidthText = resolutionSpecMatch.Groups["acpectRateWidth"].Value;
-                var aspectRateWidth = int.Parse(aspectRateWidthText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-                if (aspectRateWidth <= 0)
-                    return (null, null);
-                var aspectRateHeightText = resolutionSpecMatch.Groups["aspectRateHeight"].Value;
-                var aspectRateHeight = int.Parse(aspectRateHeightText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-                if (aspectRateHeight <= 0)
-                    return (null, null);
-                return ($"{resolutionWidth}x{resolutionHeight}", $"{aspectRateWidth}:{aspectRateHeight}");
+                // 解像度指定がない場合(構文エラー)
+                return (false, null, null, null);
+
             }
-            else if (resolutionSpecMatch.Groups["aspectRate"].Success)
+
+            // 解像度指定がある場合
+
+            var resolutionWidth = int.Parse(resolutionSpecMatch.Groups["resolutionWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+            var resolutionHeight = int.Parse(resolutionSpecMatch.Groups["resolutionHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+            conversionSpec = conversionSpec[resolutionSpecMatch.Length..];
+            if (conversionSpec.Length <= 0)
             {
-                var aspectRateText = resolutionSpecMatch.Groups["aspectRate"].Value;
-                var aspectRate = double.Parse(aspectRateText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat);
-                if (aspectRate <= 0)
-                    return (null, null);
-                return ($"{resolutionWidth}x{resolutionHeight}", $"{aspectRateText}");
-            }
-            else
-            {
+                // 解像度指定で終わっている場合
+
+                // 解像度から整数比を求めてそれをアスペクト比とする。
                 var gcd = ExtendedMath.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
                 var aspectRateWidth = resolutionWidth / gcd;
                 var aspectRateHeight = resolutionHeight / gcd;
-                return ($"{resolutionWidth}x{resolutionHeight}", $"{aspectRateWidth}:{aspectRateHeight}");
+                return (true, $"{resolutionWidth}x{resolutionHeight}", $"{aspectRateWidth}:{aspectRateHeight}", null);
+            }
+
+            // 解像度指定の後に続きがある場合
+            var separaterMatch = _startsWithSeparaterBetweenResolutionSpecAndAspectRatePattern.Match(conversionSpec);
+            if (!separaterMatch.Success)
+            {
+                // 解像度指定の後がセパレータではない場合(構文ミス)
+
+                return (false, null, null, null);
+            }
+
+            // 解像度指定の後にセパレータがある場合
+            conversionSpec = conversionSpec[separaterMatch.Length..];
+            var matchAspectRateSpecMatch = _startsWithAspectRateSpecPattern.Match(conversionSpec);
+            if (!matchAspectRateSpecMatch.Success)
+            {
+                // セパレータの後がアスペクト比ではない場合(構文ミス)
+
+                return (false, null, null, null);
+            }
+            // セパレータの後がアスペクト比である場合
+            conversionSpec = conversionSpec[matchAspectRateSpecMatch.Length..];
+            if (conversionSpec.Length > 0)
+            {
+                // アスペクト比の後に続きがある場合(構文ミス)
+
+                return (false, null, null, null);
+            }
+            // アスペクト比で終わっている場合
+            if (matchAspectRateSpecMatch.Groups["aspectRateWidth"].Success &&
+                matchAspectRateSpecMatch.Groups["aspectRateSeparater"].Success &&
+                matchAspectRateSpecMatch.Groups["aspectRateHeight"].Success)
+            {
+                // アスペクト比が整数比で表現されている場合
+
+                var aspectRateWidth = int.Parse(matchAspectRateSpecMatch.Groups["aspectRateWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                var aspectRateHeight = int.Parse(matchAspectRateSpecMatch.Groups["aspectRateHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+
+                return (true, $"{resolutionWidth}x{resolutionHeight}", $"{aspectRateWidth}:{aspectRateHeight}", $"{aspectRateWidth}{matchAspectRateSpecMatch.Groups["aspectRateSeparater"].Value}{aspectRateHeight}");
+            }
+            else if (matchAspectRateSpecMatch.Groups["aspectRateValue"].Success)
+            {
+                // アスペクト比が実数値で表現されている場合
+
+
+                var aspectRateValueText = matchAspectRateSpecMatch.Groups["aspectRateValue"].Value;
+                if (!double.TryParse(aspectRateValueText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double aspectRateValue) ||
+                    aspectRateValue <= 0)
+                {
+                    // 数値の書式が正しくないかまたは正ではない場合(構文ミス)
+                    // アスペクト比として0を指定した場合のみここに到達する
+
+                    return (false, null, null, null);
+                }
+
+                return (true, $"{resolutionWidth}x{resolutionHeight}", aspectRateValueText, aspectRateValueText);
+            }
+            else
+            {
+                // _startsWithAspectRateSpecPattern.Match(conversionSpec) == true なので、このルートには到達しないはず
+
+                throw new Exception("internal error");
             }
         }
 
-
-
-        private static string ReplaceResolutionSpecInFileName(FileInfo sourceFile, string resolutionSpec)
+        private static string ReplaceResolutionSpecInFileName(string sourceFileName, string resolutionSpec, string? aspectRateSpecOnFileSystem)
         {
-            var matches = _resolutionSpecInFileNamePattern.Matches(sourceFile.Name);
+            var resolutionAndAspectRateSpec = aspectRateSpecOnFileSystem is null ? resolutionSpec : $"{resolutionSpec} {aspectRateSpecOnFileSystem}";
+            if (string.IsNullOrEmpty(resolutionAndAspectRateSpec))
+            {
+                // 解像度とアスペクト比が共に指定されていない場合
+
+                return Path.GetFileNameWithoutExtension(sourceFileName) + ".mkv";
+            }
+            var matches = _resolutionAndAspectRateSpecInFileNamePattern.Matches(sourceFileName);
             if (matches.Count == 1)
             {
-                // 入力元ファイル名に解像度指定がただ一つだけある場合
-                
-                // 入力ファイル名のの解像度指定を変換先の解像度指定に置き換える
+                // 入力元ファイル名に解像度・アスペクト比指定がただ一つだけある場合
+
+                // 入力ファイル名のの解像度・アスペクト比指定を変換先の解像度・アスペクト比指定に置き換える
                 return
-                    _resolutionSpecInFileNamePattern.Replace(
-                        Path.GetFileNameWithoutExtension(sourceFile.Name),
+                    _resolutionAndAspectRateSpecInFileNamePattern.Replace(
+                        Path.GetFileNameWithoutExtension(sourceFileName),
                         match =>
                         {
                             var prefix = match.Groups["prefix"].Value;
                             var suffix = match.Groups["suffix"].Value;
-                            return prefix + resolutionSpec + suffix;
+                            return prefix + resolutionAndAspectRateSpec + suffix;
                         })
                     + ".mkv";
 
@@ -429,12 +527,12 @@ namespace MatroskaBatchToolBox
             else if (matches.Count > 1)
             {
                 // 入力元ファイルの名前に解像度指定が複数ある場合
-                if (matches.Any(match => string.Equals(match.Groups["resolutionSpec"].Value, resolutionSpec)))
+                if (matches.Any(match => string.Equals(match.Groups["resolutionAndAspectRateSpec"].Value, resolutionAndAspectRateSpec)))
                 {
                     // 入力ファイル名の解像度指定の中に、変換先の解像度指定に一致するものが一つでもある場合
 
                     // 入力ファイル名に解像度指定を新たに付加せずに返す。
-                    return $"{Path.GetFileNameWithoutExtension(sourceFile.Name)}.mkv";
+                    return $"{Path.GetFileNameWithoutExtension(sourceFileName)}.mkv";
 
                 }
                 else
@@ -442,7 +540,7 @@ namespace MatroskaBatchToolBox
                     // 入力ファイル名の解像度指定の中に、変換先の解像度指定に一致するものが一つもない場合
 
                     // ファイル名の解像度指定の置換を行うと利用者が意図しない問題が発生する可能性があるため、新たな解像度指定をファイル名の末尾に付加するに留める。
-                    return $"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{resolutionSpec}].mkv";
+                    return $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRateSpec}].mkv";
                 }
             }
             else
@@ -450,7 +548,7 @@ namespace MatroskaBatchToolBox
                 // 入力元ファイルの名前に解像度指定が一つもない場合
 
                 // 解像度指定をファイル名の末尾に付加する。
-                return $"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{resolutionSpec}].mkv";
+                return $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRateSpec}].mkv";
             }
         }
 
