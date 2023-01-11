@@ -397,55 +397,63 @@ namespace MatroskaBatchToolBox
             var process = Process.Start(info);
             if (process is null)
                 throw new Exception("Could not start process");
-            var cancelled = false;
-            var cancellationWatcherTask =
-                Task.Run(() =>
-                {
-                    if (childProcessCcanceller is not null)
+            try
+            {
+                process.PriorityClass = ProcessPriorityClass.BelowNormal;
+                var cancelled = false;
+                var cancellationWatcherTask =
+                    Task.Run(() =>
                     {
-                        while (!_requestedCancellation && !process.WaitForExit(1000)) ;
-                        if (_requestedCancellation)
+                        if (childProcessCcanceller is not null)
                         {
+                            while (!_requestedCancellation && !process.WaitForExit(1000)) ;
+                            if (_requestedCancellation)
+                            {
 #if DEBUG && false
                             System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: Detected cancellation for \"{info.FileName}\"({process.Id}).");
 #endif
-                            try
-                            {
-                                childProcessCcanceller(process);
+                                try
+                                {
+                                    childProcessCcanceller(process);
 #if DEBUG && false
                                 System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: Requested to cancel child process \"{info.FileName}\"({process.Id}).");
 #endif
-                                process.WaitForExit();
-                            }
-                            catch (Exception)
-                            {
-                            }
-                            finally
-                            {
-                                cancelled = true;
+                                    process.WaitForExit();
+                                }
+                                catch (Exception)
+                                {
+                                }
+                                finally
+                                {
+                                    cancelled = true;
+                                }
                             }
                         }
-                    }
-                });
+                    });
 
-            var standardOutputReaderTask =
-                Task.Run(() =>
-                {
-                    // 同じ子プロセスの標準出力と標準エラーからの OutputReader() 呼び出しが(できるだけ)混じらないように、ロックオブジェクトには子プロセスのオブジェクトを指定する。
-                    ProcessChildOutput(process, OutputReader, OutputStreamType.StandardOutput, process.StandardOutput);
-                });
+                var standardOutputReaderTask =
+                    Task.Run(() =>
+                    {
+                        // 同じ子プロセスの標準出力と標準エラーからの OutputReader() 呼び出しが(できるだけ)混じらないように、ロックオブジェクトには子プロセスのオブジェクトを指定する。
+                        ProcessChildOutput(process, OutputReader, OutputStreamType.StandardOutput, process.StandardOutput);
+                    });
 
-            var standardErrorReaderTask =
-                Task.Run(() =>
-                {
-                    // 同じ子プロセスの標準出力と標準エラーからの OutputReader() 呼び出しが(できるだけ)混じらないように、ロックオブジェクトには子プロセスのオブジェクトを指定する。
-                    ProcessChildOutput(process, OutputReader, OutputStreamType.StandardError, process.StandardError);
-                });
-            standardErrorReaderTask.Wait();
-            standardOutputReaderTask.Wait();
-            cancellationWatcherTask.Wait();
-            process.WaitForExit();
-            return (cancelled, process.ExitCode);
+                var standardErrorReaderTask =
+                    Task.Run(() =>
+                    {
+                        // 同じ子プロセスの標準出力と標準エラーからの OutputReader() 呼び出しが(できるだけ)混じらないように、ロックオブジェクトには子プロセスのオブジェクトを指定する。
+                        ProcessChildOutput(process, OutputReader, OutputStreamType.StandardError, process.StandardError);
+                    });
+                standardErrorReaderTask.Wait();
+                standardOutputReaderTask.Wait();
+                cancellationWatcherTask.Wait();
+                process.WaitForExit();
+                return (cancelled, process.ExitCode);
+            }
+            finally
+            {
+                process.Dispose();
+            }
         }
 
         private static void ProcessChildOutput(object lockObject, Action<OutputStreamType, string>? OutputReader, OutputStreamType streamType, StreamReader streamReader)
