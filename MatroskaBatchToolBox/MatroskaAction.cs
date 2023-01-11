@@ -86,7 +86,13 @@ namespace MatroskaBatchToolBox
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
                     $".work.audio-normalize.{sourceFile.Name}"));
-            workingFile.Delete();
+            try
+            {
+                workingFile.Delete();
+            }
+            catch (Exception)
+            {
+            }
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
             try
@@ -222,7 +228,13 @@ namespace MatroskaBatchToolBox
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
                     $".work.resize-resolution.{sourceFile.Name}"));
-            workingFile.Delete();
+            try
+            {
+                workingFile.Delete();
+            }
+            catch (Exception)
+            {
+            }
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
             try
@@ -332,7 +344,13 @@ namespace MatroskaBatchToolBox
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
                     $".work.resize-resolution.{sourceFile.Name}"));
-            workingFile.Delete();
+            try
+            {
+                workingFile.Delete();
+            }
+            catch (Exception)
+            {
+            }
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
             try
