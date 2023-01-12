@@ -156,7 +156,7 @@
   <data name="TimeSpanFriendlyFormat4Text" xml:space="preserve">
     <value>(1分未満)</value>
   </data>
-  <data name="VideoResizingProcessStartMessageText" xml:space="preserve">
-    <value>映像の解像度変更を開始します。 'q' キーを押すと中断します。</value>
+  <data name="VideoConversionStartMessageText" xml:space="preserve">
+    <value>動画ファイルの映像の変換またはMatroska形式(".mkv")への変換を行います。 'q' キーを押すと中断します。</value>
   </data>
 </root>

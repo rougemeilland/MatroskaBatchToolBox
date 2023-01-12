@@ -178,11 +178,11 @@ namespace MatroskaBatchToolBox.Properties {
         }
         
         /// <summary>
-        ///   Start changing the video resolution. Press the &apos;q&apos; key to abort. に類似しているローカライズされた文字列を検索します。
+        ///   Start video conversion of movie file or conversion to Matroska format (&quot;.mkv&quot;). Press the &apos;q&apos; key to abort. に類似しているローカライズされた文字列を検索します。
         /// </summary>
-        internal static string VideoResizingProcessStartMessageText {
+        internal static string VideoConversionStartMessageText {
             get {
-                return ResourceManager.GetString("VideoResizingProcessStartMessageText", resourceCulture);
+                return ResourceManager.GetString("VideoConversionStartMessageText", resourceCulture);
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using MatroskaBatchToolBox.Properties;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -16,11 +17,11 @@ namespace MatroskaBatchToolBox
         {
             None = 0,
             NormalizeAudio,
-            ResizeVideo,
+            ConvertVideo,
         }
 
         private const string _optionStringNormalizeAudio = "--normalize-audio";
-        private const string _optionStringResizeResolution = "--change-resolution";
+        private const string _optionStringResizeResolution = "--convert-video";
         private static readonly string _applicationUniqueId;
         private static readonly object _lockConsoleObject;
         private static readonly TimeSpan _maximumTimeForProgressUpdate;
@@ -56,7 +57,7 @@ namespace MatroskaBatchToolBox
                     }
                     if (string.Equals(arg, _optionStringResizeResolution, StringComparison.InvariantCulture))
                     {
-                        actionMode = ActionMode.ResizeVideo;
+                        actionMode = ActionMode.ConvertVideo;
                         break;
                     }
                 }
@@ -75,7 +76,7 @@ namespace MatroskaBatchToolBox
                     actionMode switch
                     {
                         ActionMode.NormalizeAudio => Resource.AudioNormalizationProcessStartMessageText,
-                        ActionMode.ResizeVideo => Resource.VideoResizingProcessStartMessageText,
+                        ActionMode.ConvertVideo => Resource.VideoConversionStartMessageText,
                         _ => throw new Exception("internal error"),
                     });
                 Console.WriteLine();
@@ -108,12 +109,7 @@ namespace MatroskaBatchToolBox
                     }
                 });
 
-                var sourceFileList =
-                    EnumerateSourceFile(args.Where(arg => !arg.StartsWith("--", StringComparison.InvariantCulture)))
-                    .OrderBy(file => file.FullName)
-                    .ToList();
-
-                var progressState = new ProgressState(sourceFileList);
+                var progressState = new ProgressState(CreateSourceFileList(args, actionMode));
                 progressState.WriteProgressText(PrintProgress);
 
                 var degreeOfParallelism = Settings.CurrentSettings.DegreeOfParallelism;
@@ -168,7 +164,7 @@ namespace MatroskaBatchToolBox
                                 ? actionMode switch
                                 {
                                     ActionMode.NormalizeAudio => MatroskaAction.NormalizeMovieFile(sourceFile, progress),
-                                    ActionMode.ResizeVideo => MatroskaAction.ResizeMovieFile(sourceFile, progress),
+                                    ActionMode.ConvertVideo => MatroskaAction.ResizeMovieFile(sourceFile, progress),
                                     _ => ActionResult.Skipped,
                                 }
                                 : ActionResult.Skipped;
@@ -215,6 +211,62 @@ namespace MatroskaBatchToolBox
                 Console.WriteLine("Press ENTER key to exit.");
                 Console.ReadLine();
             }
+        }
+
+        private static IEnumerable<FileInfo> CreateSourceFileList(string[] args, ActionMode actionMode)
+        {
+            var sourceFileList =
+                EnumerateSourceFile(args.Where(arg => !arg.StartsWith("--", StringComparison.InvariantCulture)))
+                .OrderBy(file => file.FullName)
+                .ToList();
+            if (actionMode != ActionMode.ConvertVideo)
+                return sourceFileList;
+
+            // "--convert-video" モードの際に、親ディレクトリに処理方法を指定するという仕様の都合上、単純変換対象のファイルが先に処理されやすい。
+            // 進捗の母数はソースファイルのサイズの合計で、単純変換は非常に高速に終了するため、その後のサイズ変換の進捗や終了予定時刻に非現実的な値が表示されやすい問題がある。
+            // そのため、"--convert-video" モードでは「サイズ変更対象になりそうなソースファイル」と「単純変換対象になりそうなファイル」がそれぞれ大量に連続して処理されにくいように
+            // 適当に処理順序を変えた sourceFileList を再作成する。
+            
+            var sourceQueueWithSimpleConversion = new Queue<FileInfo>();
+            var sourceQueueWithComplexConversion = new Queue<FileInfo>();
+            foreach (var sourceFile in sourceFileList)
+            {
+                var sourceFileDirectoryName = Path.GetFileName(Path.GetDirectoryName(sourceFile.FullName) ?? ".");
+                if (sourceFileDirectoryName.StartsWith("==", StringComparison.InvariantCulture))
+                    sourceQueueWithSimpleConversion.Enqueue(sourceFile);
+                else
+                    sourceQueueWithComplexConversion.Enqueue(sourceFile);
+            }
+            var totalCountOfSourceFilesWithSimpleConversion = sourceQueueWithSimpleConversion.Count;
+            var totalCountOfSourceFilesWithComplexConversion = sourceQueueWithComplexConversion.Count;
+            var modifiedSourceFileList = new List<FileInfo>();
+            while (sourceQueueWithSimpleConversion.Count > 0 && sourceQueueWithComplexConversion.Count > 0)
+            {
+                if (sourceQueueWithSimpleConversion.Count *  totalCountOfSourceFilesWithComplexConversion > sourceQueueWithComplexConversion.Count * totalCountOfSourceFilesWithSimpleConversion)
+                    modifiedSourceFileList.Add(sourceQueueWithSimpleConversion.Dequeue());
+                else
+                    modifiedSourceFileList.Add(sourceQueueWithComplexConversion.Dequeue());
+            }
+            while (sourceQueueWithSimpleConversion.Count > 0)
+                modifiedSourceFileList.Add(sourceQueueWithSimpleConversion.Dequeue());
+            while (sourceQueueWithComplexConversion.Count > 0)
+                modifiedSourceFileList.Add(sourceQueueWithComplexConversion.Dequeue());
+#if true
+#if DEBUG
+            System.Diagnostics.Debug.WriteLine("-----");
+            System.Diagnostics.Debug.WriteLine("modifiedSourceFileList:");
+            System.Diagnostics.Debug.Indent();
+            foreach (var sourceFile in modifiedSourceFileList)
+            {
+                System.Diagnostics.Debug.WriteLine($"\"{sourceFile.FullName}\"");
+            }
+            System.Diagnostics.Debug.Unindent();
+            System.Diagnostics.Debug.WriteLine("-----");
+            if (modifiedSourceFileList.Count != sourceFileList.Count)
+                throw new Exception();
+#endif
+#endif
+            return modifiedSourceFileList;
         }
 
         private static IEnumerable<FileInfo> EnumerateSourceFile(IEnumerable<string> args)

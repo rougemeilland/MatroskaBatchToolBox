@@ -48,25 +48,25 @@ namespace MatroskaBatchToolBox
         /// <summary>
         /// 推定終了時刻の計算において、ヒストリの最新の項目からこの時間より前の項目は参考にされません。
         /// </summary>
-        private static TimeSpan _maximumHistoryIntervalForValidHistoryItem;
+        private static readonly TimeSpan _maximumHistoryIntervalForValidHistoryItem;
 
         /// <summary>
         /// 有効な推定終了時刻の計算のためには、ヒストリの最新の項目からこの時間以上以前の項目がヒストリに存在しなければなりません。
         /// </summary>
-        private static TimeSpan _minimumHistoryIntervalForFinishTimeCalculation;
+        private static readonly TimeSpan _minimumHistoryIntervalForFinishTimeCalculation;
 
         /// <summary>
         /// 有効な推定終了時刻の計算のためには、少なくともこの値以上進捗がなければなりません。
         /// </summary>
         private const double _minimumPercentageForFinishTimeCalculation = 0.01 / 100.0;
 
-        private Queue<SourceFileInfo> _unprocessedSourceFiles;
-        private IDictionary<int, SourceFileInfo> _processingSourceFiles;
-        private IDictionary<ActionResult, ICollection<SourceFileInfo>> _processedSourceFiles;
+        private readonly Queue<SourceFileInfo> _unprocessedSourceFiles;
+        private readonly IDictionary<int, SourceFileInfo> _processingSourceFiles;
+        private readonly IDictionary<ActionResult, ICollection<SourceFileInfo>> _processedSourceFiles;
+        private readonly DateTime _firstDateTime;
+        private readonly LinkedList<ProgressHistoryElement> _progressHistory;
         private long _totalLengthOfUnprocessedSourceFiles;
         private long _totalLengthOfProcessedSourceFiles;
-        private DateTime _firstDateTime;
-        private LinkedList<ProgressHistoryElement> _progressHistory;
 
         static ProgressState()
         {
@@ -76,10 +76,7 @@ namespace MatroskaBatchToolBox
 
         public ProgressState(IEnumerable<FileInfo> sourceFiles)
         {
-            _unprocessedSourceFiles
-                = new Queue<SourceFileInfo>(
-                    sourceFiles
-                    .Select((sourceFile, index) => new SourceFileInfo(index, sourceFile, sourceFile.Length)));
+            _unprocessedSourceFiles = new Queue<SourceFileInfo>(EnumerateSourceFileInfo(sourceFiles));
             _totalLengthOfUnprocessedSourceFiles = _unprocessedSourceFiles.Sum(sourceFile => sourceFile.FileLength);
             _processingSourceFiles = new Dictionary<int, SourceFileInfo>();
             _processedSourceFiles = new Dictionary<ActionResult, ICollection<SourceFileInfo>>
@@ -251,6 +248,8 @@ namespace MatroskaBatchToolBox
             }
         }
 
+        // 将来のデバッグ用のメソッドであるため、警告を抑止する属性を付加
+        [SuppressMessage("Performance", "CA1822:メンバーを static に設定します", Justification = "<保留中>")]
         public void CheckCompletion()
         {
 
@@ -269,6 +268,38 @@ namespace MatroskaBatchToolBox
                     throw new Exception();
             }
 #endif
+        }
+
+        private static IEnumerable<SourceFileInfo> EnumerateSourceFileInfo(IEnumerable<FileInfo> sourceFiles)
+        {
+            // Lengthプロパティの参照で例外が発生した場合は、そのファイルは結果のリストからは除く
+            foreach (var item in sourceFiles.Select((sourceFile, index) => new { index, sourceFile}))
+            {
+                FileInfo? sourceFile = null;
+                int? index = null;
+                long? sourceFileLength = null;
+                try
+                {
+                    if (item.sourceFile.Exists)
+                    {
+                        var length = item.sourceFile.Length;
+                        if (length > 0)
+                        {
+                            sourceFile = item.sourceFile;
+                            index = item.index;
+                            sourceFileLength = length;
+                        }
+                    }
+                }
+                catch (FileNotFoundException)
+                {
+                }
+                catch (IOException)
+                {
+                }
+                if (sourceFile is not null && index is not null && sourceFileLength is not null)
+                    yield return new SourceFileInfo(index.Value, sourceFile, sourceFileLength.Value);
+            }
         }
 
         private double GetProgressValue()
