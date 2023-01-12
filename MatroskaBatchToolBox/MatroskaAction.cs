@@ -86,13 +86,7 @@ namespace MatroskaBatchToolBox
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
                     $".work.audio-normalize.{sourceFile.Name}"));
-            try
-            {
-                workingFile.Delete();
-            }
-            catch (Exception)
-            {
-            }
+            DeleteFileSafety(workingFile);
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
             try
@@ -131,13 +125,7 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    try
-                    {
-                        destinationFile.Delete();
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
                 ExternalCommand.ReportAggregateException(logFile, ex);
@@ -147,13 +135,7 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    try
-                    {
-                        destinationFile.Delete();
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
                 ExternalCommand.ReportException(logFile, ex);
@@ -163,13 +145,7 @@ namespace MatroskaBatchToolBox
             {
                 if (workingFile.Exists)
                 {
-                    try
-                    {
-                        workingFile.Delete();
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    DeleteFileSafety(workingFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
                 switch (actionResult)
@@ -228,13 +204,7 @@ namespace MatroskaBatchToolBox
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
                     $".work.resize-resolution.{sourceFile.Name}"));
-            try
-            {
-                workingFile.Delete();
-            }
-            catch (Exception)
-            {
-            }
+            DeleteFileSafety(workingFile);
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
             try
@@ -265,13 +235,7 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    try
-                    {
-                        destinationFile.Delete();
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
                 ExternalCommand.ReportAggregateException(logFile, ex);
@@ -281,13 +245,7 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    try
-                    {
-                        destinationFile.Delete();
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
                 ExternalCommand.ReportException(logFile, ex);
@@ -297,13 +255,7 @@ namespace MatroskaBatchToolBox
             {
                 if (workingFile.Exists)
                 {
-                    try
-                    {
-                        workingFile.Delete();
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    DeleteFileSafety(workingFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
                 switch (actionResult)
@@ -344,13 +296,7 @@ namespace MatroskaBatchToolBox
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
                     $".work.resize-resolution.{sourceFile.Name}"));
-            try
-            {
-                workingFile.Delete();
-            }
-            catch (Exception)
-            {
-            }
+            DeleteFileSafety(workingFile);
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
             try
@@ -381,13 +327,7 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    try
-                    {
-                        destinationFile.Delete();
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
                 ExternalCommand.ReportAggregateException(logFile, ex);
@@ -397,13 +337,7 @@ namespace MatroskaBatchToolBox
             {
                 if (destinationFile.Exists)
                 {
-                    try
-                    {
-                        destinationFile.Delete();
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
                 ExternalCommand.ReportException(logFile, ex);
@@ -413,13 +347,7 @@ namespace MatroskaBatchToolBox
             {
                 if (workingFile.Exists)
                 {
-                    try
-                    {
-                        workingFile.Delete();
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    DeleteFileSafety(workingFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
                 switch (actionResult)
@@ -640,11 +568,35 @@ namespace MatroskaBatchToolBox
         {
             try
             {
-                logFile.Delete();
-                File.Delete(ConstructLogFilePath(logFile, "OK"));
-                File.Delete(ConstructLogFilePath(logFile, "NG"));
+                DeleteFileSafety(logFile);
+                DeleteFileSafety(ConstructLogFilePath(logFile, "OK"));
+                DeleteFileSafety(ConstructLogFilePath(logFile, "NG"));
             }
             catch (Exception)
+            {
+            }
+        }
+
+        private static void DeleteFileSafety(string targetFilePath)
+        {
+            try
+            {
+                if (File.Exists(targetFilePath))
+                    File.Delete(targetFilePath);
+            }
+            catch (IOException)
+            {
+            }
+        }
+
+        private static void DeleteFileSafety(FileInfo targetFile)
+        {
+            try
+            {
+                if (targetFile.Exists)
+                    targetFile.Delete();
+            }
+            catch (IOException)
             {
             }
         }

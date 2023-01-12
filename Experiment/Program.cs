@@ -3,6 +3,7 @@ using System.Threading;
 using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 
 namespace Experiment
 {
@@ -11,25 +12,35 @@ namespace Experiment
     {
         public static void Main(string[] args)
         {
-            Console.WriteLine("x が伸び縮みします。");
-            Console.WriteLine();
+            var 実際に存在するファイルのパス = typeof(Program).Assembly.Location;
+            var baseDirectoryPath = Path.GetDirectoryName(実際に存在するファイルのパス) ?? ".";
+            var 実際に存在しないファイルのパス = Path.Combine(baseDirectoryPath, "hogehoge.txt");
+            var 実際に存在しないディレクトリのパス = Path.Combine(baseDirectoryPath, "--directory--");
+            var 実際に存在しないディレクトリの配下のファイルのパス = Path.Combine(実際に存在しないディレクトリのパス, "hoehoe.txt");
 
-            var _previousTextLength = 0;
-            while (true)
-            {
-                foreach (var textLength in new[] { -10, -7, -4, -1, 2, 5, 8, 11, 8, 5, 2, -1, -4, -7 })
-                {
-                    var (leftPos0, topPos0) = Console.GetCursorPosition();
-                    Console.Write(new string('x', Console.WindowWidth + textLength));
-                    var (leftPos1, topPos1) = Console.GetCursorPosition();
-                    var currentProgressTextLength = (leftPos1 - leftPos0) + (topPos1 - topPos0) * Console.WindowWidth;
-                    if (_previousTextLength > currentProgressTextLength)
-                        Console.Write(new string(' ', _previousTextLength - currentProgressTextLength));
-                    Console.SetCursorPosition(leftPos0, topPos0);
-                    _previousTextLength = currentProgressTextLength;
-                    Thread.Sleep(500);
-                }
-            }
+            if (!File.Exists(実際に存在するファイルのパス))
+                throw new Exception();
+            if (!new FileInfo(実際に存在するファイルのパス).Exists)
+                throw new Exception();
+
+            if (File.Exists(実際に存在しないファイルのパス))
+                throw new Exception();
+            if (new FileInfo(実際に存在しないファイルのパス).Exists)
+                throw new Exception();
+
+            if (Directory.Exists(実際に存在しないディレクトリのパス))
+                throw new Exception();
+            if (new DirectoryInfo(実際に存在しないディレクトリのパス).Exists)
+                throw new Exception();
+
+            if (File.Exists(実際に存在しないディレクトリの配下のファイルのパス))
+                throw new Exception();
+            if (new FileInfo(実際に存在しないディレクトリの配下のファイルのパス).Exists)
+                throw new Exception();
+
+            Console.WriteLine("OK");
+            Console.Beep();
+            Console.ReadLine();
         }
     }
 }
