@@ -282,6 +282,7 @@ namespace MatroskaBatchToolBox
 
         private static ActionResult ChangeResolutionOfMovieFile(FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
+            var calculateVMAFScore = Settings.CurrentSettings.CalculateVMAFScore;
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
             var (isParsedSuccessfully, resolutionSpec, aspectRateSpec, aspectRateSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
@@ -317,8 +318,19 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
-                if (ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, _videoEncoderName, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
-                    return actionResult = ActionResult.Cancelled;
+                if (calculateVMAFScore)
+                {
+                    if (ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, _videoEncoderName, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
+                        return actionResult = ActionResult.Cancelled;
+                    if (ExternalCommand.CalculateVMAFScoreFromMovieFile(logFile, sourceFile, workingFile, resolutionSpec, out double vmafScore, new Progress<double>(progress => progressReporter.Report((1 + progress) / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
+                        return actionResult = ActionResult.Cancelled;
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: VMAF Score: {vmafScore:F6}" });
+                }
+                else
+                {
+                    if (ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, _videoEncoderName, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                        return actionResult = ActionResult.Cancelled;
+                }
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
                 return actionResult = ActionResult.Success;

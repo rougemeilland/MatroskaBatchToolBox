@@ -35,6 +35,7 @@ namespace MatroskaBatchToolBox
         private static readonly Regex _audioChannelLayoutPattern;
         private static readonly Regex _ffmpegConversionDurationPattern;
         private static readonly Regex _ffmpegConversionProgressPattern;
+        private static readonly Regex _ffmpegVMAFScoreCalculationResultPattern;
         private static bool _requestedCancellation;
 
         static ExternalCommand()
@@ -48,6 +49,7 @@ namespace MatroskaBatchToolBox
             _audioChannelLayoutPattern = new Regex(@"(?<layoutType>[^\(]+)(\([^\)]+\))?", RegexOptions.Compiled);
             _ffmpegConversionDurationPattern = new Regex(@"\s*(Duration|DURATION)\s*:\s*(?<hours>\d+):(?<minutes>\d+):(?<seconds>[\d\.]+)", RegexOptions.Compiled);
             _ffmpegConversionProgressPattern = new Regex(@" time=(?<hours>\d+):(?<minutes>\d+):(?<seconds>[\d\.]+) ", RegexOptions.Compiled);
+            _ffmpegVMAFScoreCalculationResultPattern = new Regex(@"^\[Parsed_libvmaf_\d+\s*@\s*[a-fA-F0-9]+\]\s*VMAF\s+score:\s*(?<vmafScoreValue>\d+(\.\d+)?)$", RegexOptions.Compiled);
             _requestedCancellation = false;
         }
 
@@ -195,13 +197,14 @@ namespace MatroskaBatchToolBox
             commandParameter.Append($" \"{outFile.FullName}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
+            var vmafScore = double.NaN; // この値は使用されない
             var (cancelled, exitCode) =
                 ExecuteCommand(
                     Settings.CurrentSettings.FFmpegCommandFile,
                     logFile,
                     commandParameter.ToString(),
                     Encoding.UTF8,
-                    (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, progressReporter),
+                    (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScore, progressReporter),
                     proc =>
                     {
                         proc.StandardInput.Write("q");
@@ -232,18 +235,19 @@ namespace MatroskaBatchToolBox
             commandParameter.Append(" -b:v 0");
             commandParameter.Append(" -row-mt 1");
             commandParameter.Append(" -g 240");
-            if (!string.IsNullOrEmpty(Settings.CurrentSettings.AV1EncoderOptionOnResize))
-                commandParameter.Append($" {Settings.CurrentSettings.AV1EncoderOptionOnResize.Trim()}");
+            if (!string.IsNullOrEmpty(Settings.CurrentSettings.AV1EncoderOptionOnComplexConversion))
+                commandParameter.Append($" {Settings.CurrentSettings.AV1EncoderOptionOnComplexConversion.Trim()}");
             commandParameter.Append($" \"{outFile}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
+            var vmafScore = double.NaN; // この値は使用されない
             var (cancelled, exitCode) =
                 ExecuteCommand(
                     Settings.CurrentSettings.FFmpegCommandFile,
                     logFile,
                     commandParameter.ToString(),
                     Encoding.UTF8,
-                    (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, progressReporter),
+                    (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScore, progressReporter),
                     proc =>
                     {
                         proc.StandardInput.Write("q");
@@ -259,73 +263,44 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        private static void ProcessFFmpegOutput(FileInfo logFile, string lineText, ref bool detectedToQuit, ref double maximumDurationSeconds, IProgress<double> progressReporter)
+        public static ExternalCommandResult CalculateVMAFScoreFromMovieFile(FileInfo logFile, FileInfo originalFile, FileInfo modifiedFile, string resolutionSpec, out double vmafScore, IProgress<double> progressReporter)
         {
-            if (string.Equals(lineText, "[q] command received. Exiting.", StringComparison.InvariantCulture))
-            {
-                detectedToQuit = true;
-                return;
-            }
-            if (!lineText.StartsWith("frame=", StringComparison.InvariantCulture))
-            {
-                Log(logFile, new[] { lineText });
-
-                var match = _ffmpegConversionDurationPattern.Match(lineText);
-                if (!match.Success)
-                {
-                    // Ignore unknown format
-                    return;
-                }
-
-                if (!int.TryParse(match.Groups["hours"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int hours) ||
-                    !int.TryParse(match.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int minutes) ||
-                    !double.TryParse(match.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double seconds))
-                {
-                    // Ignore unknown format
-                    return;
-                }
-
-                // If the duration is parsed successfully and is greater than the maximumDurationSeconds, replace the maximumDurationSeconds.
-                var duration = hours * 3600 + minutes * 60 + seconds;
-                if (double.IsNaN(maximumDurationSeconds) || duration > maximumDurationSeconds)
-                    maximumDurationSeconds = duration;
-
-                return;
-            }
+            var commandParameter = new StringBuilder();
+            commandParameter.Append($" -i \"{originalFile.FullName}\"");
+            commandParameter.Append($" -i \"{modifiedFile.FullName}\"");
+            commandParameter.Append($" -filter_complex \"scale={resolutionSpec},[1]libvmaf\"");
+            commandParameter.Append(" -an -sn");
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                commandParameter.Append(" -f NULL -");
             else
+                commandParameter.Append(" -f null /dev/null");
+            var detectedToQuit = false;
+            var maximumDurationSeconds = double.NaN;
+            var vmafScoreValue = double.NaN;
+            var (cancelled, exitCode) =
+                ExecuteCommand(
+                    Settings.CurrentSettings.FFmpegCommandFile,
+                    logFile,
+                    commandParameter.ToString(),
+                    Encoding.UTF8,
+                    (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScoreValue, progressReporter),
+                    proc =>
+                    {
+                        proc.StandardInput.Write("q");
+                    });
+            if (detectedToQuit || cancelled)
             {
-                if (double.IsNaN(maximumDurationSeconds))
-                {
-                    // If the duration is not set, the progress cannot be calculated, so nothing is done.
-                    return;
-                }
-
-                var match = _ffmpegConversionProgressPattern.Match(lineText);
-                if (!match.Success)
-                {
-                    // Ignore unknown format
-                    return;
-                }
-
-                if (!int.TryParse(match.Groups["hours"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int hours) ||
-                    !int.TryParse(match.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int minutes) ||
-                    !double.TryParse(match.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double seconds))
-                {
-                    // Ignore unknown format
-                    return;
-                }
-
-                var timeSeconds = hours * 3600 + minutes * 60 + seconds;
-
-                var progress = timeSeconds / maximumDurationSeconds;
-                if (progress < 0)
-                    progress = 0;
-                if (progress > 1)
-                    progress = 1;
-
-                progressReporter.Report(progress);
-                return;
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
+                vmafScore = double.NaN;
+                return ExternalCommandResult.Cancelled;
             }
+            Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
+            if (exitCode != 0)
+                throw new Exception($"ffmpeg failed. (exit code {exitCode})");
+            if (double.IsNaN(vmafScoreValue))
+                throw new Exception("VMAF score was not reported by ffmpeg.");
+            vmafScore = vmafScoreValue;
+            return ExternalCommandResult.Completed;
         }
 
         public static void Log(FileInfo logFile, IEnumerable<string> testLines)
@@ -371,6 +346,96 @@ namespace MatroskaBatchToolBox
             for (var innerEx = ex.InnerException; innerEx is not null; innerEx = innerEx.InnerException)
                 Log(logFile, new[] { "----------", innerEx.Message, innerEx.StackTrace ?? "" });
             Log(logFile, new[] { "----------" });
+        }
+
+        private static void ProcessFFmpegOutput(FileInfo logFile, string lineText, ref bool detectedToQuit, ref double maximumDurationSeconds, ref double vmafCalculationResult, IProgress<double> progressReporter)
+        {
+            if (string.Equals(lineText, "[q] command received. Exiting.", StringComparison.InvariantCulture))
+            {
+                detectedToQuit = true;
+                return;
+            }
+            if (!lineText.StartsWith("frame=", StringComparison.InvariantCulture))
+            {
+                Log(logFile, new[] { lineText });
+
+                var durationMatch = _ffmpegConversionDurationPattern.Match(lineText);
+                if (durationMatch.Success)
+                {
+
+                    if (!int.TryParse(durationMatch.Groups["hours"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int hours) ||
+                        !int.TryParse(durationMatch.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int minutes) ||
+                        !double.TryParse(durationMatch.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double seconds))
+                    {
+                        // Ignore unknown format
+                        return;
+                    }
+
+                    // If the duration is parsed successfully and is greater than the maximumDurationSeconds, replace the maximumDurationSeconds.
+                    var duration = hours * 3600 + minutes * 60 + seconds;
+                    if (double.IsNaN(maximumDurationSeconds) || duration > maximumDurationSeconds)
+                        maximumDurationSeconds = duration;
+
+                    return;
+                }
+                else
+                {
+                    var vmafSoreMatch = _ffmpegVMAFScoreCalculationResultPattern.Match(lineText);
+                    if (vmafSoreMatch.Success)
+                    {
+                        var vmafScoreValueText = vmafSoreMatch.Groups["vmafScoreValue"].Value;
+                        if (double.TryParse(vmafScoreValueText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double vmafScoreValue) &&
+                            vmafScoreValue >= 0.0 && vmafScoreValue <= 100.0)
+                        {
+                            vmafCalculationResult = vmafScoreValue;
+                        }
+                        else
+                        {
+                            // このルートには到達しないはず
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // Ignore unknown format
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                if (double.IsNaN(maximumDurationSeconds))
+                {
+                    // If the duration is not set, the progress cannot be calculated, so nothing is done.
+                    return;
+                }
+
+                var match = _ffmpegConversionProgressPattern.Match(lineText);
+                if (!match.Success)
+                {
+                    // Ignore unknown format
+                    return;
+                }
+
+                if (!int.TryParse(match.Groups["hours"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int hours) ||
+                    !int.TryParse(match.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int minutes) ||
+                    !double.TryParse(match.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double seconds))
+                {
+                    // Ignore unknown format
+                    return;
+                }
+
+                var timeSeconds = hours * 3600 + minutes * 60 + seconds;
+
+                var progress = timeSeconds / maximumDurationSeconds;
+                if (progress < 0)
+                    progress = 0;
+                if (progress > 1)
+                    progress = 1;
+
+                progressReporter.Report(progress);
+                return;
+            }
         }
 
         private static (bool cancelled, int exitCode) ExecuteCommand(FileInfo programFile, FileInfo logFile, string args, Encoding intputOutputEncoding, Action<OutputStreamType, string>? OutputReader, Action<Process>? childProcessCcanceller)

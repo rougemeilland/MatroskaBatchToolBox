@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -14,13 +13,15 @@ namespace MatroskaBatchToolBox
             {
                 FFmpegNormalizeCommandPath = null;
                 AV1QualityFactor = null;
-                AV1EncoderOptionOnResize = null;
+                AV1EncoderOptionOnComplexConversion = null;
+                CalculateVMAFScore = null;
                 DegreeOfParallelism = null;
             }
 
             public string? FFmpegNormalizeCommandPath { get; set; }
             public int? AV1QualityFactor { get; set; }
-            public string? AV1EncoderOptionOnResize { get; set; }
+            public string? AV1EncoderOptionOnComplexConversion { get; set; }
+            public bool? CalculateVMAFScore { get; set; }
             public int? DegreeOfParallelism { get; set; }
         }
 
@@ -73,14 +74,16 @@ namespace MatroskaBatchToolBox
             }
 
             var av1QualityFactor = settings.AV1QualityFactor ?? 23;
-            var av1EncoderOptionOnResize = settings.AV1EncoderOptionOnResize;
+            var av1EncoderOptionOnComplexConversion = settings.AV1EncoderOptionOnComplexConversion;
+            var calculateVMAFScore = settings.CalculateVMAFScore ?? false;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
             CurrentSettings =
                 new Settings(
                     ffmpegNormalizeCommandFile,
                     ffmpegCommandFile,
                     av1QualityFactor,
-                    av1EncoderOptionOnResize,
+                    av1EncoderOptionOnComplexConversion,
+                    calculateVMAFScore,
                     degreeOfParallelism: degreeOfParallelism);
         }
 
@@ -98,19 +101,21 @@ namespace MatroskaBatchToolBox
             Environment.Exit(1);
         }
 
-        private Settings(FileInfo ffmpegNormalizeCommandFile, FileInfo ffmpegCommandFile, int av1QualityFactor, string? av1EncoderOptionOnResize, int degreeOfParallelism)
+        private Settings(FileInfo ffmpegNormalizeCommandFile, FileInfo ffmpegCommandFile, int av1QualityFactor, string? av1EncoderOptionOnComplexConversion, bool calculateVMAFScore, int degreeOfParallelism)
         {
             FFmpegNormalizeCommandFile = ffmpegNormalizeCommandFile;
             FFmpegCommandFile = ffmpegCommandFile;
             AV1QualityFactor = av1QualityFactor;
-            AV1EncoderOptionOnResize = av1EncoderOptionOnResize;
+            AV1EncoderOptionOnComplexConversion = av1EncoderOptionOnComplexConversion;
+            CalculateVMAFScore = calculateVMAFScore;
             DegreeOfParallelism = degreeOfParallelism;
         }
 
-        public FileInfo FFmpegNormalizeCommandFile { get;private set; }
+        public FileInfo FFmpegNormalizeCommandFile { get; private set; }
         public FileInfo FFmpegCommandFile { get; private set; }
         public int AV1QualityFactor { get; private set; }
-        public string? AV1EncoderOptionOnResize { get; private set; }
+        public string? AV1EncoderOptionOnComplexConversion { get; private set; }
+        public bool CalculateVMAFScore { get; private set; }
         public int DegreeOfParallelism { get; private set; }
         public static Settings CurrentSettings { get; private set; }
     }
