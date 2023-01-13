@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MatroskaBatchToolBox", "Mat
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Experiment", "Experiment\Experiment.csproj", "{6BEB6077-E905-4754-9B95-FD9E8CD95F1C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EncoderBenchmarkTest", "EncoderBenchmarkTest\EncoderBenchmarkTest.csproj", "{83940C16-51B2-46E4-BA0E-ECC1AB87D9CA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{6BEB6077-E905-4754-9B95-FD9E8CD95F1C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6BEB6077-E905-4754-9B95-FD9E8CD95F1C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6BEB6077-E905-4754-9B95-FD9E8CD95F1C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{83940C16-51B2-46E4-BA0E-ECC1AB87D9CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{83940C16-51B2-46E4-BA0E-ECC1AB87D9CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{83940C16-51B2-46E4-BA0E-ECC1AB87D9CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{83940C16-51B2-46E4-BA0E-ECC1AB87D9CA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

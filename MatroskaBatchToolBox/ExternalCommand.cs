@@ -230,7 +230,6 @@ namespace MatroskaBatchToolBox
             commandParameter.Append($" -c:v {encoder}");
             commandParameter.Append(" -c:a copy");
             commandParameter.Append(" -c:s copy");
-            commandParameter.Append(" -pix_fmt yuv420p");
             commandParameter.Append($" -crf {Settings.CurrentSettings.AV1QualityFactor}");
             commandParameter.Append(" -b:v 0");
             commandParameter.Append(" -row-mt 1");

@@ -291,7 +291,7 @@ namespace MatroskaBatchToolBox
                 // 親ディレクトの名前が解像度(およびアスペクト比の指定)ではないので、何もせず復帰する。
                 return ActionResult.Skipped;
             }
-            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem, $"{_videoFormatName} CQ crf{Settings.CurrentSettings.AV1QualityFactor}");
+            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem, $"{_videoFormatName} CRF");
             var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", destinationFileName));
             var workingFile =
                 new FileInfo(
