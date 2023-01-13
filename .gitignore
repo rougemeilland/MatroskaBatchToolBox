@@ -352,3 +352,4 @@ MigrationBackup/
 /MatroskaBatchToolBox/ffprobe.exe
 /MatroskaBatchToolBox/ffplay.exe
 /MatroskaBatchToolBox/ffmpeg.exe
+/EncoderBenchmarkTest/Properties/launchSettings.json
