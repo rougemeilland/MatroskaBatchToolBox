@@ -1,7 +1,8 @@
 {
   "FFmpegNormalizeCommandPath": "C:\\Users\\lunor\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\ffmpeg-normalize.exe",
-  "AV1QualityFactor": 23,
-  "AV1EncoderOptionOnComplexConversion": "-cpu-used 5 -threads 2",
+  "VideoEncoderOnComplexConversion": "libx265",
+  "Libx265EncoderOptionOnComplexConversion": "-crf 19 -tag:v hvc1",
+  "LibaomAV1EncoderOptionOnComplexConversion": "-crf 23 -b:v 0 -cpu-used 5 -threads 2",
   "CalculateVMAFScore": true,
-  "DegreeOfParallelism": 3
+  "DegreeOfParallelism": 1
 }

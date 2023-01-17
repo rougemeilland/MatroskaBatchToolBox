@@ -121,7 +121,7 @@
     <value>{0} は既に実行中です。</value>
   </data>
   <data name="AudioNormalizationProcessStartMessageText" xml:space="preserve">
-    <value>動画ファイルの音声の正規化を開始します。'F9' キーを押すと中断します。</value>
+    <value>動画ファイルの音声の正規化を開始します。 [q] キーを押すと中断します。</value>
   </data>
   <data name="CompletionDateTimeFriendlyFormat1Text" xml:space="preserve">
     <value>{0}年{1:D2}月{2:D2}日{3:D2}時{4:D2}分</value>
@@ -142,7 +142,7 @@
     <value>進捗: {0}%. 経過時間: {1}, 残り時間(推定): {2}, 終了予定時刻(推定): {3}</value>
   </data>
   <data name="Q_KeyPressedMessasgeText" xml:space="preserve">
-    <value>'F9' キーが押されました。変換処理が中断されるまで少々お待ちください…</value>
+    <value>[q] キーが押されました。変換処理が中断されるまで少々お待ちください…</value>
   </data>
   <data name="TimeSpanFriendlyFormat1Text" xml:space="preserve">
     <value>{0}日 {1:D2}時間 {2:D2}分</value>
@@ -157,6 +157,6 @@
     <value>(1分未満)</value>
   </data>
   <data name="VideoConversionStartMessageText" xml:space="preserve">
-    <value>動画ファイルの映像の変換またはMatroska形式(".mkv")への変換を行います。'F9' キーを押すと中断します。</value>
+    <value>動画ファイルの映像の変換またはMatroska形式(".mkv")への変換を行います。 [q] キーを押すと中断します。</value>
   </data>
 </root>

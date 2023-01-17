@@ -58,17 +58,10 @@ namespace MatroskaBatchToolBox
             _requestedCancellation = true;
         }
 
-        public static ExternalCommandResult NormalizeAudioFile(FileInfo logFile, FileInfo inFile, AudioCodeType codec, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult NormalizeAudioFile(FileInfo logFile, FileInfo inFile, AudioEncoderType audioEncoder, FileInfo outFile, IProgress<double> progressReporter)
         {
             Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, Settings.CurrentSettings.FFmpegCommandFile.FullName);
-            var codecSpec =
-                codec switch
-                {
-                    AudioCodeType.Opus => "libopus",
-                    AudioCodeType.Vorbis => "libvorbis",
-                    _ => throw new Exception($"Specified unsupported codec '{codec}'"),
-                };
-            var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr -v -d --keep-loudness-range-target --audio-codec {codecSpec}";
+            var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr -v -d --keep-loudness-range-target --audio-codec {audioEncoder.ToCodecSpec()}";
             var totalStream = 1;
             var isNotAvailableCodec = false;
             var (cancelled, exitCode) =
@@ -89,7 +82,7 @@ namespace MatroskaBatchToolBox
                             return;
                         if (string.IsNullOrEmpty(text))
                             return;
-                        if (codec == AudioCodeType.Opus && _libopusNotAvailableOnFFmpegNormalizeInLogs.IsMatch(text))
+                        if (audioEncoder == AudioEncoderType.Libopus && _libopusNotAvailableOnFFmpegNormalizeInLogs.IsMatch(text))
                         {
                             // libopus が一部のチャネルレイアウトをサポートしていないために発生する
                             isNotAvailableCodec = true;
@@ -220,22 +213,20 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        public static ExternalCommandResult ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, string encoder, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
         {
             var commandParameter = new StringBuilder();
             commandParameter.Append("-y");
             commandParameter.Append($" -i \"{inFile.FullName}\"");
             commandParameter.Append($" -s {resolutionSpec}");
             commandParameter.Append($" -aspect {aspectRateSpec}");
-            commandParameter.Append($" -c:v {encoder}");
+            commandParameter.Append($" -c:v {videoEncoderType.ToCodecSpec()}");
+            var encoderOptions = videoEncoderType.ToEncodingOption();
+            if (!string.IsNullOrEmpty(encoderOptions))
+                commandParameter.Append($" {encoderOptions.Trim()}");
             commandParameter.Append(" -c:a copy");
             commandParameter.Append(" -c:s copy");
-            commandParameter.Append($" -crf {Settings.CurrentSettings.AV1QualityFactor}");
-            commandParameter.Append(" -b:v 0");
-            commandParameter.Append(" -row-mt 1");
             commandParameter.Append(" -g 240");
-            if (!string.IsNullOrEmpty(Settings.CurrentSettings.AV1EncoderOptionOnComplexConversion))
-                commandParameter.Append($" {Settings.CurrentSettings.AV1EncoderOptionOnComplexConversion.Trim()}");
             commandParameter.Append($" \"{outFile}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;

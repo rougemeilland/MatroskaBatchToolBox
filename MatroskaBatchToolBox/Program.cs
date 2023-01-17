@@ -86,7 +86,7 @@ namespace MatroskaBatchToolBox
                     while (true)
                     {
                         var keyInfo = Console.ReadKey(true);
-                        if (keyInfo.Key == ConsoleKey.F9)
+                        if (keyInfo.Key == ConsoleKey.Q)
                         {
                             ExternalCommand.AbortExternalCommands();
                             lock (_lockConsoleObject)

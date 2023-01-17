@@ -70,7 +70,7 @@ namespace MatroskaBatchToolBox.Properties {
         }
         
         /// <summary>
-        ///   Start normalizing the audio of the movie file. Press &apos;F9&apos; to abort. に類似しているローカライズされた文字列を検索します。
+        ///   Start normalizing the audio of the movie file. Press [q] to abort. に類似しているローカライズされた文字列を検索します。
         /// </summary>
         internal static string AudioNormalizationProcessStartMessageText {
             get {
@@ -133,7 +133,7 @@ namespace MatroskaBatchToolBox.Properties {
         }
         
         /// <summary>
-        ///   &apos;F9&apos; key was pressed. Please wait a moment while the conversion process is interrupted... に類似しているローカライズされた文字列を検索します。
+        ///   [q] key was pressed. Please wait a moment while the conversion process is interrupted... に類似しているローカライズされた文字列を検索します。
         /// </summary>
         internal static string Q_KeyPressedMessasgeText {
             get {
@@ -178,7 +178,7 @@ namespace MatroskaBatchToolBox.Properties {
         }
         
         /// <summary>
-        ///   Start video conversion of movie file or conversion to Matroska format (&quot;.mkv&quot;). Press the &apos;F9&apos; key to abort. に類似しているローカライズされた文字列を検索します。
+        ///   Start video conversion of movie file or conversion to Matroska format (&quot;.mkv&quot;). Press the [q] key to abort. に類似しているローカライズされた文字列を検索します。
         /// </summary>
         internal static string VideoConversionStartMessageText {
             get {
