@@ -261,7 +261,7 @@ namespace MatroskaBatchToolBox
             commandParameter.Append("-hide_banner");
             commandParameter.Append($" -i \"{originalFile.FullName}\"");
             commandParameter.Append($" -i \"{modifiedFile.FullName}\"");
-            commandParameter.Append($" -filter_complex \"scale={resolutionSpec},[1]libvmaf\"");
+            commandParameter.Append($" -filter_complex \"scale={resolutionSpec},[1]libvmaf=n_threads=4\"");
             commandParameter.Append(" -an -sn");
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
                 commandParameter.Append(" -f NULL -");
