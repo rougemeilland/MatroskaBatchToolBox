@@ -182,7 +182,8 @@ namespace MatroskaBatchToolBox
         public static ExternalCommandResult ConvertMovieFile(FileInfo logFile, FileInfo inFile, string? aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
         {
             var commandParameter = new StringBuilder();
-            commandParameter.Append("-y");
+            commandParameter.Append("-hide_banner");
+            commandParameter.Append(" -y");
             commandParameter.Append($" -i \"{inFile.FullName}\"");
             if (aspectRateSpec is not null)
                 commandParameter.Append($" -aspect {aspectRateSpec}");
@@ -216,7 +217,8 @@ namespace MatroskaBatchToolBox
         public static ExternalCommandResult ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
         {
             var commandParameter = new StringBuilder();
-            commandParameter.Append("-y");
+            commandParameter.Append("-hide_banner");
+            commandParameter.Append(" -y");
             commandParameter.Append($" -i \"{inFile.FullName}\"");
             commandParameter.Append($" -s {resolutionSpec}");
             commandParameter.Append($" -aspect {aspectRateSpec}");
@@ -256,6 +258,7 @@ namespace MatroskaBatchToolBox
         public static ExternalCommandResult CalculateVMAFScoreFromMovieFile(FileInfo logFile, FileInfo originalFile, FileInfo modifiedFile, string resolutionSpec, out double vmafScore, IProgress<double> progressReporter)
         {
             var commandParameter = new StringBuilder();
+            commandParameter.Append("-hide_banner");
             commandParameter.Append($" -i \"{originalFile.FullName}\"");
             commandParameter.Append($" -i \"{modifiedFile.FullName}\"");
             commandParameter.Append($" -filter_complex \"scale={resolutionSpec},[1]libvmaf\"");

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CalcVMAF": {
+      "commandName": "Project",
+      "commandLineArgs": "--log --scale 640x480 \"D:\\テストデータ\\MOVIE\\640x480\\test3.mp4\" \"D:\\テストデータ\\MOVIE\\640x480\\test3 [x265 CRF 640x480].mkv\""
+    }
+  }
+}
