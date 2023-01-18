@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 
 namespace MatroskaBatchToolBox
 {
@@ -38,16 +39,16 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static string ToEncodingOption(this VideoEncoderType videoEncoderType)
+        public static string ToEncodingOption(this VideoEncoderType videoEncoderType, Settings localSettings)
         {
             switch (videoEncoderType)
             {
                 case VideoEncoderType.Libx264:
-                    return Settings.CurrentSettings.Libx264EncoderOptionOnComplexConversion;
+                    return localSettings.Libx264EncoderOptionOnComplexConversion;
                 case VideoEncoderType.Libx265:
-                    return Settings.CurrentSettings.Libx265EncoderOptionOnComplexConversion;
+                    return localSettings.Libx265EncoderOptionOnComplexConversion;
                 case VideoEncoderType.LibaomAV1:
-                    return Settings.CurrentSettings.LibaomAV1EncoderOptionOnComplexConversion;
+                    return localSettings.LibaomAV1EncoderOptionOnComplexConversion;
                 default:
                     throw new Exception($"Unsupported video codec.: \"{videoEncoderType}\"");
             }

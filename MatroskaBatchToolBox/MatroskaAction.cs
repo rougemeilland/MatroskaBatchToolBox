@@ -2,7 +2,6 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection.Metadata;
 using System.Text.RegularExpressions;
 
 namespace MatroskaBatchToolBox
@@ -27,7 +26,7 @@ namespace MatroskaBatchToolBox
         {
             _duplicatedFileNamePattern = new Regex(@" \(\d+\)$", RegexOptions.Compiled);
             _normalizedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]*? )?)audio-normalized(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
-            _encodedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]*? )?)(AV1|x265) CRF(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
+            _encodedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]*? )?)(H\.264|x264|MPEG\-4|AVC|H\.265|x265|HEVC|AV1) (CRF|crf)(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
             _startsWithConvertModeSymbolPattern = new Regex($"^({_convertModeSymbolPatternText})", RegexOptions.Compiled);
             _startsWithResolutionSpecPattern = new Regex($"^({_resolutionPatternText})", RegexOptions.Compiled);
             _startsWithSeparaterBetweenResolutionSpecAndAspectRatePattern = new Regex($"^({_separaterBetweenResolutionSpecAndAspectRatePatternText})", RegexOptions.Compiled);
@@ -175,7 +174,16 @@ namespace MatroskaBatchToolBox
 
         public static ActionResult ResizeMovieFile(FileInfo sourceFile, IProgress<double> progressReporter)
         {
-            var conversionSpec = sourceFile.Directory?.Name ?? "";
+            var sourceFileDirectory = sourceFile.Directory;
+            if (sourceFileDirectory is null)
+            {
+                // 親ディレクトが存在しない場合 (ディスクファイルの場合はありえない)
+
+                // 何もせず復帰する。
+                return ActionResult.Skipped;
+            }
+            var localSettings = Settings.GlobalSettings.GetLocalSettings(sourceFileDirectory);
+            var conversionSpec = sourceFileDirectory.Name;
             var match = _startsWithConvertModeSymbolPattern.Match(conversionSpec);
             if (match.Success)
             {
@@ -185,7 +193,7 @@ namespace MatroskaBatchToolBox
             else
             {
                 // 親ディレクトリ名に単純変換の指示がなかった場合、解像度変更を実行を試みる。
-                return ChangeResolutionOfMovieFile(sourceFile, conversionSpec, progressReporter);
+                return ChangeResolutionOfMovieFile(localSettings, sourceFile, conversionSpec, progressReporter);
             }
         }
 
@@ -283,10 +291,10 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static ActionResult ChangeResolutionOfMovieFile(FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
+        private static ActionResult ChangeResolutionOfMovieFile(Settings localSettings, FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
-            var videoEncoder = Settings.CurrentSettings.VideoEncoderOnComplexConversion;
-            var calculateVMAFScore = Settings.CurrentSettings.CalculateVMAFScore;
+            var videoEncoder = localSettings.VideoEncoderOnComplexConversion;
+            var calculateVMAFScore = localSettings.CalculateVMAFScore;
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
             var (isParsedSuccessfully, resolutionSpec, aspectRateSpec, aspectRateSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
@@ -330,7 +338,7 @@ namespace MatroskaBatchToolBox
                 }
                 if (calculateVMAFScore)
                 {
-                    if (ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                     if (ExternalCommand.CalculateVMAFScoreFromMovieFile(logFile, sourceFile, workingFile, resolutionSpec, out double vmafScore, new Progress<double>(progress => progressReporter.Report((1 + progress) / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
@@ -338,7 +346,7 @@ namespace MatroskaBatchToolBox
                 }
                 else
                 {
-                    if (ExternalCommand.ResizeMovieFile(logFile, sourceFile, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                 }
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);

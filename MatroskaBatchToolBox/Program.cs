@@ -1,7 +1,6 @@
 ﻿using MatroskaBatchToolBox.Properties;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -112,7 +111,7 @@ namespace MatroskaBatchToolBox
                 var progressState = new ProgressState(CreateSourceFileList(args, actionMode));
                 progressState.WriteProgressText(PrintProgress);
 
-                var degreeOfParallelism = Settings.CurrentSettings.DegreeOfParallelism;
+                var degreeOfParallelism = Settings.GlobalSettings.DegreeOfParallelism;
                 if (degreeOfParallelism > Environment.ProcessorCount)
                     degreeOfParallelism = Environment.ProcessorCount;
                 if (degreeOfParallelism < 1)

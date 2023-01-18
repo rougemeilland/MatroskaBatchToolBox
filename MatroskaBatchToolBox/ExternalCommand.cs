@@ -60,13 +60,13 @@ namespace MatroskaBatchToolBox
 
         public static ExternalCommandResult NormalizeAudioFile(FileInfo logFile, FileInfo inFile, AudioEncoderType audioEncoder, FileInfo outFile, IProgress<double> progressReporter)
         {
-            Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, Settings.CurrentSettings.FFmpegCommandFile.FullName);
+            Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, Settings.GlobalSettings.FFmpegCommandFile.FullName);
             var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr -v -d --keep-loudness-range-target --audio-codec {audioEncoder.ToCodecSpec()}";
             var totalStream = 1;
             var isNotAvailableCodec = false;
             var (cancelled, exitCode) =
                 ExecuteCommand(
-                    Settings.CurrentSettings.FFmpegNormalizeCommandFile,
+                    Settings.GlobalSettings.FFmpegNormalizeCommandFile,
                     logFile,
                     commandParameter,
 
@@ -145,8 +145,8 @@ namespace MatroskaBatchToolBox
                         //    環境変数 FFMPEG_PATH で与えられた ffmpeg を  優先的に実行するので、kill したとしても MatroskaBatchToolBox 以外の
                         //    実行中のプログラムに被害はないはず。
                         var targetProcesses =
-                            Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Settings.CurrentSettings.FFmpegCommandFile.Name))
-                            .Where(proc => string.Equals(proc?.MainModule?.FileName ?? "", Settings.CurrentSettings.FFmpegCommandFile.FullName, StringComparison.InvariantCulture))
+                            Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Settings.GlobalSettings.FFmpegCommandFile.Name))
+                            .Where(proc => string.Equals(proc?.MainModule?.FileName ?? "", Settings.GlobalSettings.FFmpegCommandFile.FullName, StringComparison.InvariantCulture))
                             .ToList();
 
                         // 列挙されたプロセスをすべて kill する。
@@ -194,7 +194,7 @@ namespace MatroskaBatchToolBox
             var vmafScore = double.NaN; // この値は使用されない
             var (cancelled, exitCode) =
                 ExecuteCommand(
-                    Settings.CurrentSettings.FFmpegCommandFile,
+                    Settings.GlobalSettings.FFmpegCommandFile,
                     logFile,
                     commandParameter.ToString(),
                     Encoding.UTF8,
@@ -214,7 +214,7 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        public static ExternalCommandResult ResizeMovieFile(FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ResizeMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
         {
             var commandParameter = new StringBuilder();
             commandParameter.Append("-hide_banner");
@@ -223,7 +223,7 @@ namespace MatroskaBatchToolBox
             commandParameter.Append($" -s {resolutionSpec}");
             commandParameter.Append($" -aspect {aspectRateSpec}");
             commandParameter.Append($" -c:v {videoEncoderType.ToCodecSpec()}");
-            var encoderOptions = videoEncoderType.ToEncodingOption();
+            var encoderOptions = videoEncoderType.ToEncodingOption(localSettings);
             if (!string.IsNullOrEmpty(encoderOptions))
                 commandParameter.Append($" {encoderOptions.Trim()}");
             commandParameter.Append(" -c:a copy");
@@ -235,7 +235,7 @@ namespace MatroskaBatchToolBox
             var vmafScore = double.NaN; // この値は使用されない
             var (cancelled, exitCode) =
                 ExecuteCommand(
-                    Settings.CurrentSettings.FFmpegCommandFile,
+                    Settings.GlobalSettings.FFmpegCommandFile,
                     logFile,
                     commandParameter.ToString(),
                     Encoding.UTF8,
@@ -274,7 +274,7 @@ namespace MatroskaBatchToolBox
             var vmafScoreValue = double.NaN;
             var (cancelled, exitCode) =
                 ExecuteCommand(
-                    Settings.CurrentSettings.FFmpegCommandFile,
+                    Settings.GlobalSettings.FFmpegCommandFile,
                     logFile,
                     commandParameter.ToString(),
                     Encoding.UTF8,

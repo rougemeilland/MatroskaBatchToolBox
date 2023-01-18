@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -8,9 +7,11 @@ namespace MatroskaBatchToolBox
 {
     internal class Settings
     {
-        public class SettingsContainer
+        private const string _localSettingFileName = $".{nameof(MatroskaBatchToolBox)}.setting.json";
+
+        public class GlobalSettingsContainer
         {
-            public SettingsContainer()
+            public GlobalSettingsContainer()
             {
                 FFmpegNormalizeCommandPath = null;
                 VideoEncoderOnComplexConversion = null;
@@ -30,6 +31,24 @@ namespace MatroskaBatchToolBox
             public int? DegreeOfParallelism { get; set; }
         }
 
+        public class LocalSettingsContainer
+        {
+            public LocalSettingsContainer()
+            {
+                VideoEncoderOnComplexConversion = null;
+                Libx264EncoderOptionOnComplexConversion = null;
+                Libx265EncoderOptionOnComplexConversion = null;
+                LibaomAV1EncoderOptionOnComplexConversion = null;
+                CalculateVMAFScore = null;
+            }
+
+            public string? VideoEncoderOnComplexConversion { get; set; }
+            public string? Libx264EncoderOptionOnComplexConversion { get; set; }
+            public string? Libx265EncoderOptionOnComplexConversion { get; set; }
+            public string? LibaomAV1EncoderOptionOnComplexConversion { get; set; }
+            public bool? CalculateVMAFScore { get; set; }
+        }
+
         static Settings()
         {
             var baseDirectoryPath = Path.GetDirectoryName(typeof(Settings).Assembly.Location);
@@ -37,7 +56,7 @@ namespace MatroskaBatchToolBox
                 throw new Exception("'settings.json' is not found.");
             var settingsFilePath = Path.Combine(baseDirectoryPath, "settings.json");
             var settingsText = File.ReadAllText(settingsFilePath);
-            var settings = JsonSerializer.Deserialize<SettingsContainer>(settingsText);
+            var settings = JsonSerializer.Deserialize<GlobalSettingsContainer>(settingsText);
             if (settings is null)
                 throw new Exception("Failed to parse 'settings.json'.");
 
@@ -97,7 +116,7 @@ namespace MatroskaBatchToolBox
 
             var calculateVMAFScore = settings.CalculateVMAFScore ?? false;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
-            CurrentSettings =
+            GlobalSettings =
                 new Settings(
                     ffmpegNormalizeCommandFile,
                     ffmpegCommandFile,
@@ -143,6 +162,34 @@ namespace MatroskaBatchToolBox
         public string LibaomAV1EncoderOptionOnComplexConversion { get; set; }
         public bool CalculateVMAFScore { get; private set; }
         public int DegreeOfParallelism { get; private set; }
-        public static Settings CurrentSettings { get; private set; }
+        public static Settings GlobalSettings { get; private set; }
+
+        public Settings GetLocalSettings(DirectoryInfo movieFileDirectory)
+        {
+            try
+            {
+                var localSettingFilePath = Path.Combine(movieFileDirectory.FullName, _localSettingFileName);
+                if (!File.Exists(localSettingFilePath))
+                    return GlobalSettings;
+                var settingsText = File.ReadAllText(localSettingFilePath);
+                var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText);
+                if (localSettings is null)
+                    return GlobalSettings;
+                return
+                    new Settings(
+                        GlobalSettings.FFmpegNormalizeCommandFile,
+                        GlobalSettings.FFmpegCommandFile,
+                        localSettings.VideoEncoderOnComplexConversion.TryParseAsVideoEncoderType() ?? GlobalSettings.VideoEncoderOnComplexConversion,
+                        localSettings.Libx264EncoderOptionOnComplexConversion ?? GlobalSettings.Libx264EncoderOptionOnComplexConversion,
+                        localSettings.Libx265EncoderOptionOnComplexConversion ?? GlobalSettings.Libx265EncoderOptionOnComplexConversion,
+                        localSettings.LibaomAV1EncoderOptionOnComplexConversion ?? GlobalSettings.LibaomAV1EncoderOptionOnComplexConversion,
+                        localSettings.CalculateVMAFScore ?? GlobalSettings.CalculateVMAFScore,
+                        GlobalSettings.DegreeOfParallelism);
+            }
+            catch (Exception)
+            {
+                return GlobalSettings;
+            }
+        }
     }
 }
