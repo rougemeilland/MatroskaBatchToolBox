@@ -28,18 +28,17 @@ namespace CalcVMAF
                 Console.Error.WriteLine("'ffmpeg' executable not found.");
                 return 1;
             }
-            var (originalMovieFilePath, encodedMovieFilePath, option) = ParseArguments(args);
-            if (string.IsNullOrEmpty(originalMovieFilePath) || string.IsNullOrEmpty(encodedMovieFilePath))
+            var (originalMovieFile, encodedMovieFile, option) = ParseArguments(args);
+            if (originalMovieFile is null || encodedMovieFile is null || option is null)
                 return 1;
             var commandParameter = new StringBuilder();
             commandParameter.Append("-hide_banner");
-            commandParameter.Append($" -i \"{originalMovieFilePath}\"");
-            commandParameter.Append($" -i \"{encodedMovieFilePath}\"");
-            if (string.IsNullOrEmpty(option.Scale))
-                commandParameter.Append($" -filter_complex \"libvmaf=n_threads=4\"");
-            else
-                commandParameter.Append($" -filter_complex \"scale={option.Scale},[1]libvmaf=n_threads=4\"");
+            commandParameter.Append($" -i \"{originalMovieFile.FullName}\"");
+            commandParameter.Append($" -i \"{encodedMovieFile.FullName}\"");
+            commandParameter.Append($" -filter_complex \"[0:v]settb=1/AVTB,setpts=PTS-STARTPTS[original];[1:v]settb=1/AVTB,setpts=PTS-STARTPTS[1v];[original][1v]scale2ref=flags=bicubic,libvmaf=model=version=vmaf_v0.6.1\\\\:name=vmaf\\\\:n_threads=4:shortest=1:repeatlast=0\"");
+#if false // -an をつけると、実行中の time と speed が正常に表示されなくなる。
             commandParameter.Append(" -an -sn");
+#endif
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
                 commandParameter.Append(" -f NULL -");
             else
@@ -114,10 +113,17 @@ namespace CalcVMAF
                 process.WaitForExit();
                 if (option.Log ?? false)
                 {
-                    foreach (var logFilePath in Directory.EnumerateFiles(Path.GetDirectoryName(encodedMovieFilePath) ?? ".", $"{Path.GetFileName(encodedMovieFilePath)}.vmaf-*.log"))
+                    foreach (var logFilePath in Directory.EnumerateFiles(encodedMovieFile.DirectoryName ?? ".", $"{encodedMovieFile.Name}.vmaf-*.log"))
                         File.Delete(logFilePath);
-                    using (var writer = new StreamWriter($"{encodedMovieFilePath}.vmaf-{vmafScore}.log"))
+                    using (var writer = new StreamWriter($"{encodedMovieFile.FullName}.vmaf-{vmafScore}.log"))
+                    {
+                        writer.WriteLine($"Original file: \"{originalMovieFile.FullName}\"");
+                        writer.WriteLine($"Original file size [bytes]: \"{originalMovieFile.Length:N0}\"");
+                        writer.WriteLine($"Encoded file: \"{encodedMovieFile.FullName}\"");
+                        writer.WriteLine($"Encoded file size [bytes]: \"{encodedMovieFile.Length:N0}\"");
+                        writer.WriteLine($"Compression ratio (<Encoded file size> / <Original file size>): \"{(double)encodedMovieFile.Length / originalMovieFile.Length:F6}\"");
                         writer.WriteLine($"VMAF score: {vmafScore}");
+                    }
                 }
                 return process.ExitCode;
             }
@@ -142,10 +148,10 @@ namespace CalcVMAF
             }
         }
 
-        private static (string originalMovieFilePath, string encodedMovieFilePath, ProgramOption option) ParseArguments(string[] args)
+        private static (FileInfo? originalMovieFilePath, FileInfo? encodedMovieFilePath, ProgramOption? option) ParseArguments(string[] args)
         {
-            string? originalMovieFilePath = null;
-            string? encodedMovieFilePath = null;
+            FileInfo? originalMovieFile = null;
+            FileInfo? encodedMovieFile = null;
             var option = new ProgramOption();
 
             for (var index = 0; index < args.Length; ++index)
@@ -155,19 +161,19 @@ namespace CalcVMAF
                     if (!string.IsNullOrEmpty(option.Scale))
                     {
                         Console.Error.WriteLine("Duplicate '--scale' option specified.");
-                        return ("", "", new ProgramOption());
+                        return (null, null, null);
                     }
                     if (index + 1 >= args.Length)
                     {
                         Console.Error.WriteLine("'--scale' option requires a value.");
-                        return ("", "", new ProgramOption());
+                        return (null, null, null);
                     }
                     var value = args[index + 1];
                     ++index;
                     if (!Regex.IsMatch(value, @"^\d+x\d+$"))
                     {
                         Console.Error.WriteLine($"The '--scale' option value must be a resolution string.: \"{value}\"");
-                        return ("", "", new ProgramOption());
+                        return (null, null, null);
                     }
                     option.Scale = value;
                 }
@@ -176,7 +182,7 @@ namespace CalcVMAF
                     if (option.Log is not null)
                     {
                         Console.Error.WriteLine("Duplicate '--log' option specified.");
-                        return ("", "", new ProgramOption());
+                        return (null, null, null);
                     }
                     option.Log = true;
                 }
@@ -184,59 +190,63 @@ namespace CalcVMAF
                          args[index].StartsWith("--", StringComparison.InvariantCulture))
                 {
                     Console.Error.WriteLine($"An unsupported option was specified.: \"{args[index]}\"");
-                    return ("", "", new ProgramOption());
+                    return (null, null, null);
                 }
-                else if (string.IsNullOrEmpty(originalMovieFilePath))
+                else if (originalMovieFile is null)
                 {
+                    FileInfo file;
                     try
                     {
-                        if (!File.Exists(args[index]))
+                        file = new FileInfo(args[index]);
+                        if (!file.Exists)
                         {
                             Console.Error.WriteLine($"Original movie file does not exist.: \"{args[index]}\"");
-                            return ("", "", new ProgramOption());
+                            return (null, null, null);
                         }
                     }
                     catch (Exception)
                     {
                         Console.Error.WriteLine($"Original movie file does not exist.: \"{args[index]}\"");
-                        return ("", "", new ProgramOption());
+                        return (null, null, null);
                     }
-                    originalMovieFilePath = args[index];
+                    originalMovieFile = file;
                 }
-                else if (string.IsNullOrEmpty(encodedMovieFilePath))
+                else if (encodedMovieFile is null)
                 {
+                    FileInfo file;
                     try
                     {
-                        if (!File.Exists(args[index]))
+                        file = new FileInfo(args[index]);
+                        if (!file.Exists)
                         {
                             Console.Error.WriteLine($"Encoded movie file does not exist.: \"{args[index]}\"");
-                            return ("", "", new ProgramOption());
+                            return (null, null, null);
                         }
                     }
                     catch (Exception)
                     {
                         Console.Error.WriteLine($"Encoded movie file does not exist.: \"{args[index]}\"");
-                        return ("", "", new ProgramOption());
+                        return (null, null, null);
                     }
-                    encodedMovieFilePath = args[index];
+                    encodedMovieFile = file;
                 }
                 else
                 {
                     Console.Error.WriteLine($"There is an error in the command line arguments.: {nameof(CalcVMAF)} {string.Join(" ", args)}");
-                    return ("", "", new ProgramOption());
+                    return (null, null, null);
                 }
             }
-            if (string.IsNullOrEmpty(originalMovieFilePath))
+            if (originalMovieFile is null)
             {
                 Console.Error.WriteLine($"Original movie file is not specified.: {nameof(CalcVMAF)} {string.Join(" ", args)}");
-                return ("", "", new ProgramOption());
+                return (null, null, null);
             }
-            if (string.IsNullOrEmpty(encodedMovieFilePath))
+            if (encodedMovieFile is null)
             {
                 Console.Error.WriteLine($"Encoded movie file is not specified.: {nameof(CalcVMAF)} {string.Join(" ", args)}");
-                return ("", "", new ProgramOption());
+                return (null, null, null);
             }
-            return (originalMovieFilePath, encodedMovieFilePath, option);
+            return (originalMovieFile, encodedMovieFile, option);
         }
     }
 }
