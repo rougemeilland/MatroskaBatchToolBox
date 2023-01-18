@@ -261,8 +261,10 @@ namespace MatroskaBatchToolBox
             commandParameter.Append("-hide_banner");
             commandParameter.Append($" -i \"{originalFile.FullName}\"");
             commandParameter.Append($" -i \"{modifiedFile.FullName}\"");
-            commandParameter.Append($" -filter_complex \"scale={resolutionSpec},[1]libvmaf=n_threads=4\"");
+            commandParameter.Append($" -filter_complex \"[0:v]settb=1/AVTB,setpts=PTS-STARTPTS[original];[1:v]settb=1/AVTB,setpts=PTS-STARTPTS[1v];[original][1v]scale2ref=flags=bicubic,libvmaf=model=version=vmaf_v0.6.1\\\\:name=vmaf\\\\:n_threads=4:shortest=1:repeatlast=0\"");
+#if false // -sn をつけると、VMAFスコア自体は正常に計算されるものの、実行経過に表示される time と speed に異常な値が表示され、進行状況が正しく把握できない。
             commandParameter.Append(" -an -sn");
+#endif
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
                 commandParameter.Append(" -f NULL -");
             else
@@ -506,6 +508,7 @@ namespace MatroskaBatchToolBox
                 standardOutputReaderTask.Wait();
                 cancellationWatcherTask.Wait();
                 process.WaitForExit();
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Total process time: {process.TotalProcessorTime.TotalSeconds:F2}[sec]" });
                 return (cancelled, process.ExitCode);
             }
             finally

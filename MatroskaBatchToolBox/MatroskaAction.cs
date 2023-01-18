@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text.RegularExpressions;
 
 namespace MatroskaBatchToolBox
@@ -19,6 +20,7 @@ namespace MatroskaBatchToolBox
         private static readonly Regex _startsWithResolutionSpecPattern;
         private static readonly Regex _startsWithSeparaterBetweenResolutionSpecAndAspectRatePattern;
         private static readonly Regex _startsWithAspectRateSpecPattern;
+        private static readonly Regex _startsWithCommentPattern;
         private static readonly Regex _resolutionAndAspectRateSpecInFileNamePattern;
 
         static MatroskaAction()
@@ -30,6 +32,7 @@ namespace MatroskaBatchToolBox
             _startsWithResolutionSpecPattern = new Regex($"^({_resolutionPatternText})", RegexOptions.Compiled);
             _startsWithSeparaterBetweenResolutionSpecAndAspectRatePattern = new Regex($"^({_separaterBetweenResolutionSpecAndAspectRatePatternText})", RegexOptions.Compiled);
             _startsWithAspectRateSpecPattern = new Regex($"^({_aspectRatePatternText})", RegexOptions.Compiled);
+            _startsWithCommentPattern = new Regex($"^ *#", RegexOptions.Compiled);
             var groupNamePattern = new Regex(@"\?<[^>]+>");
             var resolutionPatternTextWithoutGroup = groupNamePattern.Replace(_resolutionPatternText, "");
             var aspectRatePatternTextWithoutGroup = groupNamePattern.Replace(_aspectRatePatternText, "");
@@ -372,7 +375,17 @@ namespace MatroskaBatchToolBox
                 switch (actionResult)
                 {
                     case ActionResult.Success:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The video resolution of the movie fie was successfully changed.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
+                        ExternalCommand.Log(
+                            logFile,
+                            new[]
+                            {
+                                $"{nameof(MatroskaBatchToolBox)}: INFO: The video resolution of the movie fie was successfully changed.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? "<???>"}\"",
+                                $"{nameof(MatroskaBatchToolBox)}: INFO: Source file: \"{sourceFile.FullName}\"",
+                                $"{nameof(MatroskaBatchToolBox)}: INFO: Source file size: {sourceFile.Length:N0}[bytes]",
+                                $"{nameof(MatroskaBatchToolBox)}: INFO: Destination file: \"{actualDestinationFilePath?.FullName ?? "<???>"}\"",
+                                $"{nameof(MatroskaBatchToolBox)}: INFO: Destination file size: {actualDestinationFilePath?.Length ?? 0:N0}[bytes]",
+                                $"{nameof(MatroskaBatchToolBox)}: INFO: Compression ratio (<Destination file size> / <Source file size>): {(actualDestinationFilePath is not null ? (100.0 * actualDestinationFilePath.Length / sourceFile.Length).ToString("F2") : "<???>" )}%",
+                            });
                         FinalizeLogFile(logFile, "OK");
                         break;
                     case ActionResult.Skipped:
@@ -400,7 +413,6 @@ namespace MatroskaBatchToolBox
             {
                 // 解像度指定がない場合(構文エラー)
                 return (false, null, null, null);
-
             }
 
             // 解像度指定がある場合
@@ -408,9 +420,9 @@ namespace MatroskaBatchToolBox
             var resolutionWidth = int.Parse(resolutionSpecMatch.Groups["resolutionWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
             var resolutionHeight = int.Parse(resolutionSpecMatch.Groups["resolutionHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
             conversionSpec = conversionSpec[resolutionSpecMatch.Length..];
-            if (conversionSpec.Length <= 0)
+            if (conversionSpec.Length <= 0 || _startsWithCommentPattern.IsMatch(conversionSpec))
             {
-                // 解像度指定で終わっている場合
+                // 解像度指定で終わっている、または次がコメントである場合
 
                 // 解像度から整数比を求めてそれをアスペクト比とする。
                 var gcd = ExtendedMath.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
@@ -439,9 +451,9 @@ namespace MatroskaBatchToolBox
             }
             // セパレータの後がアスペクト比である場合
             conversionSpec = conversionSpec[matchAspectRateSpecMatch.Length..];
-            if (conversionSpec.Length > 0)
+            if (conversionSpec.Length > 0 && !_startsWithCommentPattern.IsMatch(conversionSpec))
             {
-                // アスペクト比の後に続きがある場合(構文ミス)
+                // アスペクト比の後にコメント以外の続きがある場合(構文ミス)
 
                 return (false, null, null, null);
             }

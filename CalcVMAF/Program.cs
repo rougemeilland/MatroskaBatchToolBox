@@ -14,7 +14,6 @@ namespace CalcVMAF
     {
         private class ProgramOption
         {
-            public string? Scale { get; set; }
             public bool? Log { get; set; }
         }
 
@@ -31,101 +30,127 @@ namespace CalcVMAF
             var (originalMovieFile, encodedMovieFile, option) = ParseArguments(args);
             if (originalMovieFile is null || encodedMovieFile is null || option is null)
                 return 1;
-            var commandParameter = new StringBuilder();
-            commandParameter.Append("-hide_banner");
-            commandParameter.Append($" -i \"{originalMovieFile.FullName}\"");
-            commandParameter.Append($" -i \"{encodedMovieFile.FullName}\"");
-            commandParameter.Append($" -filter_complex \"[0:v]settb=1/AVTB,setpts=PTS-STARTPTS[original];[1:v]settb=1/AVTB,setpts=PTS-STARTPTS[1v];[original][1v]scale2ref=flags=bicubic,libvmaf=model=version=vmaf_v0.6.1\\\\:name=vmaf\\\\:n_threads=4:shortest=1:repeatlast=0\"");
+            foreach (var oldLogFilePath in Directory.EnumerateFiles(encodedMovieFile.DirectoryName ?? ".", $"{encodedMovieFile.Name}.vmaf-*.log"))
+                File.Delete(oldLogFilePath);
+            var logFilePath = $"{encodedMovieFile.FullName}.vmaf.log";
+            var logWriter = option.Log ?? false ? new StreamWriter(logFilePath) : null;
+            try
+            {
+                var commandParameter = new StringBuilder();
+                commandParameter.Append("-hide_banner");
+                commandParameter.Append($" -i \"{originalMovieFile.FullName}\"");
+                commandParameter.Append($" -i \"{encodedMovieFile.FullName}\"");
+                commandParameter.Append($" -filter_complex \"[0:v]settb=1/AVTB,setpts=PTS-STARTPTS[original];[1:v]settb=1/AVTB,setpts=PTS-STARTPTS[1v];[original][1v]scale2ref=flags=bicubic,libvmaf=model=version=vmaf_v0.6.1\\\\:name=vmaf\\\\:n_threads=4:shortest=1:repeatlast=0\"");
 #if false // -an をつけると、実行中の time と speed が正常に表示されなくなる。
             commandParameter.Append(" -an -sn");
 #endif
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-                commandParameter.Append(" -f NULL -");
-            else
-                commandParameter.Append(" -f null /dev/null");
-            var processStartInfo = new ProcessStartInfo
-            {
-                Arguments = commandParameter.ToString(),
-                CreateNoWindow = true,
-                FileName = ffmpegExecutablePath,
-                RedirectStandardError = true,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                StandardErrorEncoding = Encoding.UTF8,
-                StandardInputEncoding = Encoding.UTF8,
-                StandardOutputEncoding = Encoding.UTF8,
-                UseShellExecute = false,
-            };
-            var vmafScore = "";
-            using (var process = Process.Start(processStartInfo))
-            {
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                    commandParameter.Append(" -f NULL -");
+                else
+                    commandParameter.Append(" -f null /dev/null");
+                var processStartInfo = new ProcessStartInfo
+                {
+                    Arguments = commandParameter.ToString(),
+                    CreateNoWindow = true,
+                    FileName = ffmpegExecutablePath,
+                    RedirectStandardError = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    StandardErrorEncoding = Encoding.UTF8,
+                    StandardInputEncoding = Encoding.UTF8,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    UseShellExecute = false,
+                };
+                if (logWriter is not null)
+                {
+                    logWriter.WriteLine($"command: {processStartInfo.FileName} {processStartInfo.Arguments}");
+                    logWriter.WriteLine(new string('=', 40));
+                    logWriter.WriteLine("");
+                }
+                var vmafScore = "";
+                var process = Process.Start(processStartInfo);
                 if (process is null)
                 {
                     Console.Error.WriteLine("'Failed to start ffmpeg.");
                     return 1;
                 }
-                _ = Task.Run(() =>
+                try
                 {
-                    while (true)
+                    _ = Task.Run(() =>
                     {
-                        var c = Console.Read();
-                        if (c < 0)
-                            break;
-                        process.StandardInput.Write(char.ConvertFromUtf32(c));
-                    }
-                });
-                var standardOutputProcessTask = Task.Run(() =>
-                {
-                    var buffer = new char[1024];
-                    while (true)
-                    {
-                        var length = process.StandardOutput.Read(buffer, 0, buffer.Length);
-                        if (length <= 0)
-                            break;
-                        Console.Write(new string(buffer, 0, length));
-                    }
-                });
-                var standardErrorProcessTask = Task.Run(() =>
-                {
-                    var buffer = new char[1024];
-                    var cache = "";
-                    while (true)
-                    {
-                        var length = process.StandardError.Read(buffer, 0, buffer.Length);
-                        if (length <= 0)
-                            break;
-                        var blockText = new string(buffer, 0, length);
-                        Console.Error.Write(blockText);
-                        cache = cache + blockText;
-                        foreach (var match in vmafScorePattern.Matches(cache).Cast<Match>())
+                        while (true)
                         {
-                            vmafScore = match.Groups["vmafScore"].Value;
-                            if (!(option.Log ?? false))
-                            Console.WriteLine(vmafScore);
+                            var c = Console.Read();
+                            if (c < 0)
+                                break;
+                            process.StandardInput.Write(char.ConvertFromUtf32(c));
                         }
-                        var indexOfLastNewLine = cache.LastIndexOfAny(new[] { '\r', '\n' });
-                        if (indexOfLastNewLine >= 0)
-                            cache = cache.Substring(indexOfLastNewLine + 1);
-                    }
-                });
-                standardOutputProcessTask.Wait();
-                standardErrorProcessTask.Wait();
-                process.WaitForExit();
-                if (option.Log ?? false)
-                {
-                    foreach (var logFilePath in Directory.EnumerateFiles(encodedMovieFile.DirectoryName ?? ".", $"{encodedMovieFile.Name}.vmaf-*.log"))
-                        File.Delete(logFilePath);
-                    using (var writer = new StreamWriter($"{encodedMovieFile.FullName}.vmaf-{vmafScore}.log"))
+                    });
+                    var standardOutputProcessTask = Task.Run(() =>
                     {
-                        writer.WriteLine($"Original file: \"{originalMovieFile.FullName}\"");
-                        writer.WriteLine($"Original file size [bytes]: \"{originalMovieFile.Length:N0}\"");
-                        writer.WriteLine($"Encoded file: \"{encodedMovieFile.FullName}\"");
-                        writer.WriteLine($"Encoded file size [bytes]: \"{encodedMovieFile.Length:N0}\"");
-                        writer.WriteLine($"Compression ratio (<Encoded file size> / <Original file size>): \"{(double)encodedMovieFile.Length / originalMovieFile.Length:F6}\"");
-                        writer.WriteLine($"VMAF score: {vmafScore}");
+                        var buffer = new char[1024];
+                        while (true)
+                        {
+                            var length = process.StandardOutput.Read(buffer, 0, buffer.Length);
+                            if (length <= 0)
+                                break;
+                            var blockText = new string(buffer, 0, length);
+                            Console.Write(blockText);
+                            logWriter?.Write(blockText);
+                        }
+                    });
+                    var standardErrorProcessTask = Task.Run(() =>
+                    {
+                        var buffer = new char[1024];
+                        var cache = "";
+                        while (true)
+                        {
+                            var length = process.StandardError.Read(buffer, 0, buffer.Length);
+                            if (length <= 0)
+                                break;
+                            var blockText = new string(buffer, 0, length);
+                            Console.Error.Write(blockText);
+                            logWriter?.Write(blockText);
+                            cache = cache + blockText;
+                            foreach (var match in vmafScorePattern.Matches(cache).Cast<Match>())
+                            {
+                                vmafScore = match.Groups["vmafScore"].Value;
+                                if (!(option.Log ?? false))
+                                    Console.WriteLine(vmafScore);
+                            }
+                            var indexOfLastNewLine = cache.LastIndexOfAny(new[] { '\r', '\n' });
+                            if (indexOfLastNewLine >= 0)
+                                cache = cache.Substring(indexOfLastNewLine + 1);
+                        }
+                    });
+                    standardOutputProcessTask.Wait();
+                    standardErrorProcessTask.Wait();
+                    process.WaitForExit();
+                    if ((option.Log ?? false) && logWriter is not null)
+                    {
+                        logWriter.WriteLine("");
+                        logWriter.WriteLine(new string('=', 40));
+                        logWriter.WriteLine($"Original file: \"{originalMovieFile.FullName}\"");
+                        logWriter.WriteLine($"Original file size [bytes]: \"{originalMovieFile.Length:N0}\"");
+                        logWriter.WriteLine($"Encoded file: \"{encodedMovieFile.FullName}\"");
+                        logWriter.WriteLine($"Encoded file size [bytes]: \"{encodedMovieFile.Length:N0}\"");
+                        logWriter.WriteLine($"Compression ratio (<Encoded file size> / <Original file size>): \"{100.0 * encodedMovieFile.Length / originalMovieFile.Length:F2}%\"");
+                        logWriter.WriteLine($"VMAF score: {vmafScore}");
+                        logWriter.Flush();
+                        logWriter.Dispose();
+                        logWriter = null;
+                        File.Move(logFilePath, $"{encodedMovieFile.FullName}.vmaf-{vmafScore}.log", true);
                     }
+                    return process.ExitCode;
                 }
-                return process.ExitCode;
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+            finally
+            {
+                logWriter?.Dispose();
             }
         }
 
@@ -156,28 +181,7 @@ namespace CalcVMAF
 
             for (var index = 0; index < args.Length; ++index)
             {
-                if (string.Equals(args[index], "--scale", StringComparison.InvariantCulture))
-                {
-                    if (!string.IsNullOrEmpty(option.Scale))
-                    {
-                        Console.Error.WriteLine("Duplicate '--scale' option specified.");
-                        return (null, null, null);
-                    }
-                    if (index + 1 >= args.Length)
-                    {
-                        Console.Error.WriteLine("'--scale' option requires a value.");
-                        return (null, null, null);
-                    }
-                    var value = args[index + 1];
-                    ++index;
-                    if (!Regex.IsMatch(value, @"^\d+x\d+$"))
-                    {
-                        Console.Error.WriteLine($"The '--scale' option value must be a resolution string.: \"{value}\"");
-                        return (null, null, null);
-                    }
-                    option.Scale = value;
-                }
-                else if (string.Equals(args[index], "--log", StringComparison.InvariantCulture))
+                if (string.Equals(args[index], "--log", StringComparison.InvariantCulture))
                 {
                     if (option.Log is not null)
                     {
