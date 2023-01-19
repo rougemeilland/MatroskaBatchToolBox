@@ -73,6 +73,19 @@ namespace MatroskaBatchToolBox
                 throw new Exception(); // can't reach here
             }
 
+            FileInfo? ffprobeCommandFile = null;
+            foreach (var executableFile in new DirectoryInfo(Path.GetDirectoryName(typeof(Settings).Assembly.Location) ?? ".").EnumerateFiles())
+            {
+                if (Regex.IsMatch(executableFile.Name, @"^ffprobe(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                    ffprobeCommandFile = executableFile;
+            }
+            if (ffprobeCommandFile is null)
+            {
+                var message = $"'ffprobe' is not installed.";
+                PrintFatalMessage(message);
+                throw new Exception(); // can't reach here
+            }
+
             FileInfo? ffmpegNormalizeCommandFile;
             if (string.IsNullOrEmpty(settings.FFmpegNormalizeCommandPath))
             {
@@ -119,6 +132,7 @@ namespace MatroskaBatchToolBox
             GlobalSettings =
                 new Settings(
                     ffmpegNormalizeCommandFile,
+                    ffprobeCommandFile,
                     ffmpegCommandFile,
                     videoEncoderOnComplexConversion.Value,
                     libx264EncoderOptionOnComplexConversion,
@@ -142,9 +156,19 @@ namespace MatroskaBatchToolBox
             Environment.Exit(1);
         }
 
-        private Settings(FileInfo ffmpegNormalizeCommandFile, FileInfo ffmpegCommandFile, VideoEncoderType videoEncoderOnComplexConversion, string libx264EncoderOptionOnComplexConversion, string libx265EncoderOptionOnComplexConversion, string libaomAV1EncoderOptionOnComplexConversion, bool calculateVMAFScore, int degreeOfParallelism)
+        private Settings(
+            FileInfo ffmpegNormalizeCommandFile,
+            FileInfo ffprobeCommandFile,
+            FileInfo ffmpegCommandFile,
+            VideoEncoderType videoEncoderOnComplexConversion,
+            string libx264EncoderOptionOnComplexConversion,
+            string libx265EncoderOptionOnComplexConversion,
+            string libaomAV1EncoderOptionOnComplexConversion,
+            bool calculateVMAFScore,
+            int degreeOfParallelism)
         {
             FFmpegNormalizeCommandFile = ffmpegNormalizeCommandFile;
+            FFprobeCommandFile = ffprobeCommandFile;
             FFmpegCommandFile = ffmpegCommandFile;
             VideoEncoderOnComplexConversion = videoEncoderOnComplexConversion;
             Libx264EncoderOptionOnComplexConversion = libx264EncoderOptionOnComplexConversion;
@@ -155,6 +179,7 @@ namespace MatroskaBatchToolBox
         }
 
         public FileInfo FFmpegNormalizeCommandFile { get; private set; }
+        public FileInfo FFprobeCommandFile { get; private set; }
         public FileInfo FFmpegCommandFile { get; private set; }
         public VideoEncoderType VideoEncoderOnComplexConversion { get; set; }
         public string Libx264EncoderOptionOnComplexConversion { get; set; }
@@ -178,13 +203,14 @@ namespace MatroskaBatchToolBox
                 return
                     new Settings(
                         GlobalSettings.FFmpegNormalizeCommandFile,
+                        GlobalSettings.FFprobeCommandFile,
                         GlobalSettings.FFmpegCommandFile,
-                        localSettings.VideoEncoderOnComplexConversion.TryParseAsVideoEncoderType() ?? GlobalSettings.VideoEncoderOnComplexConversion,
-                        localSettings.Libx264EncoderOptionOnComplexConversion ?? GlobalSettings.Libx264EncoderOptionOnComplexConversion,
-                        localSettings.Libx265EncoderOptionOnComplexConversion ?? GlobalSettings.Libx265EncoderOptionOnComplexConversion,
-                        localSettings.LibaomAV1EncoderOptionOnComplexConversion ?? GlobalSettings.LibaomAV1EncoderOptionOnComplexConversion,
-                        localSettings.CalculateVMAFScore ?? GlobalSettings.CalculateVMAFScore,
-                        GlobalSettings.DegreeOfParallelism);
+                        videoEncoderOnComplexConversion: localSettings.VideoEncoderOnComplexConversion.TryParseAsVideoEncoderType() ?? GlobalSettings.VideoEncoderOnComplexConversion,
+                        libx264EncoderOptionOnComplexConversion: localSettings.Libx264EncoderOptionOnComplexConversion ?? GlobalSettings.Libx264EncoderOptionOnComplexConversion,
+                        libx265EncoderOptionOnComplexConversion: localSettings.Libx265EncoderOptionOnComplexConversion ?? GlobalSettings.Libx265EncoderOptionOnComplexConversion,
+                        libaomAV1EncoderOptionOnComplexConversion: localSettings.LibaomAV1EncoderOptionOnComplexConversion ?? GlobalSettings.LibaomAV1EncoderOptionOnComplexConversion,
+                        calculateVMAFScore: localSettings.CalculateVMAFScore ?? GlobalSettings.CalculateVMAFScore,
+                        degreeOfParallelism: GlobalSettings.DegreeOfParallelism);
             }
             catch (Exception)
             {

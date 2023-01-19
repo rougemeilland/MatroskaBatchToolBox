@@ -333,12 +333,23 @@ namespace MatroskaBatchToolBox
                 if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
                 {
                     // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
+
+                var (commandResult, streams) = ExternalCommand.GetMovieStreamInfos(logFile, sourceFile);
+                if (commandResult == ExternalCommand.ExternalCommandResult.Cancelled)
+                    return actionResult = ActionResult.Cancelled;
+                if (streams is null)
+                {
+                    // このルートには到達しないはず
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Stream information could not be obtained from the video file.: \"{sourceFile.FullName}\"", });
+                    return actionResult = ActionResult.Failed;
+                }
+
                 if (calculateVMAFScore)
                 {
-                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, streams.EnumerateVideoStreams(), resolutionSpec, aspectRateSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                     if (ExternalCommand.CalculateVMAFScoreFromMovieFile(logFile, sourceFile, workingFile, resolutionSpec, out double vmafScore, new Progress<double>(progress => progressReporter.Report((1 + progress) / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
@@ -346,7 +357,7 @@ namespace MatroskaBatchToolBox
                 }
                 else
                 {
-                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, streams.EnumerateVideoStreams(), resolutionSpec, aspectRateSpec, videoEncoder, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                 }
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);

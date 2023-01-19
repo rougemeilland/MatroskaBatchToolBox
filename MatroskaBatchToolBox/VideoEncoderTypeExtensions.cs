@@ -39,7 +39,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static string ToEncodingOption(this VideoEncoderType videoEncoderType, Settings localSettings)
+        public static string GetEncodingOption(this Settings localSettings, VideoEncoderType videoEncoderType)
         {
             switch (videoEncoderType)
             {

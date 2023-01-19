@@ -1,12 +1,17 @@
-﻿using System;
+﻿using MatroskaBatchToolBox.Model;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using static MatroskaBatchToolBox.Settings;
 
 namespace MatroskaBatchToolBox
 {
@@ -179,6 +184,53 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
+        public static (ExternalCommandResult result, MovieStreamInfos? streams) GetMovieStreamInfos(FileInfo logFile, FileInfo inFile)
+        {
+            var commandParameter = new StringBuilder();
+            commandParameter.Append("-hide_banner");
+            commandParameter.Append(" -v error");
+            commandParameter.Append(" -print_format json");
+            commandParameter.Append(" -show_streams");
+            commandParameter.Append($" -i \"{inFile.FullName}\"");
+            var standardOutputTextLines = new List<string>();
+            var (cancelled, exitCode) =
+                ExecuteCommand(
+                    Settings.GlobalSettings.FFprobeCommandFile,
+                    logFile,
+                    commandParameter.ToString(),
+                    Encoding.UTF8,
+                    (type, text) =>
+                    {
+                        if (type == OutputStreamType.StandardOutput)
+                            standardOutputTextLines.Add(text);
+                    },
+                    proc =>
+                    {
+                        proc.StandardInput.Write("q");
+                    });
+            if (cancelled)
+            {
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffprobe aborted at user request." });
+                return (ExternalCommandResult.Cancelled, null);
+            }
+            Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffprobe exited with exit code {exitCode}." });
+            if (exitCode != 0)
+                throw new Exception($"ffprobe failed. (exit code {exitCode})");
+
+            string jsonText = string.Join("\r\n", standardOutputTextLines);
+            try
+            {
+                var streams = JsonSerializer.Deserialize<MovieStreamInfos>(jsonText);
+                if (streams is null)
+                    throw new Exception("ffprobe returned no information.");
+                return (ExternalCommandResult.Completed, streams);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"The information returned by ffprobe is in an unknown format.: {jsonText}", ex);
+            }
+        }
+
         public static ExternalCommandResult ConvertMovieFile(FileInfo logFile, FileInfo inFile, string? aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
         {
             var commandParameter = new StringBuilder();
@@ -214,36 +266,52 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        public static ExternalCommandResult ResizeMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ResizeMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, IEnumerable<VideoStreamInfo> videoStreams, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
         {
-            var commandParameter = new StringBuilder();
-            commandParameter.Append("-hide_banner");
-            commandParameter.Append(" -y");
-            commandParameter.Append($" -i \"{inFile.FullName}\"");
-            commandParameter.Append($" -s {resolutionSpec}");
-            commandParameter.Append($" -aspect {aspectRateSpec}");
-            commandParameter.Append($" -c:v {videoEncoderType.ToCodecSpec()}");
-            var encoderOptions = videoEncoderType.ToEncodingOption(localSettings);
-            if (!string.IsNullOrEmpty(encoderOptions))
-                commandParameter.Append($" {encoderOptions.Trim()}");
-            commandParameter.Append(" -c:a copy");
-            commandParameter.Append(" -c:s copy");
-            commandParameter.Append(" -g 240");
-            commandParameter.Append($" \"{outFile}\"");
+            var videoStreamsArray = videoStreams.ToArray();
+            var videoStreamsExceptPng = videoStreamsArray.Where(stream => !string.Equals(stream.CodecName, "png", StringComparison.InvariantCulture));
+            if (videoStreamsArray.Length <= 0)
+                throw new Exception("The input movie file does not have a video stream other than \"png\".");
+            if (videoStreamsArray.Length > 1)
+                throw new Exception("The input movie file has multiple video streams other than \"png\".");
+            var commandParameters = new List<string>
+            {
+                "-hide_banner",
+                "-y",
+                $"-i \"{inFile.FullName}\"",
+                $"-s {resolutionSpec}",
+                $"-aspect {aspectRateSpec}"
+            };
+            for (var index = 0; index < videoStreamsArray.Length; ++index)
+            {
+                if (string.Equals(videoStreamsArray[index].CodecName, "png", StringComparison.InvariantCulture))
+                    commandParameters.Add($"-c:v:{index} copy");
+                else
+                {
+                    commandParameters.Add($" -c:v:{index} {videoEncoderType.ToCodecSpec()}");
+                    var encoderOptions = localSettings.GetEncodingOption(videoEncoderType);
+                    if (!string.IsNullOrEmpty(encoderOptions))
+                        commandParameters.Add($"{encoderOptions.Trim()}");
+                }
+            }
+            commandParameters.Add("-c:a copy");
+            commandParameters.Add("-c:s copy");
+            commandParameters.Add("-g 240");
+            commandParameters.Add($"\"{outFile}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
             var vmafScore = double.NaN; // この値は使用されない
             var (cancelled, exitCode) =
                 ExecuteCommand(
-                    Settings.GlobalSettings.FFmpegCommandFile,
+                    GlobalSettings.FFmpegCommandFile,
                     logFile,
-                    commandParameter.ToString(),
+                    string.Join(" ", commandParameters),
                     Encoding.UTF8,
                     (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScore, progressReporter),
                     proc =>
                     {
                         proc.StandardInput.Write("q");
-                    });
+                    }); ;
             if (detectedToQuit || cancelled)
             {
                 Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
@@ -274,7 +342,7 @@ namespace MatroskaBatchToolBox
             var vmafScoreValue = double.NaN;
             var (cancelled, exitCode) =
                 ExecuteCommand(
-                    Settings.GlobalSettings.FFmpegCommandFile,
+                    GlobalSettings.FFmpegCommandFile,
                     logFile,
                     commandParameter.ToString(),
                     Encoding.UTF8,
@@ -534,7 +602,7 @@ namespace MatroskaBatchToolBox
                         var length = streamReader.Read(buffer, 0, buffer.Length);
                         if (length <= 0)
                             break;
-                        cache = cache + new string(buffer, 0, length);
+                        cache += new string(buffer, 0, length);
 #if DEBUG && false
                         System.Diagnostics.Debug.Write(new string(buffer, 0, buffer.Length));
 #endif
@@ -603,7 +671,7 @@ namespace MatroskaBatchToolBox
                                     catch (Exception)
                                     {
                                     }
-                                    cache = cache.Substring(endOfLine + 1);
+                                    cache = cache[(endOfLine + 1)..];
                                 }
                                 else
                                     throw new Exception("internal error");
