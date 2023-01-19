@@ -4,7 +4,7 @@
   "FFmpegLibx264EncoderOption": "-crf 19",
   "FFmpegLibx265EncoderOption": "-crf 19 -tag:v hvc1",
   "FFmpegLibaomAV1EncoderOption": "-crf 23 -b:v 0 -cpu-used 5 -threads 2",
-  "FFmpegGenericOption": null,
+  "FFmpegOption": null,
   "CalculateVMAFScore": true,
   "DegreeOfParallelism": 1
 }

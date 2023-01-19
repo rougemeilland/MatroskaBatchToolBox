@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -241,7 +242,7 @@ namespace MatroskaBatchToolBox
             };
             if (aspectRateSpec is not null)
                 commandParameters.Add($"-aspect {aspectRateSpec}");
-            commandParameters.Add("-c:v copy -c:a copy -c:s copy");
+            commandParameters.Add("-c copy");
             if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
                 commandParameters.Add(localSettings.FFmpegOption);
             commandParameters.Add($"\"{outFile.FullName}\"");
@@ -270,14 +271,25 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        public static ExternalCommandResult ResizeMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, IEnumerable<VideoStreamInfo> videoStreams, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ResizeMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieStreamInfos streams, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
         {
-            var videoStreamsArray = videoStreams.ToArray();
-            var videoStreamsExceptPng = videoStreamsArray.Where(stream => !string.Equals(stream.CodecName, "png", StringComparison.InvariantCulture));
-            if (videoStreamsArray.Length <= 0)
-                throw new Exception("The input movie file does not have a video stream other than \"png\".");
-            if (videoStreamsArray.Length > 1)
-                throw new Exception("The input movie file has multiple video streams other than \"png\".");
+            var videoStreams = streams.EnumerateVideoStreams().ToArray();
+            if (videoStreams.Any(stream => string.Equals(stream.CodecName, "png", StringComparison.InvariantCulture)))
+            {
+                var videoStreamsCountExceptPng = videoStreams.Where(stream => !string.Equals(stream.CodecName, "png", StringComparison.InvariantCulture)).Count();
+                if (videoStreamsCountExceptPng <= 0)
+                    throw new Exception("The input movie file does not have a video stream other than \"png\".");
+                if (videoStreamsCountExceptPng > 1)
+                    throw new Exception("The input movie file has multiple video streams other than \"png\".");
+            }
+            else
+            {
+                var videoStreamsCount = videoStreams.Count();
+                if (videoStreamsCount <= 0)
+                    throw new Exception("The input movie file does not have a video stream.");
+                if (videoStreamsCount > 1)
+                    throw new Exception("The input movie file has multiple video streams.");
+            }
             var commandParameters = new List<string>
             {
                 "-hide_banner",
@@ -286,9 +298,9 @@ namespace MatroskaBatchToolBox
                 $"-s {resolutionSpec}",
                 $"-aspect {aspectRateSpec}"
             };
-            for (var index = 0; index < videoStreamsArray.Length; ++index)
+            for (var index = 0; index < videoStreams.Length; ++index)
             {
-                if (string.Equals(videoStreamsArray[index].CodecName, "png", StringComparison.InvariantCulture))
+                if (string.Equals(videoStreams[index].CodecName, "png", StringComparison.InvariantCulture))
                     commandParameters.Add($"-c:v:{index} copy");
                 else
                 {
@@ -303,6 +315,7 @@ namespace MatroskaBatchToolBox
             commandParameters.Add("-g 240");
             if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
                 commandParameters.Add(localSettings.FFmpegOption);
+            commandParameters.Add("-map 0");
             commandParameters.Add($"\"{outFile}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;

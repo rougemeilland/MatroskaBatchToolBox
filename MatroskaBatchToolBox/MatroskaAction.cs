@@ -349,7 +349,7 @@ namespace MatroskaBatchToolBox
 
                 if (calculateVMAFScore)
                 {
-                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, streams.EnumerateVideoStreams(), resolutionSpec, aspectRateSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                     if (ExternalCommand.CalculateVMAFScoreFromMovieFile(logFile, sourceFile, workingFile, resolutionSpec, out double vmafScore, new Progress<double>(progress => progressReporter.Report((1 + progress) / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
@@ -357,7 +357,7 @@ namespace MatroskaBatchToolBox
                 }
                 else
                 {
-                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, streams.EnumerateVideoStreams(), resolutionSpec, aspectRateSpec, videoEncoder, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ResizeMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                 }
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
