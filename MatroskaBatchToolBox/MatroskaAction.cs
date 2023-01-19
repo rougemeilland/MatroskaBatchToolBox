@@ -87,7 +87,7 @@ namespace MatroskaBatchToolBox
             var workingFile =
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
-                    $".work.audio-normalize.{sourceFile.Name}"));
+                    $".work.audio-normalize.{sourceFile.Name}.mkv"));
             DeleteFileSafety(workingFile);
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
@@ -214,7 +214,7 @@ namespace MatroskaBatchToolBox
             var workingFile =
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
-                    $".work.resize-resolution.{sourceFile.Name}"));
+                    $".work.resize-resolution.{sourceFile.Name}.mkv"));
             DeleteFileSafety(workingFile);
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
@@ -309,7 +309,7 @@ namespace MatroskaBatchToolBox
             var workingFile =
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
-                    $".work.resize-resolution.{sourceFile.Name}"));
+                    $".work.resize-resolution.{sourceFile.Name}.mkv"));
             DeleteFileSafety(workingFile);
             var actionResult = ActionResult.Failed;
             FileInfo? actualDestinationFilePath = null;
