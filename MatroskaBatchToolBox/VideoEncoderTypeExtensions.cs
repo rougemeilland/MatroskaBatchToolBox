@@ -11,47 +11,38 @@ namespace MatroskaBatchToolBox
 
         public static string ToFormatName(this VideoEncoderType videoEncoderType)
         {
-            switch (videoEncoderType)
-            {
-                case VideoEncoderType.Libx264:
-                    return "H.264";
-                case VideoEncoderType.Libx265:
-                    return "H.265";
-                case VideoEncoderType.LibaomAV1:
-                    return "AV1";
-                default:
-                    throw new Exception($"Unsupported video codec.: \"{videoEncoderType}\"");
-            }
+            return
+                videoEncoderType switch
+                {
+                    VideoEncoderType.Libx264 => "H.264",
+                    VideoEncoderType.Libx265 => "H.265",
+                    VideoEncoderType.LibaomAV1 => "AV1",
+                    _ => throw new Exception($"Unsupported video codec.: \"{videoEncoderType}\""),
+                };
         }
 
         public static string ToCodecSpec(this VideoEncoderType videoEncoderType)
         {
-            switch (videoEncoderType)
-            {
-                case VideoEncoderType.Libx264:
-                    return _libx264EncoderName;
-                case VideoEncoderType.Libx265:
-                    return _libx265EncoderName;
-                case VideoEncoderType.LibaomAV1:
-                    return _libaomAV1EncoderName;
-                default:
-                    throw new Exception($"Unsupported video codec.: \"{videoEncoderType}\"");
-            }
+            return
+                videoEncoderType switch
+                {
+                    VideoEncoderType.Libx264 => _libx264EncoderName,
+                    VideoEncoderType.Libx265 => _libx265EncoderName,
+                    VideoEncoderType.LibaomAV1 => _libaomAV1EncoderName,
+                    _ => throw new Exception($"Unsupported video codec.: \"{videoEncoderType}\""),
+                };
         }
 
         public static string GetEncodingOption(this Settings localSettings, VideoEncoderType videoEncoderType)
         {
-            switch (videoEncoderType)
-            {
-                case VideoEncoderType.Libx264:
-                    return localSettings.Libx264EncoderOptionOnComplexConversion;
-                case VideoEncoderType.Libx265:
-                    return localSettings.Libx265EncoderOptionOnComplexConversion;
-                case VideoEncoderType.LibaomAV1:
-                    return localSettings.LibaomAV1EncoderOptionOnComplexConversion;
-                default:
-                    throw new Exception($"Unsupported video codec.: \"{videoEncoderType}\"");
-            }
+            return
+                videoEncoderType switch
+                {
+                    VideoEncoderType.Libx264 => localSettings.FFmpegLibx264EncoderOption,
+                    VideoEncoderType.Libx265 => localSettings.FFmpegLibx265EncoderOption,
+                    VideoEncoderType.LibaomAV1 => localSettings.FFmpegLibaomAV1EncoderOption,
+                    _ => throw new Exception($"Unsupported video codec.: \"{videoEncoderType}\""),
+                };
         }
 
         public static VideoEncoderType? TryParseAsVideoEncoderType(this string? videoEncoderTypeText)

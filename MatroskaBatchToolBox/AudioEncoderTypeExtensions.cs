@@ -6,28 +6,24 @@ namespace MatroskaBatchToolBox
     {
         public static string ToFormatName(this AudioEncoderType audioEncoderType)
         {
-            switch (audioEncoderType)
-            {
-                case AudioEncoderType.Libopus:
-                    return "Opus";
-                case AudioEncoderType.Libvorbis:
-                    return "Vorbis";
-                default:
-                    throw new Exception($"Unsupported audio codec.: \"{audioEncoderType}\"");
-            }
+            return
+                audioEncoderType switch
+                {
+                    AudioEncoderType.Libopus => "Opus",
+                    AudioEncoderType.Libvorbis => "Vorbis",
+                    _ => throw new Exception($"Unsupported audio codec.: \"{audioEncoderType}\""),
+                };
         }
 
         public static string ToCodecSpec(this AudioEncoderType audioEncoderType)
         {
-            switch (audioEncoderType)
-            {
-                case AudioEncoderType.Libopus:
-                    return "libopus";
-                case AudioEncoderType.Libvorbis:
-                    return "libvorbis";
-                default:
-                    throw new Exception($"Unsupported audio codec.: \"{audioEncoderType}\"");
-            }
+            return
+                audioEncoderType switch
+                {
+                    AudioEncoderType.Libopus => "libopus",
+                    AudioEncoderType.Libvorbis => "libvorbis",
+                    _ => throw new Exception($"Unsupported audio codec.: \"{audioEncoderType}\""),
+                };
         }
     }
 }

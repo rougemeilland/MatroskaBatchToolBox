@@ -14,19 +14,21 @@ namespace MatroskaBatchToolBox
             public GlobalSettingsContainer()
             {
                 FFmpegNormalizeCommandPath = null;
-                VideoEncoderOnComplexConversion = null;
-                Libx264EncoderOptionOnComplexConversion = null;
-                Libx265EncoderOptionOnComplexConversion = null;
-                LibaomAV1EncoderOptionOnComplexConversion = null;
+                FFmpegVideoEncoder = null;
+                FFmpegLibx264EncoderOption = null;
+                FFmpegLibx265EncoderOption = null;
+                FFmpegLibaomAV1EncoderOption = null;
+                FFmpegOption = null;
                 CalculateVMAFScore = null;
                 DegreeOfParallelism = null;
             }
 
             public string? FFmpegNormalizeCommandPath { get; set; }
-            public string? VideoEncoderOnComplexConversion { get; set; }
-            public string? Libx264EncoderOptionOnComplexConversion { get; set; }
-            public string? Libx265EncoderOptionOnComplexConversion { get; set; }
-            public string? LibaomAV1EncoderOptionOnComplexConversion { get; set; }
+            public string? FFmpegVideoEncoder { get; set; }
+            public string? FFmpegLibx264EncoderOption { get; set; }
+            public string? FFmpegLibx265EncoderOption { get; set; }
+            public string? FFmpegLibaomAV1EncoderOption { get; set; }
+            public string? FFmpegOption { get; set; }
             public bool? CalculateVMAFScore { get; set; }
             public int? DegreeOfParallelism { get; set; }
         }
@@ -35,17 +37,18 @@ namespace MatroskaBatchToolBox
         {
             public LocalSettingsContainer()
             {
-                VideoEncoderOnComplexConversion = null;
-                Libx264EncoderOptionOnComplexConversion = null;
-                Libx265EncoderOptionOnComplexConversion = null;
-                LibaomAV1EncoderOptionOnComplexConversion = null;
+                FFmpegVideoEncoder = null;
+                FFmpegLibx264EncoderOption = null;
+                FFmpegLibx265EncoderOption = null;
+                FFmpegLibaomAV1EncoderOption = null;
                 CalculateVMAFScore = null;
             }
 
-            public string? VideoEncoderOnComplexConversion { get; set; }
-            public string? Libx264EncoderOptionOnComplexConversion { get; set; }
-            public string? Libx265EncoderOptionOnComplexConversion { get; set; }
-            public string? LibaomAV1EncoderOptionOnComplexConversion { get; set; }
+            public string? FFmpegVideoEncoder { get; set; }
+            public string? FFmpegLibx264EncoderOption { get; set; }
+            public string? FFmpegLibx265EncoderOption { get; set; }
+            public string? FFmpegLibaomAV1EncoderOption { get; set; }
+            public string? FFmpegOption { get; set; }
             public bool? CalculateVMAFScore { get; set; }
         }
 
@@ -110,11 +113,11 @@ namespace MatroskaBatchToolBox
                 throw new Exception(); // can't reach here
             }
 
-            var videoEncoderOnComplexConversion = settings.VideoEncoderOnComplexConversion.TryParseAsVideoEncoderType();
+            var videoEncoderOnComplexConversion = settings.FFmpegVideoEncoder.TryParseAsVideoEncoderType();
             if (videoEncoderOnComplexConversion is null)
             {
                 // サポートしていないエンコーダーが設定されていた場合
-                var message = $"Video encoders set to \"VideoEncoderOnComplexConversion\" are not supported.: {(settings.VideoEncoderOnComplexConversion is null ? "null" : $"\"{settings.VideoEncoderOnComplexConversion}\"")}";
+                var message = $"Video encoders set to \"VideoEncoderOnComplexConversion\" are not supported.: {(settings.FFmpegVideoEncoder is null ? "null" : $"\"{settings.FFmpegVideoEncoder}\"")}";
                 PrintFatalMessage(message);
                 throw new Exception(); // can't reach here
             }
@@ -123,9 +126,10 @@ namespace MatroskaBatchToolBox
             // ※ CRFの値は各エンコーダの「通常扱うであろう動画変換において視覚的に無損失と見なせる値」を選択した。
             //     参考: https://trac.ffmpeg.org/wiki/Encode/AV1 (AV1 ビデオ エンコーディング ガイド)
             //     参考: https://trac.ffmpeg.org/wiki/Encode/H.265 (H.265/HEVC ビデオ エンコーディング ガイド)
-            var libx264EncoderOptionOnComplexConversion = settings.Libx264EncoderOptionOnComplexConversion ?? "-crf 19";
-            var libx265EncoderOptionOnComplexConversion = settings.Libx265EncoderOptionOnComplexConversion ?? "-crf 19 -tag:v hvc1";
-            var libaomAV1EncoderOptionOnComplexConversion = settings.LibaomAV1EncoderOptionOnComplexConversion ?? "-crf 23";
+            var ffmpegLibx264EncoderOption = settings.FFmpegLibx264EncoderOption ?? "-crf 19";
+            var ffmpegLibx265EncoderOption = settings.FFmpegLibx265EncoderOption ?? "-crf 19 -tag:v hvc1";
+            var ffmpegLibaomAV1EncoderOption = settings.FFmpegLibaomAV1EncoderOption ?? "-crf 23";
+            var ffmpegOption = settings.FFmpegOption ?? "";
 
             var calculateVMAFScore = settings.CalculateVMAFScore ?? false;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
@@ -135,9 +139,10 @@ namespace MatroskaBatchToolBox
                     ffprobeCommandFile,
                     ffmpegCommandFile,
                     videoEncoderOnComplexConversion.Value,
-                    libx264EncoderOptionOnComplexConversion,
-                    libx265EncoderOptionOnComplexConversion,
-                    libaomAV1EncoderOptionOnComplexConversion,
+                    ffmpegLibx264EncoderOption,
+                    ffmpegLibx265EncoderOption,
+                    ffmpegLibaomAV1EncoderOption,
+                    ffmpegOption,
                     calculateVMAFScore,
                     degreeOfParallelism);
         }
@@ -160,20 +165,22 @@ namespace MatroskaBatchToolBox
             FileInfo ffmpegNormalizeCommandFile,
             FileInfo ffprobeCommandFile,
             FileInfo ffmpegCommandFile,
-            VideoEncoderType videoEncoderOnComplexConversion,
-            string libx264EncoderOptionOnComplexConversion,
-            string libx265EncoderOptionOnComplexConversion,
-            string libaomAV1EncoderOptionOnComplexConversion,
+            VideoEncoderType ffmpegVideoEncoder,
+            string ffmpegLibx264EncoderOption,
+            string ffmpegLibx265EncoderOption,
+            string ffmpegLibaomAV1EncoderOption,
+            string ffmpegOption,
             bool calculateVMAFScore,
             int degreeOfParallelism)
         {
             FFmpegNormalizeCommandFile = ffmpegNormalizeCommandFile;
             FFprobeCommandFile = ffprobeCommandFile;
             FFmpegCommandFile = ffmpegCommandFile;
-            VideoEncoderOnComplexConversion = videoEncoderOnComplexConversion;
-            Libx264EncoderOptionOnComplexConversion = libx264EncoderOptionOnComplexConversion;
-            Libx265EncoderOptionOnComplexConversion = libx265EncoderOptionOnComplexConversion;
-            LibaomAV1EncoderOptionOnComplexConversion = libaomAV1EncoderOptionOnComplexConversion;
+            FFmpegVideoEncoder = ffmpegVideoEncoder;
+            FFmpegLibx264EncoderOption = ffmpegLibx264EncoderOption;
+            FFmpegLibx265EncoderOption = ffmpegLibx265EncoderOption;
+            FFmpegLibaomAV1EncoderOption = ffmpegLibaomAV1EncoderOption;
+            FFmpegOption = ffmpegOption;
             CalculateVMAFScore = calculateVMAFScore;
             DegreeOfParallelism = degreeOfParallelism;
         }
@@ -181,10 +188,11 @@ namespace MatroskaBatchToolBox
         public FileInfo FFmpegNormalizeCommandFile { get; private set; }
         public FileInfo FFprobeCommandFile { get; private set; }
         public FileInfo FFmpegCommandFile { get; private set; }
-        public VideoEncoderType VideoEncoderOnComplexConversion { get; set; }
-        public string Libx264EncoderOptionOnComplexConversion { get; set; }
-        public string Libx265EncoderOptionOnComplexConversion { get; set; }
-        public string LibaomAV1EncoderOptionOnComplexConversion { get; set; }
+        public VideoEncoderType FFmpegVideoEncoder { get; set; }
+        public string FFmpegLibx264EncoderOption { get; set; }
+        public string FFmpegLibx265EncoderOption { get; set; }
+        public string FFmpegLibaomAV1EncoderOption { get; set; }
+        public string FFmpegOption { get; set; }
         public bool CalculateVMAFScore { get; private set; }
         public int DegreeOfParallelism { get; private set; }
         public static Settings GlobalSettings { get; private set; }
@@ -205,10 +213,11 @@ namespace MatroskaBatchToolBox
                         GlobalSettings.FFmpegNormalizeCommandFile,
                         GlobalSettings.FFprobeCommandFile,
                         GlobalSettings.FFmpegCommandFile,
-                        videoEncoderOnComplexConversion: localSettings.VideoEncoderOnComplexConversion.TryParseAsVideoEncoderType() ?? GlobalSettings.VideoEncoderOnComplexConversion,
-                        libx264EncoderOptionOnComplexConversion: localSettings.Libx264EncoderOptionOnComplexConversion ?? GlobalSettings.Libx264EncoderOptionOnComplexConversion,
-                        libx265EncoderOptionOnComplexConversion: localSettings.Libx265EncoderOptionOnComplexConversion ?? GlobalSettings.Libx265EncoderOptionOnComplexConversion,
-                        libaomAV1EncoderOptionOnComplexConversion: localSettings.LibaomAV1EncoderOptionOnComplexConversion ?? GlobalSettings.LibaomAV1EncoderOptionOnComplexConversion,
+                        localSettings.FFmpegVideoEncoder.TryParseAsVideoEncoderType() ?? GlobalSettings.FFmpegVideoEncoder,
+                        localSettings.FFmpegLibx264EncoderOption ?? GlobalSettings.FFmpegLibx264EncoderOption,
+                        localSettings.FFmpegLibx265EncoderOption ?? GlobalSettings.FFmpegLibx265EncoderOption,
+                        localSettings.FFmpegLibaomAV1EncoderOption ?? GlobalSettings.FFmpegLibaomAV1EncoderOption,
+                        localSettings.FFmpegOption ?? GlobalSettings.FFmpegOption,
                         calculateVMAFScore: localSettings.CalculateVMAFScore ?? GlobalSettings.CalculateVMAFScore,
                         degreeOfParallelism: GlobalSettings.DegreeOfParallelism);
             }

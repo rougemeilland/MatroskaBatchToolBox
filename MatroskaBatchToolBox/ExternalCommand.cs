@@ -231,24 +231,28 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static ExternalCommandResult ConvertMovieFile(FileInfo logFile, FileInfo inFile, string? aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, string? aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
         {
-            var commandParameter = new StringBuilder();
-            commandParameter.Append("-hide_banner");
-            commandParameter.Append(" -y");
-            commandParameter.Append($" -i \"{inFile.FullName}\"");
+            var commandParameters = new List<string>
+            {
+                "-hide_banner",
+                "-y",
+                $"-i \"{inFile.FullName}\""
+            };
             if (aspectRateSpec is not null)
-                commandParameter.Append($" -aspect {aspectRateSpec}");
-            commandParameter.Append(" -c:v copy -c:a copy -c:s copy");
-            commandParameter.Append($" \"{outFile.FullName}\"");
+                commandParameters.Add($"-aspect {aspectRateSpec}");
+            commandParameters.Add("-c:v copy -c:a copy -c:s copy");
+            if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
+                commandParameters.Add(localSettings.FFmpegOption);
+            commandParameters.Add($"\"{outFile.FullName}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
             var vmafScore = double.NaN; // この値は使用されない
             var (cancelled, exitCode) =
                 ExecuteCommand(
-                    Settings.GlobalSettings.FFmpegCommandFile,
+                    GlobalSettings.FFmpegCommandFile,
                     logFile,
-                    commandParameter.ToString(),
+                    string.Join(" ", commandParameters),
                     Encoding.UTF8,
                     (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScore, progressReporter),
                     proc =>
@@ -297,6 +301,8 @@ namespace MatroskaBatchToolBox
             commandParameters.Add("-c:a copy");
             commandParameters.Add("-c:s copy");
             commandParameters.Add("-g 240");
+            if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
+                commandParameters.Add(localSettings.FFmpegOption);
             commandParameters.Add($"\"{outFile}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;

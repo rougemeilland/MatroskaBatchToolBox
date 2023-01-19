@@ -188,7 +188,7 @@ namespace MatroskaBatchToolBox
             if (match.Success)
             {
                 // 親ディレクトリ名に単純変換の指示があった場合、単純変換を実行する。
-                return ContertMovieFileToMatroska(sourceFile, conversionSpec[match.Length..], progressReporter);
+                return ContertMovieFileToMatroska(localSettings, sourceFile, conversionSpec[match.Length..], progressReporter);
             }
             else
             {
@@ -197,7 +197,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static ActionResult ContertMovieFileToMatroska(FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
+        private static ActionResult ContertMovieFileToMatroska(Settings localSettings, FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
@@ -236,7 +236,7 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
-                if (ExternalCommand.ConvertMovieFile(logFile, sourceFile, aspectRateSpec, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, aspectRateSpec, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                     return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
@@ -293,7 +293,7 @@ namespace MatroskaBatchToolBox
 
         private static ActionResult ChangeResolutionOfMovieFile(Settings localSettings, FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
-            var videoEncoder = localSettings.VideoEncoderOnComplexConversion;
+            var videoEncoder = localSettings.FFmpegVideoEncoder;
             var calculateVMAFScore = localSettings.CalculateVMAFScore;
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
