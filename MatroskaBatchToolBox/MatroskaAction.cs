@@ -236,7 +236,18 @@ namespace MatroskaBatchToolBox
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
-                if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, aspectRateSpec, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+
+                var (commandResult, streams) = ExternalCommand.GetMovieStreamInfos(logFile, sourceFile);
+                if (commandResult == ExternalCommand.ExternalCommandResult.Cancelled)
+                    return actionResult = ActionResult.Cancelled;
+                if (streams is null)
+                {
+                    // このルートには到達しないはず
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Stream information could not be obtained from the movie file.: \"{sourceFile.FullName}\"", });
+                    return actionResult = ActionResult.Failed;
+                }
+
+                if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, aspectRateSpec, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                     return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
@@ -343,7 +354,7 @@ namespace MatroskaBatchToolBox
                 if (streams is null)
                 {
                     // このルートには到達しないはず
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Stream information could not be obtained from the video file.: \"{sourceFile.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Stream information could not be obtained from the movie file.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
 

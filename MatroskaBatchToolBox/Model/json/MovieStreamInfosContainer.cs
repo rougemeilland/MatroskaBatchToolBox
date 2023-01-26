@@ -1,16 +1,16 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 
-namespace MatroskaBatchToolBox.Model
+namespace MatroskaBatchToolBox.Model.json
 {
-    public class MovieStreamInfos
+    public class MovieStreamInfosContainer
     {
-        public MovieStreamInfos()
+        public MovieStreamInfosContainer()
         {
-            streams = new List<MovieStreamInfo>();
+            streams = new List<MovieStreamInfoContainer>();
         }
 
-        public IList<MovieStreamInfo> streams { get; set; }
+        public IList<MovieStreamInfoContainer> streams { get; set; }
 
         internal IEnumerable<VideoStreamInfo> EnumerateVideoStreams() =>
             streams

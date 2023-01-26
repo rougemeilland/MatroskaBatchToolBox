@@ -1,4 +1,5 @@
 ﻿using MatroskaBatchToolBox.Model;
+using MatroskaBatchToolBox.Model.json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -30,6 +31,7 @@ namespace MatroskaBatchToolBox
         }
 
         private const string _ffmpegPathEnvironmentVariableName = "FFMPEG_PATH";
+        private const string _mpngVideoStreamName = "png";
         private static readonly object _loggingLockObject;
         private static readonly Regex _ffmpegNormalizeProgressPattern;
         private static readonly Regex _logsToIgnoreInFFmpegNormalize;
@@ -76,8 +78,9 @@ namespace MatroskaBatchToolBox
 
                     // ffmpeg-normalize 自体のエンコーディングはおそらくデフォルトエンコーディング (端末のローカルエンコーディング 日本のPCなら shift_jis) だが、
                     // そこから呼び出される ffmpgのログは UTF-8になっている。
-                    // エンコーディングによって内容に差異が発生するのはパス名にASCII文字以外が含まれている場合ぐらいなので、とりあえず UTF-8にしておく。
-                    // したがって、音声の変換時に出力されるログの内容のうちパス名に関する部分は表示が乱れる可能性がある。
+                    // エンコーディングによって内容に差異が発生するのはパス名に ASCII 文字以外が含まれている場合であるが、
+                    // デバッグ時の情報として重要なのは ffmpeg のログ方なので、エンコーディングは ffmpeg と同じ UTF-8 にしておく。
+                    // その代り、ffmpeg-normalize が出力するログの内容のうちパス名の部分は表示が乱れる可能性がある。
                     Encoding.UTF8,
 
                     (type, text) =>
@@ -183,7 +186,7 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        public static (ExternalCommandResult result, MovieStreamInfos? streams) GetMovieStreamInfos(FileInfo logFile, FileInfo inFile)
+        public static (ExternalCommandResult result, MovieStreamInfosContainer? streams) GetMovieStreamInfos(FileInfo logFile, FileInfo inFile)
         {
             var commandParameter = new StringBuilder();
             commandParameter.Append("-hide_banner");
@@ -219,7 +222,7 @@ namespace MatroskaBatchToolBox
             string jsonText = string.Join("\r\n", standardOutputTextLines);
             try
             {
-                var streams = JsonSerializer.Deserialize<MovieStreamInfos>(jsonText);
+                var streams = JsonSerializer.Deserialize<MovieStreamInfosContainer>(jsonText);
                 if (streams is null)
                     throw new Exception("ffprobe returned no information.");
                 return (ExternalCommandResult.Completed, streams);
@@ -230,8 +233,11 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static ExternalCommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, string? aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieStreamInfosContainer streams, string? aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
         {
+            var videoStreams = streams.EnumerateVideoStreams().ToArray();
+            var audioStreams = streams.EnumerateAudioStreams().ToArray();
+            var subtitleStreams = streams.EnumerateSubtitleStreams().ToArray();
             var commandParameters = new List<string>
             {
                 "-hide_banner",
@@ -243,6 +249,12 @@ namespace MatroskaBatchToolBox
             commandParameters.Add("-c copy");
             if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
                 commandParameters.Add(localSettings.FFmpegOption);
+            for (var index = 0; index < videoStreams.Length; ++index)
+                AddCommandParameterToKeepStreamTags(commandParameters, "v", index, videoStreams[index].Tags);
+            for (var index = 0; index < audioStreams.Length; ++index)
+                AddCommandParameterToKeepStreamTags(commandParameters, "a", index, audioStreams[index].Tags);
+            for (var index = 0; index < subtitleStreams.Length; ++index)
+                AddCommandParameterToKeepStreamTags(commandParameters, "s", index, subtitleStreams[index].Tags);
             commandParameters.Add($"\"{outFile.FullName}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
@@ -269,12 +281,14 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        public static ExternalCommandResult ResizeMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieStreamInfos streams, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ResizeMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieStreamInfosContainer streams, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
         {
             var videoStreams = streams.EnumerateVideoStreams().ToArray();
-            if (videoStreams.Any(stream => string.Equals(stream.CodecName, "png", StringComparison.InvariantCulture)))
+            var audioStreams = streams.EnumerateAudioStreams().ToArray();
+            var subtitleStreams = streams.EnumerateSubtitleStreams().ToArray();
+            if (videoStreams.Any(stream => string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture)))
             {
-                var videoStreamsCountExceptPng = videoStreams.Where(stream => !string.Equals(stream.CodecName, "png", StringComparison.InvariantCulture)).Count();
+                var videoStreamsCountExceptPng = videoStreams.Where(stream => !string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture)).Count();
                 if (videoStreamsCountExceptPng <= 0)
                     throw new Exception("The input movie file does not have a video stream other than \"png\".");
                 if (videoStreamsCountExceptPng > 1)
@@ -298,7 +312,7 @@ namespace MatroskaBatchToolBox
             };
             for (var index = 0; index < videoStreams.Length; ++index)
             {
-                if (string.Equals(videoStreams[index].CodecName, "png", StringComparison.InvariantCulture))
+                if (string.Equals(videoStreams[index].CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture))
                     commandParameters.Add($"-c:v:{index} copy");
                 else
                 {
@@ -313,6 +327,12 @@ namespace MatroskaBatchToolBox
             commandParameters.Add("-g 240");
             if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
                 commandParameters.Add(localSettings.FFmpegOption);
+            for (var index = 0; index < videoStreams.Length; ++index)
+                AddCommandParameterToKeepStreamTags(commandParameters, "v", index, videoStreams[index].Tags);
+            for (var index = 0; index < audioStreams.Length; ++index)
+                AddCommandParameterToKeepStreamTags(commandParameters, "a", index, audioStreams[index].Tags);
+            for (var index = 0; index < subtitleStreams.Length; ++index)
+                AddCommandParameterToKeepStreamTags(commandParameters, "s", index, subtitleStreams[index].Tags);
             commandParameters.Add("-map 0");
             commandParameters.Add($"\"{outFile}\"");
             var detectedToQuit = false;
@@ -426,6 +446,18 @@ namespace MatroskaBatchToolBox
             for (var innerEx = ex.InnerException; innerEx is not null; innerEx = innerEx.InnerException)
                 Log(logFile, new[] { "----------", innerEx.Message, innerEx.StackTrace ?? "" });
             Log(logFile, new[] { "----------" });
+        }
+
+        private static void AddCommandParameterToKeepStreamTags(ICollection<string> commandParameters, string streamTypeSymbol, int index, StreamTags tags)
+        {
+            if (string.IsNullOrEmpty(tags.Language))
+                commandParameters.Add($"-metadata:s:{streamTypeSymbol}:{index} language=");
+            else
+                commandParameters.Add($"-metadata:s:{streamTypeSymbol}:{index} language=\"{tags.Language}\"");
+            if (string.IsNullOrEmpty(tags.Title))
+                commandParameters.Add($"-metadata:s:{streamTypeSymbol}:{index} title=");
+            else
+                commandParameters.Add($"-metadata:s:{streamTypeSymbol}:{index} title=\"{tags.Title}\"");
         }
 
         private static void ProcessFFmpegOutput(FileInfo logFile, string lineText, ref bool detectedToQuit, ref double maximumDurationSeconds, ref double vmafCalculationResult, IProgress<double> progressReporter)

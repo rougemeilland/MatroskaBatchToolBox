@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MatroskaBatchToolBox.Model.json;
+using System;
 using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -8,49 +9,6 @@ namespace MatroskaBatchToolBox
     internal class Settings
     {
         private const string _localSettingFileName = $".{nameof(MatroskaBatchToolBox)}.setting.json";
-
-        public class GlobalSettingsContainer
-        {
-            public GlobalSettingsContainer()
-            {
-                FFmpegNormalizeCommandPath = null;
-                FFmpegVideoEncoder = null;
-                FFmpegLibx264EncoderOption = null;
-                FFmpegLibx265EncoderOption = null;
-                FFmpegLibaomAV1EncoderOption = null;
-                FFmpegOption = null;
-                CalculateVMAFScore = null;
-                DegreeOfParallelism = null;
-            }
-
-            public string? FFmpegNormalizeCommandPath { get; set; }
-            public string? FFmpegVideoEncoder { get; set; }
-            public string? FFmpegLibx264EncoderOption { get; set; }
-            public string? FFmpegLibx265EncoderOption { get; set; }
-            public string? FFmpegLibaomAV1EncoderOption { get; set; }
-            public string? FFmpegOption { get; set; }
-            public bool? CalculateVMAFScore { get; set; }
-            public int? DegreeOfParallelism { get; set; }
-        }
-
-        public class LocalSettingsContainer
-        {
-            public LocalSettingsContainer()
-            {
-                FFmpegVideoEncoder = null;
-                FFmpegLibx264EncoderOption = null;
-                FFmpegLibx265EncoderOption = null;
-                FFmpegLibaomAV1EncoderOption = null;
-                CalculateVMAFScore = null;
-            }
-
-            public string? FFmpegVideoEncoder { get; set; }
-            public string? FFmpegLibx264EncoderOption { get; set; }
-            public string? FFmpegLibx265EncoderOption { get; set; }
-            public string? FFmpegLibaomAV1EncoderOption { get; set; }
-            public string? FFmpegOption { get; set; }
-            public bool? CalculateVMAFScore { get; set; }
-        }
 
         static Settings()
         {
@@ -203,27 +161,27 @@ namespace MatroskaBatchToolBox
             {
                 var localSettingFilePath = Path.Combine(movieFileDirectory.FullName, _localSettingFileName);
                 if (!File.Exists(localSettingFilePath))
-                    return GlobalSettings;
+                    return this;
                 var settingsText = File.ReadAllText(localSettingFilePath);
                 var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText);
                 if (localSettings is null)
-                    return GlobalSettings;
+                    return this;
                 return
                     new Settings(
-                        GlobalSettings.FFmpegNormalizeCommandFile,
-                        GlobalSettings.FFprobeCommandFile,
-                        GlobalSettings.FFmpegCommandFile,
-                        localSettings.FFmpegVideoEncoder.TryParseAsVideoEncoderType() ?? GlobalSettings.FFmpegVideoEncoder,
-                        localSettings.FFmpegLibx264EncoderOption ?? GlobalSettings.FFmpegLibx264EncoderOption,
-                        localSettings.FFmpegLibx265EncoderOption ?? GlobalSettings.FFmpegLibx265EncoderOption,
-                        localSettings.FFmpegLibaomAV1EncoderOption ?? GlobalSettings.FFmpegLibaomAV1EncoderOption,
-                        localSettings.FFmpegOption ?? GlobalSettings.FFmpegOption,
-                        calculateVMAFScore: localSettings.CalculateVMAFScore ?? GlobalSettings.CalculateVMAFScore,
-                        degreeOfParallelism: GlobalSettings.DegreeOfParallelism);
+                        FFmpegNormalizeCommandFile,
+                        FFprobeCommandFile,
+                        FFmpegCommandFile,
+                        localSettings.FFmpegVideoEncoder.TryParseAsVideoEncoderType() ?? FFmpegVideoEncoder,
+                        localSettings.FFmpegLibx264EncoderOption ?? FFmpegLibx264EncoderOption,
+                        localSettings.FFmpegLibx265EncoderOption ?? FFmpegLibx265EncoderOption,
+                        localSettings.FFmpegLibaomAV1EncoderOption ?? FFmpegLibaomAV1EncoderOption,
+                        localSettings.FFmpegOption ?? FFmpegOption,
+                        calculateVMAFScore: localSettings.CalculateVMAFScore ?? CalculateVMAFScore,
+                        degreeOfParallelism: DegreeOfParallelism);
             }
             catch (Exception)
             {
-                return GlobalSettings;
+                return this;
             }
         }
     }
