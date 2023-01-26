@@ -1,5 +1,4 @@
-﻿using MatroskaBatchToolBox.Model;
-using MatroskaBatchToolBox.Model.json;
+﻿using MatroskaBatchToolBox.Model.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -222,39 +221,116 @@ namespace MatroskaBatchToolBox
             string jsonText = string.Join("\r\n", standardOutputTextLines);
             try
             {
-                var streams = JsonSerializer.Deserialize<MovieStreamInfosContainer>(jsonText);
+                var streams = JsonSerializer.Deserialize<MovieStreamInfosContainer>(jsonText, new JsonSerializerOptions { AllowTrailingCommas = true });
                 if (streams is null)
                     throw new Exception("ffprobe returned no information.");
                 return (ExternalCommandResult.Completed, streams);
             }
             catch (Exception ex)
             {
-                throw new Exception($"The information returned by ffprobe is in an unknown format.: {jsonText}", ex);
+                throw new Exception($"The information returned by ffprobe is in an unknown format.: \"{jsonText}\"", ex);
             }
         }
 
-        public static ExternalCommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieStreamInfosContainer streams, string? aspectRateSpec, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieStreamInfosContainer streams, string? resolutionSpec, string? aspectRateSpec, VideoEncoderType videoEncoder, FileInfo outFile, IProgress<double> progressReporter)
         {
-            var videoStreams = streams.EnumerateVideoStreams().ToArray();
-            var audioStreams = streams.EnumerateAudioStreams().ToArray();
-            var subtitleStreams = streams.EnumerateSubtitleStreams().ToArray();
+            var videoStreams = streams.EnumerateVideoStreams().ToList();
+            var audioStreams = streams.EnumerateAudioStreams().ToList();
+            var subtitleStreams = streams.EnumerateSubtitleStreams().ToList();
+
+            var outputVideoStreams =
+                videoStreams
+                .Where(stream => !localSettings.DeletePNGVideoStream || !string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture))
+                .Select((stream, index) => new
+                {
+                    inIndex = stream.IndexWithinVideoStream,
+                    streamTypeSymbol = "v",
+                    outIndex = index,
+                    encodrOptions =
+                        string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture)
+                            ? new []{ $"-c:v:{index} copy"}
+                            : videoEncoder.GetEncoderOptions(localSettings, index),
+                    tags = stream.Tags,
+                })
+                .ToList();
+            var outputAudioStreams =
+                audioStreams
+                .Select((stream, index) => new
+                {
+                    inIndex = stream.IndexWithinAudioStream,
+                    streamTypeSymbol = "a",
+                    outIndex = index,
+                    encodrOptions = new[] { $"-c:a:{index} copy" }.AsEnumerable(),
+                    tags = stream.Tags,
+                })
+                .ToList();
+            var outputSubtitleStreams =
+                subtitleStreams
+                .Select((stream, index) => new
+                {
+                    inIndex = stream.IndexWithinSubtitleStream,
+                    streamTypeSymbol = "s",
+                    outIndex = index,
+                    encodrOptions = new[] { $"-c:s:{index} copy" }.AsEnumerable(),
+                    tags = stream.Tags,
+                })
+                .ToList();
+
+            // 出力対象のビデオストリームが存在するかどうかの確認
+            if (outputVideoStreams.Count <= 0)
+            {
+                if (localSettings.DeletePNGVideoStream)
+                    throw new Exception($"The input movie file does not have a video stream other than \"{_mpngVideoStreamName}\".");
+                else
+                    throw new Exception("The input movie file does not have a video stream.");
+            }
+
+            // pngビデオストリームは常に非変換対象なので、ビデオストリームが複数あるかどうかの判定にはカウントしない。
+            var outputVideoStreamsCountExceptPng = videoStreams.Where(stream => !string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture)).Count();
+            if (outputVideoStreamsCountExceptPng > 1 && !localSettings.AllowMultipleVideoStreams)
+            {
+                if (localSettings.DeletePNGVideoStream)
+                    throw new Exception($"You tried to convert a movie file with multiple video streams other than \"{_mpngVideoStreamName}\". If you don't mind applying the same encoder and encoder options to all video streams, try setting the \"{nameof(GlobalSettingsContainer.AllowMultipleVideoStreams)}\" property in the configuration file to \"true\".");
+                else
+                    throw new Exception($"You are trying to convert a movie file with multiple video streams. If you don't mind applying the same encoder and encoder options to all video streams, try setting the \"{nameof(GlobalSettingsContainer.AllowMultipleVideoStreams)}\" property in the configuration file to \"true\".");
+            }
+
             var commandParameters = new List<string>
             {
                 "-hide_banner",
                 "-y",
                 $"-i \"{inFile.FullName}\""
             };
+
+            if (resolutionSpec is not null)
+            {
+                commandParameters.Add($"-s {resolutionSpec}");
+
+            }
             if (aspectRateSpec is not null)
                 commandParameters.Add($"-aspect {aspectRateSpec}");
-            commandParameters.Add("-c copy");
+
+            foreach (var outputStream in outputVideoStreams.Concat(outputAudioStreams).Concat(outputSubtitleStreams))
+            {
+                foreach (var encoderOption in outputStream.encodrOptions)
+                    commandParameters.Add(encoderOption);
+                commandParameters.Add($"-map 0:{outputStream.streamTypeSymbol}:{outputStream.inIndex}");
+                var tags = outputStream.tags;
+                if (string.IsNullOrEmpty(tags.Language))
+                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} language=");
+                else
+                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} language=\"{tags.Language}\"");
+                if (string.IsNullOrEmpty(tags.Title))
+                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=");
+                else
+                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=\"{tags.Title}\"");
+            }
+            if (localSettings.DeleteChapters)
+                commandParameters.Add("-map_chapters -1");
+            if (videoEncoder != VideoEncoderType.Copy)
+                commandParameters.Add("-g 240");
             if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
                 commandParameters.Add(localSettings.FFmpegOption);
-            for (var index = 0; index < videoStreams.Length; ++index)
-                AddCommandParameterToKeepStreamTags(commandParameters, "v", index, videoStreams[index].Tags);
-            for (var index = 0; index < audioStreams.Length; ++index)
-                AddCommandParameterToKeepStreamTags(commandParameters, "a", index, audioStreams[index].Tags);
-            for (var index = 0; index < subtitleStreams.Length; ++index)
-                AddCommandParameterToKeepStreamTags(commandParameters, "s", index, subtitleStreams[index].Tags);
             commandParameters.Add($"\"{outFile.FullName}\"");
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
@@ -281,92 +357,13 @@ namespace MatroskaBatchToolBox
             return ExternalCommandResult.Completed;
         }
 
-        public static ExternalCommandResult ResizeMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieStreamInfosContainer streams, string resolutionSpec, string aspectRateSpec, VideoEncoderType videoEncoderType, FileInfo outFile, IProgress<double> progressReporter)
-        {
-            var videoStreams = streams.EnumerateVideoStreams().ToArray();
-            var audioStreams = streams.EnumerateAudioStreams().ToArray();
-            var subtitleStreams = streams.EnumerateSubtitleStreams().ToArray();
-            if (videoStreams.Any(stream => string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture)))
-            {
-                var videoStreamsCountExceptPng = videoStreams.Where(stream => !string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture)).Count();
-                if (videoStreamsCountExceptPng <= 0)
-                    throw new Exception("The input movie file does not have a video stream other than \"png\".");
-                if (videoStreamsCountExceptPng > 1)
-                    throw new Exception("The input movie file has multiple video streams other than \"png\".");
-            }
-            else
-            {
-                var videoStreamsCount = videoStreams.Count();
-                if (videoStreamsCount <= 0)
-                    throw new Exception("The input movie file does not have a video stream.");
-                if (videoStreamsCount > 1)
-                    throw new Exception("The input movie file has multiple video streams.");
-            }
-            var commandParameters = new List<string>
-            {
-                "-hide_banner",
-                "-y",
-                $"-i \"{inFile.FullName}\"",
-                $"-s {resolutionSpec}",
-                $"-aspect {aspectRateSpec}"
-            };
-            for (var index = 0; index < videoStreams.Length; ++index)
-            {
-                if (string.Equals(videoStreams[index].CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture))
-                    commandParameters.Add($"-c:v:{index} copy");
-                else
-                {
-                    commandParameters.Add($" -c:v:{index} {videoEncoderType.ToCodecSpec()}");
-                    var encoderOptions = localSettings.GetEncodingOption(videoEncoderType);
-                    if (!string.IsNullOrEmpty(encoderOptions))
-                        commandParameters.Add($"{encoderOptions.Trim()}");
-                }
-            }
-            commandParameters.Add("-c:a copy");
-            commandParameters.Add("-c:s copy");
-            commandParameters.Add("-g 240");
-            if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
-                commandParameters.Add(localSettings.FFmpegOption);
-            for (var index = 0; index < videoStreams.Length; ++index)
-                AddCommandParameterToKeepStreamTags(commandParameters, "v", index, videoStreams[index].Tags);
-            for (var index = 0; index < audioStreams.Length; ++index)
-                AddCommandParameterToKeepStreamTags(commandParameters, "a", index, audioStreams[index].Tags);
-            for (var index = 0; index < subtitleStreams.Length; ++index)
-                AddCommandParameterToKeepStreamTags(commandParameters, "s", index, subtitleStreams[index].Tags);
-            commandParameters.Add("-map 0");
-            commandParameters.Add($"\"{outFile}\"");
-            var detectedToQuit = false;
-            var maximumDurationSeconds = double.NaN;
-            var vmafScore = double.NaN; // この値は使用されない
-            var (cancelled, exitCode) =
-                ExecuteCommand(
-                    GlobalSettings.FFmpegCommandFile,
-                    logFile,
-                    string.Join(" ", commandParameters),
-                    Encoding.UTF8,
-                    (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScore, progressReporter),
-                    proc =>
-                    {
-                        proc.StandardInput.Write("q");
-                    }); ;
-            if (detectedToQuit || cancelled)
-            {
-                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
-                return ExternalCommandResult.Cancelled;
-            }
-            Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
-            if (exitCode != 0)
-                throw new Exception($"ffmpeg failed. (exit code {exitCode})");
-            return ExternalCommandResult.Completed;
-        }
-
         public static ExternalCommandResult CalculateVMAFScoreFromMovieFile(FileInfo logFile, FileInfo originalFile, FileInfo modifiedFile, string resolutionSpec, out double vmafScore, IProgress<double> progressReporter)
         {
             var commandParameter = new StringBuilder();
             commandParameter.Append("-hide_banner");
             commandParameter.Append($" -i \"{originalFile.FullName}\"");
             commandParameter.Append($" -i \"{modifiedFile.FullName}\"");
-            commandParameter.Append($" -filter_complex \"[0:v]settb=1/AVTB,setpts=PTS-STARTPTS[original];[1:v]settb=1/AVTB,setpts=PTS-STARTPTS[1v];[original][1v]scale2ref=flags=bicubic,libvmaf=model=version=vmaf_v0.6.1\\\\:name=vmaf\\\\:n_threads=4:shortest=1:repeatlast=0\"");
+            commandParameter.Append($" -filter_complex \"[0:v]settb=1/AVTB,setpts=PTS-STARTPTS[original];[1:v]settb=1/AVTB,setpts=PTS-STARTPTS[encoded];[original][encoded]scale2ref=flags=bicubic,libvmaf=model=version=vmaf_v0.6.1\\\\:name=vmaf\\\\:n_threads=4:shortest=1:repeatlast=0\"");
 #if false // -sn をつけると、VMAFスコア自体は正常に計算されるものの、実行経過に表示される time と speed に異常な値が表示され、進行状況が正しく把握できない。
             commandParameter.Append(" -an -sn");
 #endif
@@ -446,18 +443,6 @@ namespace MatroskaBatchToolBox
             for (var innerEx = ex.InnerException; innerEx is not null; innerEx = innerEx.InnerException)
                 Log(logFile, new[] { "----------", innerEx.Message, innerEx.StackTrace ?? "" });
             Log(logFile, new[] { "----------" });
-        }
-
-        private static void AddCommandParameterToKeepStreamTags(ICollection<string> commandParameters, string streamTypeSymbol, int index, StreamTags tags)
-        {
-            if (string.IsNullOrEmpty(tags.Language))
-                commandParameters.Add($"-metadata:s:{streamTypeSymbol}:{index} language=");
-            else
-                commandParameters.Add($"-metadata:s:{streamTypeSymbol}:{index} language=\"{tags.Language}\"");
-            if (string.IsNullOrEmpty(tags.Title))
-                commandParameters.Add($"-metadata:s:{streamTypeSymbol}:{index} title=");
-            else
-                commandParameters.Add($"-metadata:s:{streamTypeSymbol}:{index} title=\"{tags.Title}\"");
         }
 
         private static void ProcessFFmpegOutput(FileInfo logFile, string lineText, ref bool detectedToQuit, ref double maximumDurationSeconds, ref double vmafCalculationResult, IProgress<double> progressReporter)

@@ -1,13 +1,19 @@
-﻿namespace MatroskaBatchToolBox.Model.json
+﻿using System.Text.Json.Serialization;
+
+namespace MatroskaBatchToolBox.Model.Json
 {
     public class MovieStreamTagsContainer
     {
         public MovieStreamTagsContainer()
         {
-            language = null;
-            title = null;
+            Language = null;
+            Title = null;
         }
-        public string? language { get; set; }
-        public string? title { get; set; }
+
+        [JsonPropertyName("language")]
+        public string? Language { get; set; }
+
+        [JsonPropertyName("title")]
+        public string? Title { get; set; }
     }
 }

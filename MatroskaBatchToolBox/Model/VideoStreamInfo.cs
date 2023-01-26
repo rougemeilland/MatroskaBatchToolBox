@@ -1,21 +1,16 @@
-﻿using System;
-using MatroskaBatchToolBox.Model.json;
+﻿using MatroskaBatchToolBox.Model.Json;
 
 namespace MatroskaBatchToolBox.Model
 {
     internal class VideoStreamInfo
+        : StreamInfo
     {
-        public VideoStreamInfo(MovieStreamInfoContainer stream)
+        public VideoStreamInfo(MovieStreamInfoContainer stream, int indexWithinVideoStream)
+            : base(stream)
         {
-            Index = stream.index ?? throw new Exception($"The \"{nameof(stream.index)}\" property of the audio stream information is undefined.");
-            CodecName = stream.codec_name ?? throw new Exception($"The \"{nameof(stream.codec_name)}\" property of the audio stream information is undefined.");
-            CodecLongName = stream.codec_long_name ?? throw new Exception($"The \"{nameof(stream.codec_long_name)}\" property of the audio stream information is undefined.");
-            Tags = new StreamTags(stream.tags);
+            IndexWithinVideoStream = indexWithinVideoStream;
         }
 
-        public int Index { get; }
-        public string CodecName { get; }
-        public string CodecLongName { get; }
-        public StreamTags Tags { get; }
+        public int IndexWithinVideoStream { get; }
     }
 }

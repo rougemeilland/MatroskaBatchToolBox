@@ -1,10 +1,10 @@
 {
-  "FFmpegNormalizeCommandPath": "C:\\Users\\lunor\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\ffmpeg-normalize.exe",
-  "FFmpegVideoEncoder": "libaom-av1",
-  "FFmpegLibx264EncoderOption": "-crf 19",
-  "FFmpegLibx265EncoderOption": "-crf 19 -tag:v hvc1",
-  "FFmpegLibaomAV1EncoderOption": "-crf 23 -b:v 0 -cpu-used 5 -threads 2",
-  "FFmpegOption": null,
-  "CalculateVMAFScore": true,
-  "DegreeOfParallelism": 1
+  "ffmpeg_normalize_command_file_path": "C:\\Users\\lunor\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\ffmpeg-normalize.exe",
+  "ffmpeg_video_encoder": "libaom-av1",
+  "ffmpeg_libx264_encoder_option": "-crf 19",
+  "ffmpeg_libx265_encoder_option": "-crf 19",
+  "ffmpeg_libaom-av1_encoder_option": "-crf 23 -b:v 0 -cpu-used 5 -threads 2",
+  "ffmpeg_option": null,
+  "calculate_vmaf_score": true,
+  "degree_of_parallelism": 3
 }

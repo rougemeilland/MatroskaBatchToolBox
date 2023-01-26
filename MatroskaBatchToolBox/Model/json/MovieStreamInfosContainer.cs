@@ -1,30 +1,32 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 
-namespace MatroskaBatchToolBox.Model.json
+namespace MatroskaBatchToolBox.Model.Json
 {
     public class MovieStreamInfosContainer
     {
         public MovieStreamInfosContainer()
         {
-            streams = new List<MovieStreamInfoContainer>();
+            Streams = new List<MovieStreamInfoContainer>();
         }
 
-        public IList<MovieStreamInfoContainer> streams { get; set; }
+        [JsonPropertyName("streams")]
+        public IList<MovieStreamInfoContainer> Streams { get; set; }
 
         internal IEnumerable<VideoStreamInfo> EnumerateVideoStreams() =>
-            streams
-            .Where(stream => string.Equals(stream.codec_type, "video"))
-            .Select(stream => new VideoStreamInfo(stream));
+            Streams
+            .Where(stream => string.Equals(stream.CodecType, "video"))
+            .Select((stream, index) => new VideoStreamInfo(stream, index));
 
         internal IEnumerable<AudioStreamInfo> EnumerateAudioStreams() =>
-            streams
-            .Where(stream => string.Equals(stream.codec_type, "audio"))
-            .Select(stream => new AudioStreamInfo(stream));
+            Streams
+            .Where(stream => string.Equals(stream.CodecType, "audio"))
+            .Select((stream, index) => new AudioStreamInfo(stream, index));
 
         internal IEnumerable<SubtitleStreamInfo> EnumerateSubtitleStreams() =>
-            streams
-            .Where(stream => string.Equals(stream.codec_type, "subtitle"))
-            .Select(stream => new SubtitleStreamInfo(stream));
+            Streams
+            .Where(stream => string.Equals(stream.CodecType, "subtitle"))
+            .Select((stream, index) => new SubtitleStreamInfo(stream, index));
     }
 }

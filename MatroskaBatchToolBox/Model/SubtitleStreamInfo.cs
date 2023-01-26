@@ -1,25 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MatroskaBatchToolBox.Model.json;
+﻿using MatroskaBatchToolBox.Model.Json;
 
 namespace MatroskaBatchToolBox.Model
 {
     internal class SubtitleStreamInfo
+        : StreamInfo
     {
-        public SubtitleStreamInfo(MovieStreamInfoContainer stream)
+        public SubtitleStreamInfo(MovieStreamInfoContainer stream, int indexWithinSubtitleStream)
+            : base(stream)
         {
-            Index = stream.index ?? throw new Exception($"The \"{nameof(stream.index)}\" property of the audio stream information is undefined.");
-            CodecName = stream.codec_name ?? throw new Exception($"The \"{nameof(stream.codec_name)}\" property of the audio stream information is undefined.");
-            CodecLongName = stream.codec_long_name ?? throw new Exception($"The \"{nameof(stream.codec_long_name)}\" property of the audio stream information is undefined.");
-            Tags = new StreamTags(stream.tags);
+            IndexWithinSubtitleStream = indexWithinSubtitleStream;
         }
 
-        public int Index { get; }
-        public string CodecName { get; }
-        public string CodecLongName { get; }
-        public StreamTags Tags { get; }
+        public int IndexWithinSubtitleStream { get; }
     }
 }

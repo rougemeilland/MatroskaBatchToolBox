@@ -1,20 +1,31 @@
-﻿namespace MatroskaBatchToolBox.Model.json
+﻿using System.Text.Json.Serialization;
+
+namespace MatroskaBatchToolBox.Model.Json
 {
     public class MovieStreamInfoContainer
     {
         public MovieStreamInfoContainer()
         {
-            index = null;
-            codec_name = null;
-            codec_long_name = null;
-            codec_type = null;
-            tags = new MovieStreamTagsContainer();
+            Index = null;
+            codecName = null;
+            CodecLongName = null;
+            CodecType = null;
+            Tags = new MovieStreamTagsContainer();
         }
 
-        public int? index { get; set; }
-        public string? codec_name { get; set; }
-        public string? codec_long_name { get; set; }
-        public string? codec_type { get; set; }
-        public MovieStreamTagsContainer tags { get; set; }
+        [JsonPropertyName("index")]
+        public int? Index { get; set; }
+
+        [JsonPropertyName("codec_name")]
+        public string? codecName { get; set; }
+
+        [JsonPropertyName("codec_long_name")]
+        public string? CodecLongName { get; set; }
+
+        [JsonPropertyName("codec_type")]
+        public string? CodecType { get; set; }
+
+        [JsonPropertyName("tags")]
+        public MovieStreamTagsContainer Tags { get; set; }
     }
 }

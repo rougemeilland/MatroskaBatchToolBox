@@ -1,7 +1,8 @@
-﻿using MatroskaBatchToolBox.Model.json;
+﻿using MatroskaBatchToolBox.Model.Json;
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace MatroskaBatchToolBox
@@ -17,7 +18,7 @@ namespace MatroskaBatchToolBox
                 throw new Exception("'settings.json' is not found.");
             var settingsFilePath = Path.Combine(baseDirectoryPath, "settings.json");
             var settingsText = File.ReadAllText(settingsFilePath);
-            var settings = JsonSerializer.Deserialize<GlobalSettingsContainer>(settingsText);
+            var settings = JsonSerializer.Deserialize<GlobalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas = true });
             if (settings is null)
                 throw new Exception("Failed to parse 'settings.json'.");
 
@@ -48,15 +49,15 @@ namespace MatroskaBatchToolBox
             }
 
             FileInfo? ffmpegNormalizeCommandFile;
-            if (string.IsNullOrEmpty(settings.FFmpegNormalizeCommandPath))
+            if (string.IsNullOrEmpty(settings.FFmpegNormalizeCommandFilePath))
             {
-                var message = $"'{nameof(settings.FFmpegNormalizeCommandPath)}' is not set in 'settings.json'.";
+                var message = $"'{nameof(settings.FFmpegNormalizeCommandFilePath)}' is not set in 'settings.json'.";
                 PrintFatalMessage(message);
                 throw new Exception(); // can't reach here
             }
             try
             {
-                ffmpegNormalizeCommandFile = new FileInfo(settings.FFmpegNormalizeCommandPath);
+                ffmpegNormalizeCommandFile = new FileInfo(settings.FFmpegNormalizeCommandFilePath);
                 if (!ffmpegNormalizeCommandFile.Exists)
                     ffmpegNormalizeCommandFile = null;
             }
@@ -66,7 +67,7 @@ namespace MatroskaBatchToolBox
             }
             if (ffmpegNormalizeCommandFile is null)
             {
-                var message = $"The path name \"{settings.FFmpegNormalizeCommandPath}\" set in \"{nameof(settings.FFmpegNormalizeCommandPath)}\" does not exist.";
+                var message = $"The path name \"{settings.FFmpegNormalizeCommandFilePath}\" set in \"{nameof(settings.FFmpegNormalizeCommandFilePath)}\" does not exist.";
                 PrintFatalMessage(message);
                 throw new Exception(); // can't reach here
             }
@@ -85,10 +86,12 @@ namespace MatroskaBatchToolBox
             //     参考: https://trac.ffmpeg.org/wiki/Encode/AV1 (AV1 ビデオ エンコーディング ガイド)
             //     参考: https://trac.ffmpeg.org/wiki/Encode/H.265 (H.265/HEVC ビデオ エンコーディング ガイド)
             var ffmpegLibx264EncoderOption = settings.FFmpegLibx264EncoderOption ?? "-crf 19";
-            var ffmpegLibx265EncoderOption = settings.FFmpegLibx265EncoderOption ?? "-crf 19 -tag:v hvc1";
+            var ffmpegLibx265EncoderOption = settings.FFmpegLibx265EncoderOption ?? "-crf 19";
             var ffmpegLibaomAV1EncoderOption = settings.FFmpegLibaomAV1EncoderOption ?? "-crf 23";
             var ffmpegOption = settings.FFmpegOption ?? "";
-
+            var deleteChapters = settings.DeleteChapters ?? false;
+            var deletePNGVideoStream = settings.DeletePNGVideoStream ?? false;
+            var allowMultipleVideoStreams = settings.AllowMultipleVideoStreams ?? false;
             var calculateVMAFScore = settings.CalculateVMAFScore ?? false;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
             GlobalSettings =
@@ -101,8 +104,11 @@ namespace MatroskaBatchToolBox
                     ffmpegLibx265EncoderOption,
                     ffmpegLibaomAV1EncoderOption,
                     ffmpegOption,
-                    calculateVMAFScore,
-                    degreeOfParallelism);
+                    deleteChapters,
+                    deletePNGVideoStream,
+                    allowMultipleVideoStreams,
+                    calculateVMAFScore: calculateVMAFScore,
+                    degreeOfParallelism: degreeOfParallelism);
         }
 
         private static void PrintFatalMessage(string message)
@@ -128,6 +134,9 @@ namespace MatroskaBatchToolBox
             string ffmpegLibx265EncoderOption,
             string ffmpegLibaomAV1EncoderOption,
             string ffmpegOption,
+            bool deleteChapters,
+            bool deletePNGVideoStream,
+            bool allowMultipleVideoStreams,
             bool calculateVMAFScore,
             int degreeOfParallelism)
         {
@@ -139,21 +148,27 @@ namespace MatroskaBatchToolBox
             FFmpegLibx265EncoderOption = ffmpegLibx265EncoderOption;
             FFmpegLibaomAV1EncoderOption = ffmpegLibaomAV1EncoderOption;
             FFmpegOption = ffmpegOption;
+            DeleteChapters = deleteChapters;
+            DeletePNGVideoStream = deletePNGVideoStream;
+            AllowMultipleVideoStreams = allowMultipleVideoStreams;
             CalculateVMAFScore = calculateVMAFScore;
             DegreeOfParallelism = degreeOfParallelism;
         }
 
-        public FileInfo FFmpegNormalizeCommandFile { get; private set; }
-        public FileInfo FFprobeCommandFile { get; private set; }
-        public FileInfo FFmpegCommandFile { get; private set; }
-        public VideoEncoderType FFmpegVideoEncoder { get; set; }
-        public string FFmpegLibx264EncoderOption { get; set; }
-        public string FFmpegLibx265EncoderOption { get; set; }
-        public string FFmpegLibaomAV1EncoderOption { get; set; }
-        public string FFmpegOption { get; set; }
-        public bool CalculateVMAFScore { get; private set; }
-        public int DegreeOfParallelism { get; private set; }
-        public static Settings GlobalSettings { get; private set; }
+        public FileInfo FFmpegNormalizeCommandFile { get; }
+        public FileInfo FFprobeCommandFile { get;  }
+        public FileInfo FFmpegCommandFile { get; }
+        public VideoEncoderType FFmpegVideoEncoder { get; }
+        public string FFmpegLibx264EncoderOption { get; }
+        public string FFmpegLibx265EncoderOption { get; }
+        public string FFmpegLibaomAV1EncoderOption { get; }
+        public string FFmpegOption { get; }
+        public bool DeleteChapters { get; }
+        public bool DeletePNGVideoStream { get; }
+        public bool AllowMultipleVideoStreams { get; }
+        public bool CalculateVMAFScore { get; }
+        public int DegreeOfParallelism { get; }
+        public static Settings GlobalSettings { get;  }
 
         public Settings GetLocalSettings(DirectoryInfo movieFileDirectory)
         {
@@ -163,7 +178,7 @@ namespace MatroskaBatchToolBox
                 if (!File.Exists(localSettingFilePath))
                     return this;
                 var settingsText = File.ReadAllText(localSettingFilePath);
-                var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText);
+                var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas= true });
                 if (localSettings is null)
                     return this;
                 return
@@ -176,6 +191,9 @@ namespace MatroskaBatchToolBox
                         localSettings.FFmpegLibx265EncoderOption ?? FFmpegLibx265EncoderOption,
                         localSettings.FFmpegLibaomAV1EncoderOption ?? FFmpegLibaomAV1EncoderOption,
                         localSettings.FFmpegOption ?? FFmpegOption,
+                        localSettings.DeleteChapters ?? DeleteChapters,
+                        localSettings.DeletePNGVideoStream ?? DeletePNGVideoStream,
+                        localSettings.AllowMultipleVideoStreams ?? AllowMultipleVideoStreams,
                         calculateVMAFScore: localSettings.CalculateVMAFScore ?? CalculateVMAFScore,
                         degreeOfParallelism: DegreeOfParallelism);
             }

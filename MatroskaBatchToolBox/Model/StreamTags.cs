@@ -1,4 +1,4 @@
-﻿using MatroskaBatchToolBox.Model.json;
+﻿using MatroskaBatchToolBox.Model.Json;
 
 namespace MatroskaBatchToolBox.Model
 {
@@ -6,8 +6,8 @@ namespace MatroskaBatchToolBox.Model
     {
         public StreamTags(MovieStreamTagsContainer? tags)
         {
-            Title = tags?.title;
-            Language = tags?.language;
+            Title = tags?.Title;
+            Language = tags?.Language;
         }
 
         public string? Title { get; }
