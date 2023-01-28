@@ -27,5 +27,14 @@ namespace MatroskaBatchToolBox.Model.Json
 
         [JsonPropertyName("tags")]
         public MovieStreamTagsContainer Tags { get; set; }
+
+        [JsonPropertyName("width")]
+        public int? Width { get; set; }
+
+        [JsonPropertyName("height")]
+        public int? Height { get; set; }
+
+        [JsonPropertyName("display_aspect_ratio")]
+        public string? DisplayAspectRatio { get; set; }
     }
 }

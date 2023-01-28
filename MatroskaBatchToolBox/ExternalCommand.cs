@@ -232,7 +232,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static ExternalCommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieStreamInfosContainer streams, string? resolutionSpec, string? aspectRateSpec, VideoEncoderType videoEncoder, FileInfo outFile, IProgress<double> progressReporter)
+        public static ExternalCommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieStreamInfosContainer streams, string? resolutionSpec, string? aspectRatioSpec, VideoEncoderType videoEncoder, FileInfo outFile, IProgress<double> progressReporter)
         {
             var videoStreams = streams.EnumerateVideoStreams().ToList();
             var audioStreams = streams.EnumerateAudioStreams().ToList();
@@ -241,19 +241,20 @@ namespace MatroskaBatchToolBox
             var outputVideoStreams =
                 videoStreams
                 .Where(stream => !localSettings.DeletePNGVideoStream || !string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture))
+                .ToList();
+            var outputVideoStreamSummaries =
+                outputVideoStreams
                 .Select((stream, index) => new
                 {
                     inIndex = stream.IndexWithinVideoStream,
                     streamTypeSymbol = "v",
                     outIndex = index,
                     encodrOptions =
-                        string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture)
-                            ? new []{ $"-c:v:{index} copy"}
-                            : videoEncoder.GetEncoderOptions(localSettings, index),
+                        (string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture) ? VideoEncoderType.Copy : videoEncoder).GetEncoderOptions(localSettings, index),
                     tags = stream.Tags,
                 })
                 .ToList();
-            var outputAudioStreams =
+            var outputAudioStreamSummaries =
                 audioStreams
                 .Select((stream, index) => new
                 {
@@ -264,7 +265,7 @@ namespace MatroskaBatchToolBox
                     tags = stream.Tags,
                 })
                 .ToList();
-            var outputSubtitleStreams =
+            var outputSubtitleStreamSummaries =
                 subtitleStreams
                 .Select((stream, index) => new
                 {
@@ -277,7 +278,7 @@ namespace MatroskaBatchToolBox
                 .ToList();
 
             // 出力対象のビデオストリームが存在するかどうかの確認
-            if (outputVideoStreams.Count <= 0)
+            if (outputVideoStreamSummaries.Count <= 0)
             {
                 if (localSettings.DeletePNGVideoStream)
                     throw new Exception($"The input movie file does not have a video stream other than \"{_mpngVideoStreamName}\".");
@@ -302,15 +303,18 @@ namespace MatroskaBatchToolBox
                 $"-i \"{inFile.FullName}\""
             };
 
-            if (resolutionSpec is not null)
+            // 呼び出し元から解像度指定が与えられていて、かつ元動画のビデオストリームの中に与えられた解像度指定と異なるものがある場合に、ffmpeg に解像度指定を与える。
+            if (resolutionSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.Resolution, resolutionSpec, StringComparison.InvariantCulture)))
             {
                 commandParameters.Add($"-s {resolutionSpec}");
 
             }
-            if (aspectRateSpec is not null)
-                commandParameters.Add($"-aspect {aspectRateSpec}");
 
-            foreach (var outputStream in outputVideoStreams.Concat(outputAudioStreams).Concat(outputSubtitleStreams))
+            // 呼び出し元からアスペクト比が与えられていて、かつ元動画のビデオストリームの中に与えられたアスペクト比と異なるものがある場合に、ffmpeg にアスペクト比を与える。
+            if (aspectRatioSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.DisplayAspectRatio, aspectRatioSpec, StringComparison.InvariantCulture)))
+                commandParameters.Add($"-aspect {aspectRatioSpec}");
+
+            foreach (var outputStream in outputVideoStreamSummaries.Concat(outputAudioStreamSummaries).Concat(outputSubtitleStreamSummaries))
             {
                 foreach (var encoderOption in outputStream.encodrOptions)
                     commandParameters.Add(encoderOption);

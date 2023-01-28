@@ -19,7 +19,7 @@ namespace EncoderBenchmarkTest
         static Program()
         {
             _vmafScorePattern = new Regex(@"VMAF score\s*:\s*(?<vmafScore>\d+(\.\d+)?)", RegexOptions.Compiled);
-            _resolutionSpecInFileNamePattern = new Regex(@"\[(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)( (?<aspectRateWidth>\d+)(to|：)(?<aspectRateHeight>\d+))?\]", RegexOptions.Compiled);
+            _resolutionSpecInFileNamePattern = new Regex(@"\[(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)( (?<aspectRatioWidth>\d+)(to|：)(?<aspectRatioHeight>\d+))?\]", RegexOptions.Compiled);
         }
         public static void Main(string[] args)
         {
@@ -75,26 +75,26 @@ namespace EncoderBenchmarkTest
                                 int resolutionHeight = int.Parse(match.Groups["resolutionHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
                                 if (resolutionHeight <= 0)
                                     throw new Exception($"There is an error in the resolution specified in the file name.: \"{sourceFile.Name}\"");
-                                int aspectRateWidth;
-                                int aspectRateHeight;
-                                if (match.Groups["aspectRateWidth"].Success && match.Groups["aspectRateHeight"].Success)
+                                int aspectRatioWidth;
+                                int aspectRatioHeight;
+                                if (match.Groups["aspectRatioWidth"].Success && match.Groups["aspectRatioHeight"].Success)
                                 {
-                                    aspectRateWidth = int.Parse(match.Groups["aspectRateWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-                                    if (aspectRateWidth <= 0)
-                                        throw new Exception($"There is an error in the aspect rate specified in the file name.: \"{sourceFile.Name}\"");
-                                    aspectRateHeight = int.Parse(match.Groups["aspectRateHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-                                    if (aspectRateHeight <= 0)
-                                        throw new Exception($"There is an error in the aspect rate specified in the file name.: \"{sourceFile.Name}\"");
+                                    aspectRatioWidth = int.Parse(match.Groups["aspectRatioWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                                    if (aspectRatioWidth <= 0)
+                                        throw new Exception($"There is an error in the aspect ratio specified in the file name.: \"{sourceFile.Name}\"");
+                                    aspectRatioHeight = int.Parse(match.Groups["aspectRatioHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                                    if (aspectRatioHeight <= 0)
+                                        throw new Exception($"There is an error in the aspect ratio specified in the file name.: \"{sourceFile.Name}\"");
                                 }
                                 else
                                 {
                                     var gcd = ExtendedMath.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
-                                    aspectRateWidth = resolutionWidth / gcd;
-                                    aspectRateHeight = resolutionHeight / gcd;
+                                    aspectRatioWidth = resolutionWidth / gcd;
+                                    aspectRatioHeight = resolutionHeight / gcd;
                                 }
                                 try
                                 {
-                                    var (elapsedTime, fileSize, commandLine) = ConvertMovieFile(ffmpegCommandPath, sourceFile, encodedFile, resolutionWidth, resolutionHeight, aspectRateWidth, aspectRateHeight, item.encoder, item.parameter);
+                                    var (elapsedTime, fileSize, commandLine) = ConvertMovieFile(ffmpegCommandPath, sourceFile, encodedFile, resolutionWidth, resolutionHeight, aspectRatioWidth, aspectRatioHeight, item.encoder, item.parameter);
                                     Console.WriteLine(new string('-', 40));
                                     var vmafScore = CalculateVMAF(ffmpegCommandPath, sourceFile, encodedFile, resolutionWidth, resolutionHeight);
                                     var resultItems = new[] { Path.GetFileName(sourceFilePath) ?? "???", sourceFileLength.ToString("N0"), item.friendlyEncoderName, encodedFile.Length.ToString("N0"), elapsedTime.TotalSeconds.ToString("F2"), vmafScore.ToString("F6"), ((double)encodedFile.Length / sourceFileLength).ToString("F6"), commandLine};
@@ -120,14 +120,14 @@ namespace EncoderBenchmarkTest
             Console.ReadLine();
         }
 
-        private static (TimeSpan cpuTime, long encodedFileLength, string commandLine) ConvertMovieFile(string ffmpegCommandPath, FileInfo sourceFile, FileInfo encodedFile, int resolutionWidth, int resolutionHeight, int aspectRateWidth, int aspectRateHeight, string encoder, string encoderDependentParameters)
+        private static (TimeSpan cpuTime, long encodedFileLength, string commandLine) ConvertMovieFile(string ffmpegCommandPath, FileInfo sourceFile, FileInfo encodedFile, int resolutionWidth, int resolutionHeight, int aspectRatioWidth, int aspectRatioHeight, string encoder, string encoderDependentParameters)
         {
             var commandParameter = new StringBuilder();
             commandParameter.Append("-hide_banner");
             commandParameter.Append(" -y");
             commandParameter.Append($" -i \"{sourceFile.FullName}\"");
             commandParameter.Append($" -s {resolutionWidth}x{resolutionHeight}");
-            commandParameter.Append($" -aspect {aspectRateWidth}:{aspectRateHeight}");
+            commandParameter.Append($" -aspect {aspectRatioWidth}:{aspectRatioHeight}");
             commandParameter.Append($" -c:v {encoder}");
             if (!string.IsNullOrEmpty(encoderDependentParameters))
                 commandParameter.Append($" {encoderDependentParameters}");

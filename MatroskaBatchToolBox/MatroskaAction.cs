@@ -10,17 +10,17 @@ namespace MatroskaBatchToolBox
     {
         private const string _convertModeSymbolPatternText = @"(?<convertMode>==)";
         private const string _resolutionPatternText = @"(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)";
-        private const string _separaterBetweenResolutionSpecAndAspectRatePatternText = @" +|\-|_";
-        private const string _aspectRatePatternText = @"((?<aspectRateWidth>\d+)(?<aspectRateSeparater>to|：|:)(?<aspectRateHeight>\d+))|(?<aspectRateValue>\d+\.\d+)";
+        private const string _separaterBetweenResolutionSpecAndAspectRatioPatternText = @" +|\-|_";
+        private const string _aspectRatioPatternText = @"((?<aspectRatioWidth>\d+)(?<aspectRatioSeparater>to|：|:)(?<aspectRatioHeight>\d+))|(?<aspectRatioValue>\d+\.\d+)";
         private static readonly Regex _duplicatedFileNamePattern;
         private static readonly Regex _normalizedFileNamePattern;
         private static readonly Regex _encodedFileNamePattern;
         private static readonly Regex _startsWithConvertModeSymbolPattern;
         private static readonly Regex _startsWithResolutionSpecPattern;
-        private static readonly Regex _startsWithSeparaterBetweenResolutionSpecAndAspectRatePattern;
-        private static readonly Regex _startsWithAspectRateSpecPattern;
+        private static readonly Regex _startsWithSeparaterBetweenResolutionSpecAndAspectRatioPattern;
+        private static readonly Regex _startsWithAspectRatioSpecPattern;
         private static readonly Regex _startsWithCommentPattern;
-        private static readonly Regex _resolutionAndAspectRateSpecInFileNamePattern;
+        private static readonly Regex _resolutionAndAspectRatioSpecInFileNamePattern;
 
         static MatroskaAction()
         {
@@ -29,15 +29,15 @@ namespace MatroskaBatchToolBox
             _encodedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]*? )?)(H\.264|x264|MPEG\-4|AVC|H\.265|x265|HEVC|AV1) (CRF|crf)(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
             _startsWithConvertModeSymbolPattern = new Regex($"^({_convertModeSymbolPatternText})", RegexOptions.Compiled);
             _startsWithResolutionSpecPattern = new Regex($"^({_resolutionPatternText})", RegexOptions.Compiled);
-            _startsWithSeparaterBetweenResolutionSpecAndAspectRatePattern = new Regex($"^({_separaterBetweenResolutionSpecAndAspectRatePatternText})", RegexOptions.Compiled);
-            _startsWithAspectRateSpecPattern = new Regex($"^({_aspectRatePatternText})", RegexOptions.Compiled);
+            _startsWithSeparaterBetweenResolutionSpecAndAspectRatioPattern = new Regex($"^({_separaterBetweenResolutionSpecAndAspectRatioPatternText})", RegexOptions.Compiled);
+            _startsWithAspectRatioSpecPattern = new Regex($"^({_aspectRatioPatternText})", RegexOptions.Compiled);
             _startsWithCommentPattern = new Regex($"^ *#", RegexOptions.Compiled);
             var groupNamePattern = new Regex(@"\?<[^>]+>");
             var resolutionPatternTextWithoutGroup = groupNamePattern.Replace(_resolutionPatternText, "");
-            var aspectRatePatternTextWithoutGroup = groupNamePattern.Replace(_aspectRatePatternText, "");
-            _resolutionAndAspectRateSpecInFileNamePattern =
+            var aspectRatioPatternTextWithoutGroup = groupNamePattern.Replace(_aspectRatioPatternText, "");
+            _resolutionAndAspectRatioSpecInFileNamePattern =
                 new Regex(
-                    $"(?<prefix>\\[([^\\]]*? )?)(?<resolutionAndAspectRateSpec>({resolutionPatternTextWithoutGroup})( ({aspectRatePatternTextWithoutGroup}))?)(?<suffix>( [^\\]]*)?\\])",
+                    $"(?<prefix>\\[([^\\]]*? )?)(?<resolutionAndAspectRatioSpec>({resolutionPatternTextWithoutGroup})( ({aspectRatioPatternTextWithoutGroup}))?)(?<suffix>( [^\\]]*)?\\])",
                     RegexOptions.Compiled);
         }
 
@@ -201,7 +201,7 @@ namespace MatroskaBatchToolBox
         {
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
-            var (isParsedSuccessfully, resolutionSpec, aspectRateSpec, aspectRateSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
+            var (isParsedSuccessfully, resolutionSpec, aspectRatioSpec, aspectRatioSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
             if (!isParsedSuccessfully)
                 return ActionResult.Skipped;
             var destinationFile =
@@ -210,7 +210,7 @@ namespace MatroskaBatchToolBox
                         sourceFile.DirectoryName ?? ".",
                         resolutionSpec is null
                             ? $"{Path.GetFileNameWithoutExtension(sourceFile.Name)}.mkv"
-                            : ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem, null)));
+                            : ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRatioSpecOnFileSystem, null)));
             var workingFile =
                 new FileInfo(
                     Path.Combine(sourceFile.DirectoryName ?? ".",
@@ -247,7 +247,7 @@ namespace MatroskaBatchToolBox
                     return actionResult = ActionResult.Failed;
                 }
 
-                if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, null, aspectRateSpec, VideoEncoderType.Copy, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, null, aspectRatioSpec, VideoEncoderType.Copy, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                     return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
@@ -308,14 +308,14 @@ namespace MatroskaBatchToolBox
             var calculateVMAFScore = localSettings.CalculateVMAFScore;
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
-            var (isParsedSuccessfully, resolutionSpec, aspectRateSpec, aspectRateSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
-            if (!isParsedSuccessfully || resolutionSpec is null || aspectRateSpec is null)
+            var (isParsedSuccessfully, resolutionSpec, aspectRatioSpec, aspectRatioSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
+            if (!isParsedSuccessfully || resolutionSpec is null || aspectRatioSpec is null)
             {
                 // 親ディレクトの名前が解像度(およびアスペクト比の指定)ではないので、何もせず復帰する。
                 return ActionResult.Skipped;
             }
 
-            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRateSpecOnFileSystem, $"{videoEncoder.ToFormatName()} CRF");
+            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRatioSpecOnFileSystem, $"{videoEncoder.ToFormatName()} CRF");
             var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", destinationFileName));
             var workingFile =
                 new FileInfo(
@@ -360,7 +360,7 @@ namespace MatroskaBatchToolBox
 
                 if (calculateVMAFScore)
                 {
-                    if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRatioSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                     if (ExternalCommand.CalculateVMAFScoreFromMovieFile(logFile, sourceFile, workingFile, resolutionSpec, out double vmafScore, new Progress<double>(progress => progressReporter.Report((1 + progress) / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
@@ -368,7 +368,7 @@ namespace MatroskaBatchToolBox
                 }
                 else
                 {
-                    if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRateSpec, videoEncoder, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRatioSpec, videoEncoder, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                 }
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
@@ -434,7 +434,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static (bool success, string? resolutionSpec, string? aspectRateSpec, string? aspectRateSpecOnFileSystem) ParseConversionSpecText(string conversionSpec)
+        private static (bool success, string? resolutionSpec, string? aspectRatioSpec, string? aspectRatioSpecOnFileSystem) ParseConversionSpecText(string conversionSpec)
         {
             var resolutionSpecMatch = _startsWithResolutionSpecPattern.Match(conversionSpec);
             if (conversionSpec.Length <= 0)
@@ -456,13 +456,13 @@ namespace MatroskaBatchToolBox
 
                 // 解像度から整数比を求めてそれをアスペクト比とする。
                 var gcd = ExtendedMath.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
-                var aspectRateWidth = resolutionWidth / gcd;
-                var aspectRateHeight = resolutionHeight / gcd;
-                return (true, $"{resolutionWidth}x{resolutionHeight}", $"{aspectRateWidth}:{aspectRateHeight}", null);
+                var aspectRatioWidth = resolutionWidth / gcd;
+                var aspectRatioHeight = resolutionHeight / gcd;
+                return (true, $"{resolutionWidth}x{resolutionHeight}", $"{aspectRatioWidth}:{aspectRatioHeight}", null);
             }
 
             // 解像度指定の後に続きがある場合
-            var separaterMatch = _startsWithSeparaterBetweenResolutionSpecAndAspectRatePattern.Match(conversionSpec);
+            var separaterMatch = _startsWithSeparaterBetweenResolutionSpecAndAspectRatioPattern.Match(conversionSpec);
             if (!separaterMatch.Success)
             {
                 // 解像度指定の後がセパレータではない場合(構文ミス)
@@ -472,15 +472,15 @@ namespace MatroskaBatchToolBox
 
             // 解像度指定の後にセパレータがある場合
             conversionSpec = conversionSpec[separaterMatch.Length..];
-            var matchAspectRateSpecMatch = _startsWithAspectRateSpecPattern.Match(conversionSpec);
-            if (!matchAspectRateSpecMatch.Success)
+            var matchAspectRatioSpecMatch = _startsWithAspectRatioSpecPattern.Match(conversionSpec);
+            if (!matchAspectRatioSpecMatch.Success)
             {
                 // セパレータの後がアスペクト比ではない場合(構文ミス)
 
                 return (false, null, null, null);
             }
             // セパレータの後がアスペクト比である場合
-            conversionSpec = conversionSpec[matchAspectRateSpecMatch.Length..];
+            conversionSpec = conversionSpec[matchAspectRatioSpecMatch.Length..];
             if (conversionSpec.Length > 0 && !_startsWithCommentPattern.IsMatch(conversionSpec))
             {
                 // アスペクト比の後にコメント以外の続きがある場合(構文ミス)
@@ -488,25 +488,25 @@ namespace MatroskaBatchToolBox
                 return (false, null, null, null);
             }
             // アスペクト比で終わっている場合
-            if (matchAspectRateSpecMatch.Groups["aspectRateWidth"].Success &&
-                matchAspectRateSpecMatch.Groups["aspectRateSeparater"].Success &&
-                matchAspectRateSpecMatch.Groups["aspectRateHeight"].Success)
+            if (matchAspectRatioSpecMatch.Groups["aspectRatioWidth"].Success &&
+                matchAspectRatioSpecMatch.Groups["aspectRatioSeparater"].Success &&
+                matchAspectRatioSpecMatch.Groups["aspectRatioHeight"].Success)
             {
                 // アスペクト比が整数比で表現されている場合
 
-                var aspectRateWidth = int.Parse(matchAspectRateSpecMatch.Groups["aspectRateWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-                var aspectRateHeight = int.Parse(matchAspectRateSpecMatch.Groups["aspectRateHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                var aspectRatioWidth = int.Parse(matchAspectRatioSpecMatch.Groups["aspectRatioWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                var aspectRatioHeight = int.Parse(matchAspectRatioSpecMatch.Groups["aspectRatioHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
 
-                return (true, $"{resolutionWidth}x{resolutionHeight}", $"{aspectRateWidth}:{aspectRateHeight}", $"{aspectRateWidth}{matchAspectRateSpecMatch.Groups["aspectRateSeparater"].Value}{aspectRateHeight}");
+                return (true, $"{resolutionWidth}x{resolutionHeight}", $"{aspectRatioWidth}:{aspectRatioHeight}", $"{aspectRatioWidth}{matchAspectRatioSpecMatch.Groups["aspectRatioSeparater"].Value}{aspectRatioHeight}");
             }
-            else if (matchAspectRateSpecMatch.Groups["aspectRateValue"].Success)
+            else if (matchAspectRatioSpecMatch.Groups["aspectRatioValue"].Success)
             {
                 // アスペクト比が実数値で表現されている場合
 
 
-                var aspectRateValueText = matchAspectRateSpecMatch.Groups["aspectRateValue"].Value;
-                if (!double.TryParse(aspectRateValueText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double aspectRateValue) ||
-                    aspectRateValue <= 0)
+                var aspectRatioValueText = matchAspectRatioSpecMatch.Groups["aspectRatioValue"].Value;
+                if (!double.TryParse(aspectRatioValueText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double aspectRatioValue) ||
+                    aspectRatioValue <= 0)
                 {
                     // 数値の書式が正しくないかまたは正ではない場合(構文ミス)
                     // アスペクト比として0を指定した場合のみここに到達する
@@ -514,20 +514,20 @@ namespace MatroskaBatchToolBox
                     return (false, null, null, null);
                 }
 
-                return (true, $"{resolutionWidth}x{resolutionHeight}", aspectRateValueText, aspectRateValueText);
+                return (true, $"{resolutionWidth}x{resolutionHeight}", aspectRatioValueText, aspectRatioValueText);
             }
             else
             {
-                // _startsWithAspectRateSpecPattern.Match(conversionSpec) == true なので、このルートには到達しないはず
+                // _startsWithAspectRatioSpecPattern.Match(conversionSpec).Success == true なので、このルートには到達しないはず
 
                 throw new Exception("internal error");
             }
         }
 
-        private static string ReplaceResolutionSpecInFileName(string sourceFileName, string resolutionSpec, string? aspectRateSpecOnFileSystem, string? encoderDescription)
+        private static string ReplaceResolutionSpecInFileName(string sourceFileName, string resolutionSpec, string? aspectRatioSpecOnFileSystem, string? encoderDescription)
         {
-            var resolutionAndAspectRateSpec = aspectRateSpecOnFileSystem is null ? resolutionSpec : $"{resolutionSpec} {aspectRateSpecOnFileSystem}";
-            if (string.IsNullOrEmpty(resolutionAndAspectRateSpec))
+            var resolutionAndAspectRatioSpec = aspectRatioSpecOnFileSystem is null ? resolutionSpec : $"{resolutionSpec} {aspectRatioSpecOnFileSystem}";
+            if (string.IsNullOrEmpty(resolutionAndAspectRatioSpec))
             {
                 // 解像度とアスペクト比が共に指定されていない場合
 
@@ -536,20 +536,20 @@ namespace MatroskaBatchToolBox
                     ? $"{Path.GetFileNameWithoutExtension(sourceFileName)}.mkv"
                     : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription}].mkv";
             }
-            var matches = _resolutionAndAspectRateSpecInFileNamePattern.Matches(sourceFileName);
+            var matches = _resolutionAndAspectRatioSpecInFileNamePattern.Matches(sourceFileName);
             if (matches.Count == 1)
             {
                 // 入力元ファイル名に解像度・アスペクト比指定がただ一つだけある場合
 
                 // 入力ファイル名のの解像度・アスペクト比指定を変換先の解像度・アスペクト比指定に置き換える
                 var replacedFileName =
-                    _resolutionAndAspectRateSpecInFileNamePattern.Replace(
+                    _resolutionAndAspectRatioSpecInFileNamePattern.Replace(
                         Path.GetFileNameWithoutExtension(sourceFileName),
                         match =>
                         {
                             var prefix = match.Groups["prefix"].Value;
                             var suffix = match.Groups["suffix"].Value;
-                            return prefix + resolutionAndAspectRateSpec + suffix;
+                            return prefix + resolutionAndAspectRatioSpec + suffix;
                         });
                 return
                     encoderDescription is null
@@ -560,7 +560,7 @@ namespace MatroskaBatchToolBox
             else if (matches.Count > 1)
             {
                 // 入力元ファイルの名前に解像度指定が複数ある場合
-                if (matches.Any(match => string.Equals(match.Groups["resolutionAndAspectRateSpec"].Value, resolutionAndAspectRateSpec)))
+                if (matches.Any(match => string.Equals(match.Groups["resolutionAndAspectRatioSpec"].Value, resolutionAndAspectRatioSpec)))
                 {
                     // 入力ファイル名の解像度指定の中に、変換先の解像度指定に一致するものが一つでもある場合
 
@@ -578,8 +578,8 @@ namespace MatroskaBatchToolBox
                     // ファイル名の解像度指定の置換を行うと利用者が意図しない問題が発生する可能性があるため、新たな解像度指定をファイル名の末尾に付加するに留める。
                     return
                         encoderDescription is null
-                        ? $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRateSpec}].mkv"
-                        : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription} {resolutionAndAspectRateSpec}].mkv";
+                        ? $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRatioSpec}].mkv"
+                        : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription} {resolutionAndAspectRatioSpec}].mkv";
                 }
             }
             else
@@ -589,8 +589,8 @@ namespace MatroskaBatchToolBox
                 // 解像度指定をファイル名の末尾に付加する。
                 return
                     encoderDescription is null
-                    ? $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRateSpec}].mkv"
-                    : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription} {resolutionAndAspectRateSpec}].mkv";
+                    ? $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{resolutionAndAspectRatioSpec}].mkv"
+                    : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription} {resolutionAndAspectRatioSpec}].mkv";
             }
         }
 
