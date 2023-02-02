@@ -12,7 +12,7 @@ namespace MatroskaBatchToolBox.Model.Json
             FFmpegLibaomAV1EncoderOption = null;
             FFmpegOption = null;
             DeleteChapters = null;
-            DeletePNGVideoStream = null;
+            DeleteImageVideoStream = null;
             AllowMultipleVideoStreams = null;
             CalculateVMAFScore = null;
         }
@@ -35,8 +35,8 @@ namespace MatroskaBatchToolBox.Model.Json
         [JsonPropertyName("delete_chapters")]
         public bool? DeleteChapters { get; set; }
 
-        [JsonPropertyName("delete_png_stream")]
-        public bool? DeletePNGVideoStream { get; set; }
+        [JsonPropertyName("delete_image_video_stream")]
+        public bool? DeleteImageVideoStream { get; set; }
 
         [JsonPropertyName("allow_multiple_vodeo_streams")]
         public bool? AllowMultipleVideoStreams { get; set; }

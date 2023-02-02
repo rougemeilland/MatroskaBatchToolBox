@@ -6,6 +6,9 @@ namespace MatroskaBatchToolBox.Model
     internal class VideoStreamInfo
         : StreamInfo
     {
+        private const string _mpngVideoStreamName = "png";
+        private const string _mjpegVideoStreamName = "mjpeg";
+
         public VideoStreamInfo(MovieStreamInfoContainer stream, int indexWithinVideoStream)
             : base(stream)
         {
@@ -14,6 +17,9 @@ namespace MatroskaBatchToolBox.Model
             Height = stream.Height ?? throw new Exception($"Video stream #{indexWithinVideoStream} has no \"height\" property.");
             DisplayAspectRatio = stream.DisplayAspectRatio ?? throw new Exception($"Video stream #{indexWithinVideoStream} has no \"display_aspect_ratio\" property.");
             Resolution = $"{Width}x{Height}";
+            IsImageVideoStream =
+                string.Equals(stream.codecName, _mpngVideoStreamName) ||
+                string.Equals(stream.codecName, _mjpegVideoStreamName);
         }
 
         public int IndexWithinVideoStream { get; }
@@ -21,5 +27,6 @@ namespace MatroskaBatchToolBox.Model
         public int Height { get; }
         public string Resolution { get; }
         public string DisplayAspectRatio { get; }
+        public bool IsImageVideoStream { get; }
     }
 }

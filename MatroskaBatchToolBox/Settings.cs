@@ -90,7 +90,7 @@ namespace MatroskaBatchToolBox
             var ffmpegLibaomAV1EncoderOption = settings.FFmpegLibaomAV1EncoderOption ?? "-crf 23";
             var ffmpegOption = settings.FFmpegOption ?? "";
             var deleteChapters = settings.DeleteChapters ?? false;
-            var deletePNGVideoStream = settings.DeletePNGVideoStream ?? false;
+            var deleteImageVideoStream = settings.DeleteImageVideoStream ?? false;
             var allowMultipleVideoStreams = settings.AllowMultipleVideoStreams ?? false;
             var calculateVMAFScore = settings.CalculateVMAFScore ?? false;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
@@ -105,7 +105,7 @@ namespace MatroskaBatchToolBox
                     ffmpegLibaomAV1EncoderOption,
                     ffmpegOption,
                     deleteChapters,
-                    deletePNGVideoStream,
+                    deleteImageVideoStream,
                     allowMultipleVideoStreams,
                     calculateVMAFScore: calculateVMAFScore,
                     degreeOfParallelism: degreeOfParallelism);
@@ -135,7 +135,7 @@ namespace MatroskaBatchToolBox
             string ffmpegLibaomAV1EncoderOption,
             string ffmpegOption,
             bool deleteChapters,
-            bool deletePNGVideoStream,
+            bool deleteImageVideoStream,
             bool allowMultipleVideoStreams,
             bool calculateVMAFScore,
             int degreeOfParallelism)
@@ -149,7 +149,7 @@ namespace MatroskaBatchToolBox
             FFmpegLibaomAV1EncoderOption = ffmpegLibaomAV1EncoderOption;
             FFmpegOption = ffmpegOption;
             DeleteChapters = deleteChapters;
-            DeletePNGVideoStream = deletePNGVideoStream;
+            DeleteImageVideoStream = deleteImageVideoStream;
             AllowMultipleVideoStreams = allowMultipleVideoStreams;
             CalculateVMAFScore = calculateVMAFScore;
             DegreeOfParallelism = degreeOfParallelism;
@@ -164,7 +164,7 @@ namespace MatroskaBatchToolBox
         public string FFmpegLibaomAV1EncoderOption { get; }
         public string FFmpegOption { get; }
         public bool DeleteChapters { get; }
-        public bool DeletePNGVideoStream { get; }
+        public bool DeleteImageVideoStream { get; }
         public bool AllowMultipleVideoStreams { get; }
         public bool CalculateVMAFScore { get; }
         public int DegreeOfParallelism { get; }
@@ -192,7 +192,7 @@ namespace MatroskaBatchToolBox
                         localSettings.FFmpegLibaomAV1EncoderOption ?? FFmpegLibaomAV1EncoderOption,
                         localSettings.FFmpegOption ?? FFmpegOption,
                         localSettings.DeleteChapters ?? DeleteChapters,
-                        localSettings.DeletePNGVideoStream ?? DeletePNGVideoStream,
+                        localSettings.DeleteImageVideoStream ?? DeleteImageVideoStream,
                         localSettings.AllowMultipleVideoStreams ?? AllowMultipleVideoStreams,
                         calculateVMAFScore: localSettings.CalculateVMAFScore ?? CalculateVMAFScore,
                         degreeOfParallelism: DegreeOfParallelism);

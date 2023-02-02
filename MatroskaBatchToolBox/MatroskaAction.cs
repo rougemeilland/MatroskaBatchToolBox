@@ -247,6 +247,21 @@ namespace MatroskaBatchToolBox
                     return actionResult = ActionResult.Failed;
                 }
 
+                if (!string.IsNullOrEmpty(resolutionSpec))
+                {
+                    var invalidStreams =
+                        streams.EnumerateVideoStreams()
+                        .Where(stream =>
+                            !(localSettings.DeleteImageVideoStream && stream.IsImageVideoStream) &&
+                            !string.Equals(stream.Resolution, resolutionSpec, StringComparison.InvariantCulture))
+                        .ToList();
+                    if (invalidStreams.Any())
+                    {
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Simple conversion is not possible because the movie file resolution ({string.Join(", ", invalidStreams.Select(stream => stream.Resolution))}) is different from the destination resolution ({resolutionSpec}).: \"{sourceFile.FullName}\"", });
+                        return actionResult = ActionResult.Failed;
+                    }
+                }
+
                 if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, null, aspectRatioSpec, VideoEncoderType.Copy, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
                     return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);

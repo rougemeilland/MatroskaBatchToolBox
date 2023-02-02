@@ -30,7 +30,6 @@ namespace MatroskaBatchToolBox
         }
 
         private const string _ffmpegPathEnvironmentVariableName = "FFMPEG_PATH";
-        private const string _mpngVideoStreamName = "png";
         private static readonly object _loggingLockObject;
         private static readonly Regex _ffmpegNormalizeProgressPattern;
         private static readonly Regex _logsToIgnoreInFFmpegNormalize;
@@ -240,7 +239,7 @@ namespace MatroskaBatchToolBox
 
             var outputVideoStreams =
                 videoStreams
-                .Where(stream => !localSettings.DeletePNGVideoStream || !string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture))
+                .Where(stream => !(localSettings.DeleteImageVideoStream && stream.IsImageVideoStream))
                 .ToList();
             var outputVideoStreamSummaries =
                 outputVideoStreams
@@ -250,7 +249,7 @@ namespace MatroskaBatchToolBox
                     streamTypeSymbol = "v",
                     outIndex = index,
                     encodrOptions =
-                        (string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture) ? VideoEncoderType.Copy : videoEncoder).GetEncoderOptions(localSettings, index),
+                        (stream.IsImageVideoStream ? VideoEncoderType.Copy : videoEncoder).GetEncoderOptions(localSettings, index),
                     tags = stream.Tags,
                 })
                 .ToList();
@@ -280,20 +279,20 @@ namespace MatroskaBatchToolBox
             // 出力対象のビデオストリームが存在するかどうかの確認
             if (outputVideoStreamSummaries.Count <= 0)
             {
-                if (localSettings.DeletePNGVideoStream)
-                    throw new Exception($"The input movie file does not have a video stream other than \"{_mpngVideoStreamName}\".");
+                if (localSettings.DeleteImageVideoStream)
+                    throw new Exception("The input movie file has no video streams other than images.");
                 else
-                    throw new Exception("The input movie file does not have a video stream.");
+                    throw new Exception("The input movie file has no video streams.");
             }
 
             // pngビデオストリームは常に非変換対象なので、ビデオストリームが複数あるかどうかの判定にはカウントしない。
-            var outputVideoStreamsCountExceptPng = videoStreams.Where(stream => !string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture)).Count();
-            if (outputVideoStreamsCountExceptPng > 1 && !localSettings.AllowMultipleVideoStreams)
+            var outputVideoStreamsCountExceptImage = videoStreams.Where(stream => !stream.IsImageVideoStream).Count();
+            if (outputVideoStreamsCountExceptImage > 1 && !localSettings.AllowMultipleVideoStreams)
             {
-                if (localSettings.DeletePNGVideoStream)
-                    throw new Exception($"You tried to convert a movie file with multiple video streams other than \"{_mpngVideoStreamName}\". If you don't mind applying the same encoder and encoder options to all video streams, try setting the \"{nameof(GlobalSettingsContainer.AllowMultipleVideoStreams)}\" property in the configuration file to \"true\".");
+                if (localSettings.DeleteImageVideoStream)
+                    throw new Exception("You tried to convert a movie file with multiple video streams other than images. If you don't mind applying the same encoder and encoder options to all video streams, try setting the \"allow_multiple_vodeo_streams\" property in the configuration file to \"true\".");
                 else
-                    throw new Exception($"You are trying to convert a movie file with multiple video streams. If you don't mind applying the same encoder and encoder options to all video streams, try setting the \"{nameof(GlobalSettingsContainer.AllowMultipleVideoStreams)}\" property in the configuration file to \"true\".");
+                    throw new Exception("You are trying to convert a movie file with multiple video streams. If you don't mind applying the same encoder and encoder options to all video streams, try setting the \"allow_multiple_vodeo_streams\" property in the configuration file to \"true\".");
             }
 
             var commandParameters = new List<string>
