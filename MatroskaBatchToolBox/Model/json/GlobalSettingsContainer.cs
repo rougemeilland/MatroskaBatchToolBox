@@ -49,11 +49,17 @@ namespace MatroskaBatchToolBox.Model.Json
         [JsonPropertyName("allow_multiple_vodeo_streams")]
         public bool? AllowMultipleVideoStreams { get; set; }
 
-        [JsonPropertyName("cropping")]
-        public string? Cropping { get; set; }
+        [JsonPropertyName("default_video_language")]
+        public string? DefaultVideoLanguage { get; set; }
 
-        [JsonPropertyName("trimming")]
-        public string? Trimming { get; set; }
+        [JsonPropertyName("default_audio_language")]
+        public string? DefaultAudioLanguage { get; set; }
+
+        [JsonPropertyName("reset_forced_stream")]
+        public bool? ResetForcedStream { get; set; }
+
+        [JsonPropertyName("reset_default_stream")]
+        public bool ? ResetDefaultStream { get; set; }
 
         [JsonPropertyName("calculate_vmaf_score")]
         public bool? CalculateVMAFScore { get; set; }

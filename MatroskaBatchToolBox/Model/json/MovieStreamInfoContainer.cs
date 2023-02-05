@@ -7,9 +7,10 @@ namespace MatroskaBatchToolBox.Model.Json
         public MovieStreamInfoContainer()
         {
             Index = null;
-            codecName = null;
+            CodecName = null;
             CodecLongName = null;
             CodecType = null;
+            Disposition = new MovieStreamDispositionContainer();
             Tags = new MovieStreamTagsContainer();
         }
 
@@ -17,13 +18,16 @@ namespace MatroskaBatchToolBox.Model.Json
         public int? Index { get; set; }
 
         [JsonPropertyName("codec_name")]
-        public string? codecName { get; set; }
+        public string? CodecName { get; set; }
 
         [JsonPropertyName("codec_long_name")]
         public string? CodecLongName { get; set; }
 
         [JsonPropertyName("codec_type")]
         public string? CodecType { get; set; }
+
+        [JsonPropertyName("disposition")]
+        public MovieStreamDispositionContainer Disposition { get; set; }
 
         [JsonPropertyName("tags")]
         public MovieStreamTagsContainer Tags { get; set; }

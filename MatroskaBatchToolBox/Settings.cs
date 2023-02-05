@@ -3,7 +3,6 @@ using MatroskaBatchToolBox.Model.Json;
 using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace MatroskaBatchToolBox
@@ -94,34 +93,10 @@ namespace MatroskaBatchToolBox
             var deleteMetadata = settings.DeleteMetadata ?? false;
             var deleteImageVideoStream = settings.DeleteImageVideoStream ?? false;
             var allowMultipleVideoStreams = settings.AllowMultipleVideoStreams ?? false;
-            Rectangle cropping;
-            if (settings.Cropping is null)
-                cropping = Rectangle.DefaultValue;
-            else
-            {
-                if (!Rectangle.TryParse(settings.Cropping, out Rectangle? cropping2))
-                {
-                    // クロッピングの指定に誤りがあった場合
-                    var message = $"Incorrect format for cropping.: {(settings.Cropping is null ? "null" : $"\"{settings.Cropping}\"")}";
-                    PrintFatalMessage(message);
-                    throw new Exception(); // can't reach here
-                }
-                cropping = cropping2;
-            }
-            TimeRange trimming;
-            if (settings.Trimming is null)
-                trimming = TimeRange.DefaultValue;
-            else
-            {
-                if (!TimeRange.TryParse(settings.Trimming, out TimeRange? trimming2))
-                {
-                    // トリミング範囲の指定に誤りがあった場合
-                    var message = $"Incorrect format for trimming.: {(settings.Trimming is null ? "null" : $"\"{settings.Trimming}\"")}";
-                    PrintFatalMessage(message);
-                    throw new Exception(); // can't reach here
-                }
-                trimming = trimming2;
-            }
+            var defaultVideoLanguage = (string?)null;
+            var defaultAudioLanguage = (string?)null;
+            var resetForceStream = false;
+            var resetDefaultStream = false;
             var calculateVMAFScore = settings.CalculateVMAFScore ?? false;
             var doNotConvert = false;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
@@ -139,11 +114,15 @@ namespace MatroskaBatchToolBox
                     deleteMetadata,
                     deleteImageVideoStream,
                     allowMultipleVideoStreams,
-                    cropping,
-                    trimming,
+                    Rectangle.DefaultValue,
+                    TimeRange.DefaultValue,
+                    defaultVideoLanguage,
+                    defaultAudioLanguage,
+                    resetForceStream,
+                    resetDefaultStream,
                     calculateVMAFScore,
                     doNotConvert,
-                    degreeOfParallelism: degreeOfParallelism);
+                    degreeOfParallelism);
         }
 
         private static void PrintFatalMessage(string message)
@@ -175,6 +154,10 @@ namespace MatroskaBatchToolBox
             bool allowMultipleVideoStreams,
             Rectangle cropping,
             TimeRange trimming,
+            string? defaultVideoLanguage,
+            string? defaultAudioLanguage,
+            bool resetForceStream,
+            bool resetDefaultStream,
             bool calculateVMAFScore,
             bool doNotConvert,
             int degreeOfParallelism)
@@ -196,6 +179,10 @@ namespace MatroskaBatchToolBox
             CalculateVMAFScore = calculateVMAFScore;
             DoNotConvert = doNotConvert;
             DegreeOfParallelism = degreeOfParallelism;
+            DefaultVideoLanguage = defaultVideoLanguage;
+            DefaultAudioLanguage = defaultAudioLanguage;
+            ResetForcedStream = resetForceStream;
+            ResetDefaultStream = resetDefaultStream;
         }
 
         public FileInfo FFmpegNormalizeCommandFile { get; }
@@ -212,6 +199,10 @@ namespace MatroskaBatchToolBox
         public bool AllowMultipleVideoStreams { get; }
         public Rectangle Cropping { get; set; }
         public TimeRange Trimming { get; set; }
+        public string? DefaultVideoLanguage { get; set; }
+        public string? DefaultAudioLanguage { get; set; }
+        public bool ResetForcedStream { get; set; }
+        public bool ResetDefaultStream { get; set; }
         public bool CalculateVMAFScore { get; }
         public bool DoNotConvert { get; set; }
         public int DegreeOfParallelism { get; }
@@ -245,6 +236,10 @@ namespace MatroskaBatchToolBox
                         localSettings.AllowMultipleVideoStreams ?? AllowMultipleVideoStreams,
                         DeriveRectangle(Cropping, localSettings.Cropping),
                         DeriveTimeRange(Trimming, localSettings.Trimming),
+                        localSettings.DefaultVideoLanguage ?? DefaultVideoLanguage,
+                        localSettings.DefaultAudioLanguage ?? DefaultAudioLanguage,
+                        localSettings.ResetForcedStream ?? ResetForcedStream,
+                        localSettings.ResetDefaultStream ?? ResetDefaultStream,
                         localSettings.CalculateVMAFScore ?? CalculateVMAFScore,
                         localSettings.DoNotConvert ?? DoNotConvert,
                         DegreeOfParallelism);

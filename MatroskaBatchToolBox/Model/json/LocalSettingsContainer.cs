@@ -50,6 +50,18 @@ namespace MatroskaBatchToolBox.Model.Json
         [JsonPropertyName("trimming")]
         public string? Trimming { get; set; }
 
+        [JsonPropertyName("default_video_language")]
+        public string? DefaultVideoLanguage { get; set; }
+
+        [JsonPropertyName("default_audio_language")]
+        public string? DefaultAudioLanguage { get; set; }
+
+        [JsonPropertyName("reset_forced_stream")]
+        public bool? ResetForcedStream { get; set; }
+
+        [JsonPropertyName("reset_default_stream")]
+        public bool? ResetDefaultStream { get; set; }
+
         [JsonPropertyName("calculate_vmaf_score")]
         public bool? CalculateVMAFScore { get; set; }
 

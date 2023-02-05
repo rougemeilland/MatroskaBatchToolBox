@@ -18,8 +18,8 @@ namespace MatroskaBatchToolBox.Model
             DisplayAspectRatio = stream.DisplayAspectRatio ?? throw new Exception($"Video stream #{indexWithinVideoStream} has no \"display_aspect_ratio\" property.");
             Resolution = $"{Width}x{Height}";
             IsImageVideoStream =
-                string.Equals(stream.codecName, _mpngVideoStreamName) ||
-                string.Equals(stream.codecName, _mjpegVideoStreamName);
+                string.Equals(stream.CodecName, _mpngVideoStreamName) ||
+                string.Equals(stream.CodecName, _mjpegVideoStreamName);
         }
 
         public int IndexWithinVideoStream { get; }

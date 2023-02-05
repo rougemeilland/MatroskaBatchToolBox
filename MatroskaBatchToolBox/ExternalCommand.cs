@@ -250,7 +250,8 @@ namespace MatroskaBatchToolBox
                     outIndex = index,
                     encodrOptions =
                         (stream.IsImageVideoStream ? VideoEncoderType.Copy : videoEncoder).GetEncoderOptions(localSettings, index),
-                    tags = stream.Tags,
+                    language = (localSettings.DefaultVideoLanguage is not null && outputVideoStreams.Count <= 1) ? localSettings.DefaultVideoLanguage : stream.Tags.Language ?? "",
+                    title = stream.Tags.Title ?? "",
                 })
                 .ToList();
             var outputAudioStreamSummaries =
@@ -261,7 +262,8 @@ namespace MatroskaBatchToolBox
                     streamTypeSymbol = "a",
                     outIndex = index,
                     encodrOptions = new[] { $"-c:a:{index} copy" }.AsEnumerable(),
-                    tags = stream.Tags,
+                    language = (localSettings.DefaultAudioLanguage is not null && audioStreams.Count <= 1) ? localSettings.DefaultAudioLanguage : stream.Tags.Language ?? "",
+                    title = stream.Tags.Title ?? "",
                 })
                 .ToList();
             var outputSubtitleStreamSummaries =
@@ -272,7 +274,8 @@ namespace MatroskaBatchToolBox
                     streamTypeSymbol = "s",
                     outIndex = index,
                     encodrOptions = new[] { $"-c:s:{index} copy" }.AsEnumerable(),
-                    tags = stream.Tags,
+                    language = stream.Tags.Language ?? "",
+                    title = stream.Tags.Title ?? "",
                 })
                 .ToList();
 
@@ -333,18 +336,24 @@ namespace MatroskaBatchToolBox
             // ストリームごとのオプションを追加
             foreach (var outputStream in outputVideoStreamSummaries.Concat(outputAudioStreamSummaries).Concat(outputSubtitleStreamSummaries))
             {
+                // エンコーダオプションとストリームマッピングの設定
                 foreach (var encoderOption in outputStream.encodrOptions)
                     commandParameters.Add(encoderOption);
                 commandParameters.Add($"-map 0:{outputStream.streamTypeSymbol}:{outputStream.inIndex}");
-                var tags = outputStream.tags;
-                if (string.IsNullOrEmpty(tags.Language))
+
+                // disposition の設定
+                if (localSettings.ResetDefaultStream || localSettings.ResetForcedStream)
+                    commandParameters.Add($"-disposition:{outputStream.streamTypeSymbol}:{outputStream.outIndex} {(localSettings.ResetDefaultStream ? "-default" : "")}{(localSettings.ResetForcedStream ? "-forced" : "")}");
+
+                // メタデータ (言語及びタイトル) の設定
+                if (string.IsNullOrEmpty(outputStream.language))
                     commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} language=");
                 else
-                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} language=\"{tags.Language}\"");
-                if (string.IsNullOrEmpty(tags.Title))
+                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} language=\"{outputStream.language}\"");
+                if (string.IsNullOrEmpty(outputStream.title))
                     commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=");
                 else
-                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=\"{tags.Title}\"");
+                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=\"{outputStream.title}\"");
             }
 
             // その他のオプションを追加
