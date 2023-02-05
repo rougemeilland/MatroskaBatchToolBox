@@ -43,6 +43,15 @@ namespace MatroskaBatchToolBox
 
         public static ActionResult NormalizeMovieFile(FileInfo sourceFile, IProgress<double> progressReporter)
         {
+            if (sourceFile.Directory is not null)
+            {
+                var localSettings = Settings.GlobalSettings.GetLocalSettings(sourceFile.Directory);
+
+                // 設定ファイルで変換をしないように指示されている場合は何もせずに復帰する。
+                if (localSettings.DoNotConvert)
+                    return ActionResult.Skipped;
+            }
+
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
             var destinationFileEncodedByOpus = MakeDestinationFilePath(sourceFile, AudioEncoderType.Libopus);
@@ -182,7 +191,13 @@ namespace MatroskaBatchToolBox
                 // 何もせず復帰する。
                 return ActionResult.Skipped;
             }
+
             var localSettings = Settings.GlobalSettings.GetLocalSettings(sourceFileDirectory);
+
+            // 設定ファイルで変換をしないように指示されている場合は何もせずに復帰する。
+            if (localSettings.DoNotConvert)
+                return ActionResult.Skipped;
+
             var conversionSpec = sourceFileDirectory.Name;
             var match = _startsWithConvertModeSymbolPattern.Match(conversionSpec);
             if (match.Success)

@@ -52,5 +52,8 @@ namespace MatroskaBatchToolBox.Model.Json
 
         [JsonPropertyName("calculate_vmaf_score")]
         public bool? CalculateVMAFScore { get; set; }
+
+        [JsonPropertyName("do_not_convert")]
+        public bool? DoNotConvert { get; set; }
     }
 }

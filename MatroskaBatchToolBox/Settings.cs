@@ -3,6 +3,7 @@ using MatroskaBatchToolBox.Model.Json;
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace MatroskaBatchToolBox
@@ -122,6 +123,7 @@ namespace MatroskaBatchToolBox
                 trimming = trimming2;
             }
             var calculateVMAFScore = settings.CalculateVMAFScore ?? false;
+            var doNotConvert = false;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
             GlobalSettings =
                 new Settings(
@@ -140,7 +142,8 @@ namespace MatroskaBatchToolBox
                     cropping,
                     trimming,
                     calculateVMAFScore,
-                    degreeOfParallelism);
+                    doNotConvert,
+                    degreeOfParallelism: degreeOfParallelism);
         }
 
         private static void PrintFatalMessage(string message)
@@ -173,6 +176,7 @@ namespace MatroskaBatchToolBox
             Rectangle cropping,
             TimeRange trimming,
             bool calculateVMAFScore,
+            bool doNotConvert,
             int degreeOfParallelism)
         {
             FFmpegNormalizeCommandFile = ffmpegNormalizeCommandFile;
@@ -190,6 +194,7 @@ namespace MatroskaBatchToolBox
             Cropping = cropping;
             Trimming = trimming;
             CalculateVMAFScore = calculateVMAFScore;
+            DoNotConvert = doNotConvert;
             DegreeOfParallelism = degreeOfParallelism;
         }
 
@@ -208,6 +213,7 @@ namespace MatroskaBatchToolBox
         public Rectangle Cropping { get; set; }
         public TimeRange Trimming { get; set; }
         public bool CalculateVMAFScore { get; }
+        public bool DoNotConvert { get; set; }
         public int DegreeOfParallelism { get; }
         public static Settings GlobalSettings { get;  }
 
@@ -240,6 +246,7 @@ namespace MatroskaBatchToolBox
                         DeriveRectangle(Cropping, localSettings.Cropping),
                         DeriveTimeRange(Trimming, localSettings.Trimming),
                         localSettings.CalculateVMAFScore ?? CalculateVMAFScore,
+                        localSettings.DoNotConvert ?? DoNotConvert,
                         DegreeOfParallelism);
             }
             catch (Exception)
