@@ -40,6 +40,9 @@ namespace MatroskaBatchToolBox.Model.Json
         [JsonPropertyName("delete_chapters")]
         public bool? DeleteChapters { get; set; }
 
+        [JsonPropertyName("delete_metadata")]
+        public bool? DeleteMetadata { get; set; }
+
         [JsonPropertyName("delete_image_video_stream")]
         public bool? DeleteImageVideoStream { get; set; }
 

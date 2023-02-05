@@ -350,6 +350,8 @@ namespace MatroskaBatchToolBox
             // その他のオプションを追加
             if (localSettings.DeleteChapters)
                 commandParameters.Add("-map_chapters -1");
+            if (localSettings.DeleteMetadata)
+                commandParameters.Add("-map_metadata -1");
             if (videoEncoder != VideoEncoderType.Copy)
                 commandParameters.Add("-g 240");
             if (!string.IsNullOrEmpty(localSettings.FFmpegOption))

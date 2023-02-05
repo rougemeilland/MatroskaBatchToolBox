@@ -90,6 +90,7 @@ namespace MatroskaBatchToolBox
             var ffmpegLibaomAV1EncoderOption = settings.FFmpegLibaomAV1EncoderOption ?? "-crf 23";
             var ffmpegOption = settings.FFmpegOption ?? "";
             var deleteChapters = settings.DeleteChapters ?? false;
+            var deleteMetadata = settings.DeleteMetadata ?? false;
             var deleteImageVideoStream = settings.DeleteImageVideoStream ?? false;
             var allowMultipleVideoStreams = settings.AllowMultipleVideoStreams ?? false;
             Rectangle cropping;
@@ -133,12 +134,13 @@ namespace MatroskaBatchToolBox
                     ffmpegLibaomAV1EncoderOption,
                     ffmpegOption,
                     deleteChapters,
+                    deleteMetadata,
                     deleteImageVideoStream,
                     allowMultipleVideoStreams,
                     cropping,
                     trimming,
-                    calculateVMAFScore: calculateVMAFScore,
-                    degreeOfParallelism: degreeOfParallelism);
+                    calculateVMAFScore,
+                    degreeOfParallelism);
         }
 
         private static void PrintFatalMessage(string message)
@@ -165,6 +167,7 @@ namespace MatroskaBatchToolBox
             string ffmpegLibaomAV1EncoderOption,
             string ffmpegOption,
             bool deleteChapters,
+            bool deleteMetadata,
             bool deleteImageVideoStream,
             bool allowMultipleVideoStreams,
             Rectangle cropping,
@@ -181,6 +184,7 @@ namespace MatroskaBatchToolBox
             FFmpegLibaomAV1EncoderOption = ffmpegLibaomAV1EncoderOption;
             FFmpegOption = ffmpegOption;
             DeleteChapters = deleteChapters;
+            DeleteMetadata = deleteMetadata;
             DeleteImageVideoStream = deleteImageVideoStream;
             AllowMultipleVideoStreams = allowMultipleVideoStreams;
             Cropping = cropping;
@@ -198,6 +202,7 @@ namespace MatroskaBatchToolBox
         public string FFmpegLibaomAV1EncoderOption { get; }
         public string FFmpegOption { get; }
         public bool DeleteChapters { get; }
+        public bool DeleteMetadata { get; }
         public bool DeleteImageVideoStream { get; }
         public bool AllowMultipleVideoStreams { get; }
         public Rectangle Cropping { get; set; }
@@ -229,12 +234,13 @@ namespace MatroskaBatchToolBox
                         localSettings.FFmpegLibaomAV1EncoderOption ?? FFmpegLibaomAV1EncoderOption,
                         localSettings.FFmpegOption ?? FFmpegOption,
                         localSettings.DeleteChapters ?? DeleteChapters,
+                        localSettings.DeleteMetadata ?? DeleteMetadata,
                         localSettings.DeleteImageVideoStream ?? DeleteImageVideoStream,
                         localSettings.AllowMultipleVideoStreams ?? AllowMultipleVideoStreams,
                         DeriveRectangle(Cropping, localSettings.Cropping),
                         DeriveTimeRange(Trimming, localSettings.Trimming),
                         localSettings.CalculateVMAFScore ?? CalculateVMAFScore,
-                        DegreeOfParallelism) ;
+                        DegreeOfParallelism);
             }
             catch (Exception)
             {
