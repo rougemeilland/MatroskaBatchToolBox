@@ -1,8 +1,8 @@
-﻿using MatroskaBatchToolBox.Model.Json;
+﻿using MatroskaBatchToolBox.Model;
+using MatroskaBatchToolBox.Model.Json;
 using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace MatroskaBatchToolBox
@@ -92,6 +92,34 @@ namespace MatroskaBatchToolBox
             var deleteChapters = settings.DeleteChapters ?? false;
             var deleteImageVideoStream = settings.DeleteImageVideoStream ?? false;
             var allowMultipleVideoStreams = settings.AllowMultipleVideoStreams ?? false;
+            Rectangle cropping;
+            if (settings.Cropping is null)
+                cropping = Rectangle.DefaultValue;
+            else
+            {
+                if (!Rectangle.TryParse(settings.Cropping, out Rectangle? cropping2))
+                {
+                    // クロッピングの指定に誤りがあった場合
+                    var message = $"Incorrect format for cropping.: {(settings.Cropping is null ? "null" : $"\"{settings.Cropping}\"")}";
+                    PrintFatalMessage(message);
+                    throw new Exception(); // can't reach here
+                }
+                cropping = cropping2;
+            }
+            TimeRange trimming;
+            if (settings.Trimming is null)
+                trimming = TimeRange.DefaultValue;
+            else
+            {
+                if (!TimeRange.TryParse(settings.Trimming, out TimeRange? trimming2))
+                {
+                    // トリミング範囲の指定に誤りがあった場合
+                    var message = $"Incorrect format for trimming.: {(settings.Trimming is null ? "null" : $"\"{settings.Trimming}\"")}";
+                    PrintFatalMessage(message);
+                    throw new Exception(); // can't reach here
+                }
+                trimming = trimming2;
+            }
             var calculateVMAFScore = settings.CalculateVMAFScore ?? false;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
             GlobalSettings =
@@ -107,6 +135,8 @@ namespace MatroskaBatchToolBox
                     deleteChapters,
                     deleteImageVideoStream,
                     allowMultipleVideoStreams,
+                    cropping,
+                    trimming,
                     calculateVMAFScore: calculateVMAFScore,
                     degreeOfParallelism: degreeOfParallelism);
         }
@@ -137,6 +167,8 @@ namespace MatroskaBatchToolBox
             bool deleteChapters,
             bool deleteImageVideoStream,
             bool allowMultipleVideoStreams,
+            Rectangle cropping,
+            TimeRange trimming,
             bool calculateVMAFScore,
             int degreeOfParallelism)
         {
@@ -151,6 +183,8 @@ namespace MatroskaBatchToolBox
             DeleteChapters = deleteChapters;
             DeleteImageVideoStream = deleteImageVideoStream;
             AllowMultipleVideoStreams = allowMultipleVideoStreams;
+            Cropping = cropping;
+            Trimming = trimming;
             CalculateVMAFScore = calculateVMAFScore;
             DegreeOfParallelism = degreeOfParallelism;
         }
@@ -166,6 +200,8 @@ namespace MatroskaBatchToolBox
         public bool DeleteChapters { get; }
         public bool DeleteImageVideoStream { get; }
         public bool AllowMultipleVideoStreams { get; }
+        public Rectangle Cropping { get; set; }
+        public TimeRange Trimming { get; set; }
         public bool CalculateVMAFScore { get; }
         public int DegreeOfParallelism { get; }
         public static Settings GlobalSettings { get;  }
@@ -181,6 +217,7 @@ namespace MatroskaBatchToolBox
                 var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas= true });
                 if (localSettings is null)
                     return this;
+                
                 return
                     new Settings(
                         FFmpegNormalizeCommandFile,
@@ -194,13 +231,33 @@ namespace MatroskaBatchToolBox
                         localSettings.DeleteChapters ?? DeleteChapters,
                         localSettings.DeleteImageVideoStream ?? DeleteImageVideoStream,
                         localSettings.AllowMultipleVideoStreams ?? AllowMultipleVideoStreams,
-                        calculateVMAFScore: localSettings.CalculateVMAFScore ?? CalculateVMAFScore,
-                        degreeOfParallelism: DegreeOfParallelism);
+                        DeriveRectangle(Cropping, localSettings.Cropping),
+                        DeriveTimeRange(Trimming, localSettings.Trimming),
+                        localSettings.CalculateVMAFScore ?? CalculateVMAFScore,
+                        DegreeOfParallelism) ;
             }
             catch (Exception)
             {
                 return this;
             }
+        }
+
+        private static TimeRange DeriveTimeRange(TimeRange originalValue, string? newValueText)
+        {
+            if (newValueText is null)
+                return originalValue;
+            if (!TimeRange.TryParse(newValueText, out TimeRange? newValue))
+                throw new Exception("Invalid time range format.");
+            return newValue;
+        }
+
+        private static Rectangle DeriveRectangle(Rectangle originalValue, string? newValueText)
+        {
+            if (newValueText is null)
+                return originalValue;
+            if (!Rectangle.TryParse(newValueText, out Rectangle? newValue))
+                throw new Exception("Invalid rectangle format.");
+            return newValue;
         }
     }
 }

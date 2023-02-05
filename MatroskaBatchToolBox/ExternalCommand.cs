@@ -285,7 +285,7 @@ namespace MatroskaBatchToolBox
                     throw new Exception("The input movie file has no video streams.");
             }
 
-            // pngビデオストリームは常に非変換対象なので、ビデオストリームが複数あるかどうかの判定にはカウントしない。
+            // 画像ビデオストリームは常に非変換対象なので、ビデオストリームが複数あるかどうかの判定にはカウントしない。
             var outputVideoStreamsCountExceptImage = videoStreams.Where(stream => !stream.IsImageVideoStream).Count();
             if (outputVideoStreamsCountExceptImage > 1 && !localSettings.AllowMultipleVideoStreams)
             {
@@ -304,15 +304,33 @@ namespace MatroskaBatchToolBox
 
             // 呼び出し元から解像度指定が与えられていて、かつ元動画のビデオストリームの中に与えられた解像度指定と異なるものがある場合に、ffmpeg に解像度指定を与える。
             if (resolutionSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.Resolution, resolutionSpec, StringComparison.InvariantCulture)))
-            {
                 commandParameters.Add($"-s {resolutionSpec}");
-
-            }
 
             // 呼び出し元からアスペクト比が与えられていて、かつ元動画のビデオストリームの中に与えられたアスペクト比と異なるものがある場合に、ffmpeg にアスペクト比を与える。
             if (aspectRatioSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.DisplayAspectRatio, aspectRatioSpec, StringComparison.InvariantCulture)))
                 commandParameters.Add($"-aspect {aspectRatioSpec}");
 
+            // クロッピング指定があればオプションに追加
+            if (localSettings.Cropping.IsValid)
+            {
+                if (videoEncoder == VideoEncoderType.Copy)
+                    Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: WARNING: Simple movie conversion ignores the \"cropping\" property." });
+                else
+                    commandParameters.Add($"-vf crop={localSettings.Cropping.Width}:{localSettings.Cropping.Height}:{localSettings.Cropping.Left}:{localSettings.Cropping.Top}");
+            }
+
+            // トリミング指定があればオプションに追加
+            if (localSettings.Trimming.IsValid)
+            {
+                if (videoEncoder == VideoEncoderType.Copy)
+                    Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: WARNING: The \"trimming\" property is specified. The movie will be trimmed, but keep in mind that trimming in a simple conversion can result in unexpected gaps in the video and audio." });
+                if (!string.IsNullOrEmpty(localSettings.Trimming.Start))
+                    commandParameters.Add($"-ss {localSettings.Trimming.Start}");
+                if (!string.IsNullOrEmpty(localSettings.Trimming.End))
+                    commandParameters.Add($"-to {localSettings.Trimming.End}");
+            }
+
+            // ストリームごとのオプションを追加
             foreach (var outputStream in outputVideoStreamSummaries.Concat(outputAudioStreamSummaries).Concat(outputSubtitleStreamSummaries))
             {
                 foreach (var encoderOption in outputStream.encodrOptions)
@@ -328,6 +346,8 @@ namespace MatroskaBatchToolBox
                 else
                     commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=\"{tags.Title}\"");
             }
+
+            // その他のオプションを追加
             if (localSettings.DeleteChapters)
                 commandParameters.Add("-map_chapters -1");
             if (videoEncoder != VideoEncoderType.Copy)
@@ -335,6 +355,7 @@ namespace MatroskaBatchToolBox
             if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
                 commandParameters.Add(localSettings.FFmpegOption);
             commandParameters.Add($"\"{outFile.FullName}\"");
+
             var detectedToQuit = false;
             var maximumDurationSeconds = double.NaN;
             var vmafScore = double.NaN; // この値は使用されない
