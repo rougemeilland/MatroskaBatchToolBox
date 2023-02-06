@@ -219,7 +219,9 @@ namespace MatroskaBatchToolBox
                 var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas= true });
                 if (localSettings is null)
                     return this;
-                
+#if DEBUG && true
+                System.Diagnostics.Debug.WriteLine($"read settings: \"{localSettingFilePath}\"");
+#endif
                 return
                     new Settings(
                         FFmpegNormalizeCommandFile,

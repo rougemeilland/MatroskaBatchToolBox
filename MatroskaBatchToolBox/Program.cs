@@ -108,6 +108,8 @@ namespace MatroskaBatchToolBox
                     }
                 });
 
+                var localSettingsCache = new LocalSettingsCache();
+
                 var progressState = new ProgressState(CreateSourceFileList(args, actionMode));
                 progressState.WriteProgressText(PrintProgress);
 
@@ -158,12 +160,13 @@ namespace MatroskaBatchToolBox
                             });
                         try
                         {
+                            var localSettings = localSettingsCache[sourceFile.Directory];
                             var actionResult =
-                                sourceFile.Exists
+                                sourceFile.Exists && !localSettings.DoNotConvert
                                 ? actionMode switch
                                 {
-                                    ActionMode.NormalizeAudio => MatroskaAction.NormalizeMovieFile(sourceFile, progress),
-                                    ActionMode.ConvertVideo => MatroskaAction.ResizeMovieFile(sourceFile, progress),
+                                    ActionMode.NormalizeAudio => MatroskaAction.NormalizeMovieFile(localSettings, sourceFile, progress),
+                                    ActionMode.ConvertVideo => MatroskaAction.ResizeMovieFile(localSettings, sourceFile, progress),
                                     _ => ActionResult.Skipped,
                                 }
                                 : ActionResult.Skipped;
@@ -250,8 +253,7 @@ namespace MatroskaBatchToolBox
                 modifiedSourceFileList.Add(sourceQueueWithSimpleConversion.Dequeue());
             while (sourceQueueWithComplexConversion.Count > 0)
                 modifiedSourceFileList.Add(sourceQueueWithComplexConversion.Dequeue());
-#if true
-#if DEBUG
+#if DEBUG && false
             System.Diagnostics.Debug.WriteLine("-----");
             System.Diagnostics.Debug.WriteLine("modifiedSourceFileList:");
             System.Diagnostics.Debug.Indent();
@@ -263,7 +265,6 @@ namespace MatroskaBatchToolBox
             System.Diagnostics.Debug.WriteLine("-----");
             if (modifiedSourceFileList.Count != sourceFileList.Count)
                 throw new Exception();
-#endif
 #endif
             return modifiedSourceFileList;
         }

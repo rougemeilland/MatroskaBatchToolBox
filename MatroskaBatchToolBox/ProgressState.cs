@@ -217,7 +217,7 @@ namespace MatroskaBatchToolBox
                 latestDateTime = _progressHistory.Last.Value.DateTime;
                 latestPercentage = _progressHistory.Last.Value.Percentage;
                 progressValue = GetProgressValue();
-#if DEBUG
+#if DEBUG && false
                 System.Diagnostics.Debug.WriteLine($"WriteProgressText: Histories={_progressHistory.Count}, maxElapsedTime={(latestDateTime - _firstDateTime).TotalSeconds:F3}s");
 #endif
             }

@@ -40,6 +40,7 @@ namespace MatroskaBatchToolBox
         private static readonly Regex _ffmpegConversionDurationPattern;
         private static readonly Regex _ffmpegConversionProgressPattern;
         private static readonly Regex _ffmpegVMAFScoreCalculationResultPattern;
+        private static readonly TimeSpan _childProcessCancellationInterval;
         private static bool _requestedCancellation;
 
         static ExternalCommand()
@@ -54,6 +55,7 @@ namespace MatroskaBatchToolBox
             _ffmpegConversionDurationPattern = new Regex(@"\s*(Duration|DURATION)\s*:\s*(?<hours>\d+):(?<minutes>\d+):(?<seconds>[\d\.]+)", RegexOptions.Compiled);
             _ffmpegConversionProgressPattern = new Regex(@" time=(?<hours>\d+):(?<minutes>\d+):(?<seconds>[\d\.]+) ", RegexOptions.Compiled);
             _ffmpegVMAFScoreCalculationResultPattern = new Regex(@"^\[Parsed_libvmaf_\d+\s*@\s*[a-fA-F0-9]+\]\s*VMAF\s+score:\s*(?<vmafScoreValue>\d+(\.\d+)?)$", RegexOptions.Compiled);
+            _childProcessCancellationInterval = TimeSpan.FromSeconds(10);
             _requestedCancellation = false;
         }
 
@@ -611,11 +613,22 @@ namespace MatroskaBatchToolBox
 #endif
                                 try
                                 {
-                                    childProcessCcanceller(process);
+                                    process.PriorityClass = ProcessPriorityClass.Normal;
+                                    while (true)
+                                    {
+                                        try
+                                        {
+                                            childProcessCcanceller(process);
+                                        }
+                                        catch (Exception)
+                                        {
+                                        }
 #if DEBUG && false
-                                System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: Requested to cancel child process \"{info.FileName}\"({process.Id}).");
+                                        System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: Requested to cancel child process \"{info.FileName}\"({process.Id}).");
 #endif
-                                    process.WaitForExit();
+                                        if (process.WaitForExit((int)_childProcessCancellationInterval.TotalMilliseconds))
+                                            break;
+                                    }
                                 }
                                 catch (Exception)
                                 {
