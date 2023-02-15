@@ -41,7 +41,16 @@ namespace MatroskaBatchToolBox
                     break;
                 case VideoEncoderType.Libx265:
                     options.Add($"-c:v:{outputStreamIndexWithinVideoStreams} {_libx265EncoderName}");
+
+#if false   // -tag:v hvc1 オプションを追加しないように修正。以下はその理由。
+                    // hvc1 タグが必要なのは H.265 のビデオトラックを持つ mp4 ファイルを apple 系のプレイヤーで再生する場合に必要となるから。
+                    // つまり、出力先が Matoroska である場合は、実は hvc1 タグの追加は不要。
+                    // その辺りの仕様が影響しているせいなのか、ffmpeg は出力先コンテナが Matoroska である場合は、H.265 ストリームのタグに hvc1 が指定されてもそれを出力先ファイルに反映しない。
+                    // エンコード中のログにはエンコード方法が H.265 の hvc1 であることが表示されるのだが、出力された動画ファイルを ffprobe で調べると、ビデオストリームの codec_tag_string が "[0][0][0][0]" の値にクリアされてしまっている。
+                    // 一方、同じ方法でエンコードして出力先コンテナが mp4 の場合は、codec_tag_string が "hvc1" となっている。
                     options.Add($"-tag:v:{outputStreamIndexWithinVideoStreams} hvc1");
+#endif
+
                     if (!string.IsNullOrEmpty(localSettings.FFmpegLibx265EncoderOption))
                         options.Add(localSettings.FFmpegLibx265EncoderOption);
                     break;
