@@ -37,7 +37,6 @@ namespace ChapterConverter
                 OutputFormat = ChapterFormat.NotSpecified;
                 OutputFilePath = null;
                 Force = false;
-                Encoder = null;
                 From = TimeSpan.Zero;
                 To = _defaultMaximumDuration;
                 Titles = new Dictionary<int, string>();
@@ -50,7 +49,6 @@ namespace ChapterConverter
             public ChapterFormat OutputFormat { get; set; }
             public string? OutputFilePath { get; set; }
             public bool Force { get; set; }
-            public string? Encoder { get; set; }
             public TimeSpan MaximumDuration { get; set; }
             public TimeSpan From { get; set; }
             public TimeSpan To { get; set; }
@@ -113,10 +111,6 @@ namespace ChapterConverter
                 $"    --output_format <output format>  or  -of <output format>",
                 $"      (Required) Specifies the format of the output file.",
                 $"      The file formats that can be used are described later.",
-                $"",
-                $"    --ffencoder <encoder string>  or  -e <encoder string>",
-                $"      (Required) This option must be specified when \"ffmetadata\" is specified for the output file format.",
-                $"        Example: --ffencoder \"Lavf59.27.100\"",
                 $"",
                 $"    --input <input file path>  or  -i <input file path>",
                 $"      (Optional) Specifies the path name of the file from which to read the conversion source data.",
@@ -217,7 +211,6 @@ namespace ChapterConverter
             var formatterParameter =
                 new ChapterFormatterParameter(
                     options.MaximumDuration,
-                    options.Encoder,
                     messageText => PrintWarningMessage(messageText));
 
             var inputChapterFormatter =
@@ -288,10 +281,11 @@ namespace ChapterConverter
         {
             try
             {
+                var utf8EncodingWithoutBOM = new UTF8Encoding(false);
                 using var writer =
                     outputFilePath is null
-                    ? new StreamWriter(Console.OpenStandardOutput(), Encoding.UTF8)
-                    : new StreamWriter(new FileStream(outputFilePath, force ? FileMode.Create : FileMode.CreateNew, FileAccess.Write, FileShare.None), Encoding.UTF8);
+                    ? new StreamWriter(Console.OpenStandardOutput(), utf8EncodingWithoutBOM)
+                    : new StreamWriter(new FileStream(outputFilePath, force ? FileMode.Create : FileMode.CreateNew, FileAccess.Write, FileShare.None), utf8EncodingWithoutBOM);
                 writer.Write(outputRawText);
                 return true;
             }
@@ -381,7 +375,6 @@ namespace ChapterConverter
             var inputFilePath = (string?)null;
             var outputFormat = ChapterFormat.NotSpecified;
             var outputFilePath = (string?)null;
-            var encoder = (string?)null;
             var force = (bool?)null;
             var maximumDuration = (TimeSpan?)null;
             var defaultReturnValue = new CommandLineOptions { ActionMode = ActionMode.Abort };
@@ -522,27 +515,6 @@ namespace ChapterConverter
                         }
                         ++index;
                         outputFilePath = args[index];
-                        actionMode = ActionMode.Convert;
-                        break;
-                    case "-e":
-                    case "--ffencoder":
-                        if (actionMode == ActionMode.Help)
-                        {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
-                            return defaultReturnValue;
-                        }
-                        if (encoder is not null)
-                        {
-                            PrintErrorMessage("The \"-e\" option or \"--ffencoder\" option is specified more than once.");
-                            return defaultReturnValue;
-                        }
-                        if (index + 1 >= args.Length)
-                        {
-                            PrintErrorMessage("The value of the \"-e\" option or \"--ffencoder\" option is not specified.");
-                            return defaultReturnValue;
-                        }
-                        ++index;
-                        encoder = args[index];
                         actionMode = ActionMode.Convert;
                         break;
                     case "-f":
@@ -736,11 +708,6 @@ namespace ChapterConverter
                 PrintErrorMessage($"Output file format is not specified. Please specify the \"--output_format\" option.");
                 return defaultReturnValue;
             }
-            if (outputFormat == ChapterFormat.FFMetadata && encoder is null)
-            {
-                PrintErrorMessage("Neither the \"--ffencoder\" option nor the \"-e\" option is specified, even though the output format is \"ffmetadata\". Specify the encoder string with the \"--ffencoder\" option or the \"-e\" option.");
-                return defaultReturnValue;
-            }
             if (to is not null && t is not null)
             {
                 PrintErrorMessage("\"-to\" option and \"-t\" option cannot be specified at once.");
@@ -770,7 +737,6 @@ namespace ChapterConverter
                     InputFilePath = inputFilePath,
                     OutputFormat = outputFormat,
                     OutputFilePath = outputFilePath,
-                    Encoder = encoder,
                     Force = force ?? false,
                     MaximumDuration = actualMaximumDuration,
                     From = actualFrom,

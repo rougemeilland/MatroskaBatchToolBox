@@ -6,8 +6,8 @@ namespace ChapterConverter
 {
     internal static class Utility
     {
-        private static Regex _strictTimePattern;
-        private static Regex _lazyTimePattern;
+        private static readonly Regex _strictTimePattern;
+        private static readonly Regex _lazyTimePattern;
 
         static Utility()
         {

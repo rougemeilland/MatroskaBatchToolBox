@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Globalization;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace ChapterConverter
 {
@@ -69,34 +67,25 @@ namespace ChapterConverter
 
         string IChapterFormatter.Render(IEnumerable<Chapter> chapters)
         {
-            var encoder = _parameter.FFMetadataEncoder;
-            if (string.IsNullOrEmpty(encoder))
-                throw new Exception("Neither the \"-e\" option nor the \"--ffencoder\" option is specified. Output in ``ffmetadata'' format requires specification of an encoder string (e.g. \"Lavf59.27.100\").");
-
             return
                 string.Join(
-                    "\r\n",
-                    new[]
+                    "\n",
+                    chapters
+                    .SelectMany(chapter =>
                     {
-                        ";FFMETADATA1",
-                        $"encoder={encoder}",
-                    }
-                    .Concat(
-                        chapters
-                        .SelectMany(chapter =>
+                        var chapterTextLines = new[]
                         {
-                            var chapterTextLines = new[]
-                            {
-                                "[CHAPTER]",
-                                $"TIMEBASE=1/{_defaultTimeBaseDenominator}",
-                                $"START={Convert.ToInt64(chapter.StartTime.TotalSeconds * _defaultTimeBaseDenominator)}",
-                                $"END={Convert.ToInt64(chapter.EndTime.TotalSeconds * _defaultTimeBaseDenominator)}",
-                            };
-                            if (string.IsNullOrEmpty(chapter.Title))
-                                return chapterTextLines;
-                            else
-                                return chapterTextLines.Append($"title={chapter.Title}");
-                        }))
+                            "[CHAPTER]",
+                            $"TIMEBASE=1/{_defaultTimeBaseDenominator}",
+                            $"START={Convert.ToInt64(chapter.StartTime.TotalSeconds * _defaultTimeBaseDenominator)}",
+                            $"END={Convert.ToInt64(chapter.EndTime.TotalSeconds * _defaultTimeBaseDenominator)}",
+                        };
+                        if (string.IsNullOrEmpty(chapter.Title))
+                            return chapterTextLines;
+                        else
+                            return chapterTextLines.Append($"title={chapter.Title}");
+                    })
+                    .Prepend(";FFMETADATA1")
                     .Append(""));
         }
     }
