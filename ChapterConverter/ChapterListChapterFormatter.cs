@@ -44,6 +44,9 @@ namespace ChapterConverter
                     if (currentTime is null)
                         throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
 
+                    if (currentTime >= _parameter.MaximumDuration)
+                        throw new Exception($"The chapter start time is too large in the input data. Check the chapter start time or change the maximum chapter duration with the \"--maximum_duration\" option.: {currentLineText}");
+
                     var misorderedLineText1 =
                         times
                         .Where(timeItem => timeItem.Key < index && timeItem.Value.time > currentTime)

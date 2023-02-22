@@ -43,6 +43,8 @@ namespace ChapterConverter
                     var endTime = TimeSpan.FromSeconds(long.Parse(endTimeText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat) * timeBase);
                     if (startTime > endTime)
                         throw new Exception($"In a chapter with input data, the end time is earlier than the start time.: START={startTimeText}, END={endTimeText}");
+                    if (startTime >= _parameter.MaximumDuration)
+                        throw new Exception($"The chapter start time is too large in the input data. Check the chapter start time or change the maximum chapter duration with the \"--maximum_duration\" option.: START={startTimeText}");
                     var title = match.Groups["title"].Success ? match.Groups["title"].Value : "";
                     return new { startTime, endTime, title, startTimeText, endTimeText };
                 })

@@ -30,7 +30,7 @@ namespace ChapterConverter
             if (!firstMatch.Success)
                 throw new Exception("The string \"Chapters:\" indicating the beginning of a chapter was not found in the input data.");
 
-            var chapters = FFLogChapterFormatter.EnumerateChapters(rawText[(firstMatch.Index + firstMatch.Length)..]).ToArray();
+            var chapters = EnumerateChapters(rawText[(firstMatch.Index + firstMatch.Length)..]).ToArray();
             if (chapters.Length > 0 && chapters[0].chapter.StartTime != TimeSpan.Zero)
                 throw new Exception($"The time of the first chapter in the input data is not zero.");
 
@@ -50,7 +50,7 @@ namespace ChapterConverter
 
         string IChapterFormatter.Render(IEnumerable<Chapter> chapters) => throw new NotSupportedException($"It is not possible to output in \"fflog\" format.");
 
-        private static IEnumerable<(Chapter chapter, string key)> EnumerateChapters(string rawText)
+        private IEnumerable<(Chapter chapter, string key)> EnumerateChapters(string rawText)
         {
             while (rawText.Length > 0)
             {
@@ -62,6 +62,8 @@ namespace ChapterConverter
                 var endTime = double.Parse(match.Groups["endTime"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat);
                 if (startTime > endTime)
                     throw new Exception($"In a chapter with input data, the end time is earlier than the start time.: \"{key}\"");
+                if (startTime >= _parameter.MaximumDuration.TotalSeconds)
+                    throw new Exception($"The chapter start time is too large in the input data. Change the maximum chapter duration with the \"--maximum_duration\" option.: {key}");
                 var title = match.Groups["title"].Success ? match.Groups["title"].Value : "";
                 yield return (new Chapter(TimeSpan.FromSeconds(startTime), TimeSpan.FromSeconds(endTime), title), key);
                 rawText = rawText[(match.Index + match.Length)..];

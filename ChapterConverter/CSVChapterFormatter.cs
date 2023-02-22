@@ -35,6 +35,9 @@ namespace ChapterConverter
                     if (time is null)
                         throw new Exception($"Invalid row format in input data.: {lineText}");
 
+                    if (time >= _parameter.MaximumDuration)
+                        throw new Exception($"The chapter start time is too large in the input data. Check the chapter start time or change the maximum chapter duration with the \"--maximum_duration\" option.: {lineText}");
+
                     var name = match.Groups["name"].Value.Trim();
 
                     return new { time = time.Value, name, lineText };

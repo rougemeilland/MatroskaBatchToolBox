@@ -25,6 +25,7 @@ namespace ChapterConverter
             FFMetadata,
             FFLog,
             ChapterList,
+            Immediate,
         }
 
         private class CommandLineOptions
@@ -59,6 +60,7 @@ namespace ChapterConverter
         private const string _fileFormat_FFMetadata = "ffmetadata";
         private const string _fileFormat_FFLog = "fflog";
         private const string _fileFormat_ChapterList = "chapter_list";
+        private const string _fileFormat_Immediate = "immediate";
         private static readonly object _consoleLockObject;
         private static readonly string _thisProgramName;
         private static readonly TimeSpan _defaultMaximumDuration;
@@ -197,6 +199,21 @@ namespace ChapterConverter
                 $"      * The start time can be expressed in hour-minute-second format (eg 00:23:15.952) or seconds format (eg 1823.555).",
                 $"      * Chapter names cannot contain TAB codes.",
                 $"",
+                $"    {_fileFormat_Immediate}:",
+                $"      This is the format for specifying the chapter start time directly with a command parameter.",
+                $"      This format can only be specified as an input format.",
+                $"      When specifying this format, the \"-i\" or \"--input\" option must specify a comma-separated list of chapter start times instead of input file pathnames.",
+                $"      Each chapter start time is specified in hour, minute, second format (hh:mm:ss.sss) or second format (ssss.sss).",
+                $"      Also, if a chapter start time is prefixed with a plus (+) sign, it represents the time added to the previous chapter start time.",
+                $"        Examples: Here are some example specifications. Any specification is completely equivalent.",
+                $"",
+                $"          -if immediate -i 0,101.835,211.144,316.115",
+                $"          -if immediate -i 0,0:01:41.835,0:03:31.144,0:05:16.115",
+                $"          -if immediate -i 0,+101.835,+109.309,+104.971",
+                $"          -if immediate -i 0,+0:01:41.835,+0:01:49.309,+0:01:44.971",
+                $"",
+                $"      * Chapter titles cannot be specified in the \"immediate\" format. To specify the chapter title, add the \"-tt\" option or \"--title\" option.",
+                $"",
             };
             foreach (var message in helpMessageTextLines)
                 Console.WriteLine(message);
@@ -204,14 +221,11 @@ namespace ChapterConverter
 
         private static bool ConvertAction(CommandLineOptions options)
         {
-            var inputRawText = ReadRawText(options.InputFilePath);
+            var inputRawText = ReadRawText(options.InputFormat, options.InputFilePath);
             if (inputRawText is null)
                 return false;
 
-            var formatterParameter =
-                new ChapterFormatterParameter(
-                    options.MaximumDuration,
-                    messageText => PrintWarningMessage(messageText));
+            var formatterParameter = new ChapterFormatterParameter(options.MaximumDuration, PrintWarningMessage);
 
             var inputChapterFormatter =
                 options.InputFormat switch
@@ -220,6 +234,7 @@ namespace ChapterConverter
                     ChapterFormat.FFMetadata => new FFMetadataChapterFormatter(formatterParameter),
                     ChapterFormat.FFLog => new FFLogChapterFormatter(formatterParameter),
                     ChapterFormat.ChapterList => new ChapterListChapterFormatter(formatterParameter),
+                    ChapterFormat.Immediate => new ImmediateChapterFormatter(formatterParameter),
                     _ => (IChapterFormatter?)null,
                 };
             if (inputChapterFormatter is null)
@@ -260,15 +275,24 @@ namespace ChapterConverter
             return true;
         }
 
-        private static string? ReadRawText(string? inputFilePath)
+        private static string? ReadRawText(ChapterFormat inputFormat, string? inputFilePath)
         {
             try
             {
-                using var reader =
-                    inputFilePath is null
-                    ? new StreamReader(Console.OpenStandardInput(), Encoding.UTF8)
-                    : new StreamReader(inputFilePath, Encoding.UTF8);
-                return reader.ReadToEnd();
+                if (inputFormat == ChapterFormat.Immediate)
+                {
+                    if (inputFilePath is null)
+                        throw new Exception("internal error (inputFormat == ChapterFormat.Immediate && inputFilePath is null)");
+                    return inputFilePath;
+                }
+                else
+                {
+                    using var reader =
+                        inputFilePath is null
+                        ? new StreamReader(Console.OpenStandardInput(), Encoding.UTF8)
+                        : new StreamReader(inputFilePath, Encoding.UTF8);
+                    return reader.ReadToEnd();
+                }
             }
             catch (Exception ex)
             {
@@ -430,6 +454,9 @@ namespace ChapterConverter
                                 break;
                             case _fileFormat_FFMetadata:
                                 inputFormat = ChapterFormat.FFMetadata;
+                                break;
+                            case _fileFormat_Immediate:
+                                inputFormat = ChapterFormat.Immediate;
                                 break;
                             default:
                                 PrintErrorMessage($"The value of the \"-if\" option or \"--input_format\" option is an unsupported value.: \"{args[index]}\"");
@@ -688,16 +715,6 @@ namespace ChapterConverter
             if (actionMode == ActionMode.Help)
                 return new CommandLineOptions { ActionMode= ActionMode.Help };
 
-            if (inputFilePath is not null && !File.Exists(inputFilePath))
-            {
-                PrintErrorMessage($"Input file does not exist.: \"{inputFilePath}\"");
-                return defaultReturnValue;
-            }
-            if (outputFilePath is not null && !(force ?? false) && File.Exists(outputFilePath))
-            {
-                PrintErrorMessage($"Output file already exists. Consider specifying the \"--force\" option.: \"{inputFilePath}\"");
-                return defaultReturnValue;
-            }
             if (inputFormat == ChapterFormat.NotSpecified)
             {
                 PrintErrorMessage($"Input file format is not specified. Please specify the \"--input_format\" option.");
@@ -706,6 +723,27 @@ namespace ChapterConverter
             if (outputFormat == ChapterFormat.NotSpecified)
             {
                 PrintErrorMessage($"Output file format is not specified. Please specify the \"--output_format\" option.");
+                return defaultReturnValue;
+            }
+            if (inputFormat == ChapterFormat.Immediate)
+            {
+                if (inputFilePath is null)
+                {
+                    PrintErrorMessage($"Neither the \"-i\" option nor the \"--input\" option is specified even though \"immediate\" is specified for the input format. Specify a list of chapter start times with the \"-i\" or \"--input\" option.");
+                    return defaultReturnValue;
+                }
+            }
+            else
+            {
+                if (inputFilePath is not null&& !File.Exists(inputFilePath))
+                {
+                    PrintErrorMessage($"Input file does not exist.: \"{inputFilePath}\"");
+                    return defaultReturnValue;
+                }
+            }
+            if (outputFilePath is not null && !(force ?? false) && File.Exists(outputFilePath))
+            {
+                PrintErrorMessage($"Output file already exists. Specify the \"-f\" option or \"--force\" option to allow overwriting of the output file.: \"{outputFilePath}\"");
                 return defaultReturnValue;
             }
             if (to is not null && t is not null)
