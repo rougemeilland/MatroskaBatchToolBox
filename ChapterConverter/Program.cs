@@ -42,6 +42,7 @@ namespace ChapterConverter
                 To = _defaultMaximumDuration;
                 Titles = new Dictionary<int, string>();
                 MaximumDuration = _defaultMaximumDuration;
+                KeepEmptyChapter = false;
             }
 
             public ActionMode ActionMode { get; set; }
@@ -54,6 +55,26 @@ namespace ChapterConverter
             public TimeSpan From { get; set; }
             public TimeSpan To { get; set; }
             public IDictionary<int, string> Titles { get; set; }
+            public TimeSpan MinimumDuration { get; set; }
+            public bool KeepEmptyChapter { get; set; }
+        }
+
+        private class ChapterFilterParameter
+        {
+            public ChapterFilterParameter()
+            {
+                From = TimeSpan.Zero;
+                To = TimeSpan.Zero;
+                Titles = new Dictionary<int,string>();
+                KeepEmptyChapter = false;
+                From = _defaultMinimumDuration;
+            }
+
+            public TimeSpan From { get; set; }
+            public TimeSpan To { get; set; }
+            public IDictionary<int, string> Titles { get; set; }
+            public bool KeepEmptyChapter { get; set; }
+            public TimeSpan MinimumDuration { get; set; }
         }
 
         private const string _fileFormat_CSV = "csv";
@@ -64,6 +85,7 @@ namespace ChapterConverter
         private static readonly object _consoleLockObject;
         private static readonly string _thisProgramName;
         private static readonly TimeSpan _defaultMaximumDuration;
+        private static readonly TimeSpan _defaultMinimumDuration;
         private static readonly Regex _titleOptionPattern;
 
         static Program()
@@ -71,6 +93,7 @@ namespace ChapterConverter
             _consoleLockObject = new object();
             _thisProgramName =Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
             _defaultMaximumDuration = TimeSpan.FromDays(7);
+            _defaultMinimumDuration = TimeSpan.FromMilliseconds(10);
             _titleOptionPattern = new Regex(@"^(-tt|--title):(?<chapterNumber>\d+)$");
         }
 
@@ -149,6 +172,10 @@ namespace ChapterConverter
                 $"      * Note that if trimming is done, the chapter number of the trimming result will be applied.",
                 $"      * Don't forget to enclose the title in double quotes if the chapter title contains spaces.",
                 $"",
+                $"    --keep_empty_chapter",
+                $"      Causes zero-length chapters to be output as-is.",
+                $"      By default chapconv automatically removes zero length chapters.",
+                $"",
                 $"    --maximum_duration <duratuon time>",
                 $"      (Optional) Specifies the time to apply instead of the end time of the last chapter if it is unknown.",
                 $"      The value for this option can be specified in hour-minute-second format (hh:mm.ss.sss) or second format (sssss.sss).",
@@ -159,6 +186,23 @@ namespace ChapterConverter
                 $"        The value of this option is used when converting from formats that do not describe an end time to formats that require an end time. (Example: conversion from \"chapter_list\" format to \"ffmetadata\" format, etc.)",
                 $"        chapconv applies the next chapter's start time as the chapter's end time.",
                 $"        And apply the value of this option as the end time of the last chapter.",
+                $"",
+                $"    --minimum_duration <duratuon time>",
+                $"      (Optional) Specifies the minimum valid chapter length.",
+                $"      The default is 0.01 (10 ms).",
+                $"      Chapters shorter than this value are automatically merged with the chapters before and after them.",
+                $"",
+                $"      * Commentary",
+                $"        In general, chapters that are too short to be visible are meaningless.",
+                $"        So chapconv will automatically combine chapters that are too short with the chapters before and after it.",
+                $"",
+                $"        More specifically, if the first chapter is too short, merge it with the second chapter.",
+                $"        Also, if the second and subsequent chapters are too short, they are combined with the previous chapter.",
+                $"",
+                $"        Titles before merging are carried over to the merged chapters.",
+                $"        However, if both chapters had titles before the merge, one title will be lost and a warning message will be displayed.",
+                $"",
+                $"        If you want to suppress these operations, specify the \"--minimum_duration 0\" option.",
                 $"",
                 $"  [File formats]",
                 $"    {_fileFormat_FFMetadata}:",
@@ -258,7 +302,17 @@ namespace ChapterConverter
             if (chapters is null)
                 return false;
 
-            var updatedChapters = ChapterFilter(chapters, options.From, options.To, options.Titles);
+            var updatedChapters =
+                ChapterFilter(
+                    chapters,
+                    new ChapterFilterParameter
+                    {
+                        From = options.From,
+                        To = options.To,
+                        Titles = options.Titles,
+                        MinimumDuration = options.MinimumDuration,
+                        KeepEmptyChapter = options.KeepEmptyChapter,
+                    });
             if (updatedChapters is null)
                 return false;
 
@@ -357,50 +411,130 @@ namespace ChapterConverter
             }
         }
 
-        private static IEnumerable<Chapter>? ChapterFilter(IEnumerable<Chapter> chapters, TimeSpan from, TimeSpan to, IDictionary<int, string> titles)
+        private static IEnumerable<Chapter>? ChapterFilter(IEnumerable<Chapter> chapters, ChapterFilterParameter filterParameter)
         {
             try
             {
-                if (from > to)
+                if (filterParameter.From > filterParameter.To)
                     throw new Exception("internal error (from > to)");
-                var duration = to - from;
+
+                var duration = filterParameter.To - filterParameter.From;
+
+                var chapterList = chapters.ToList();
+                var lastChapter = chapterList.LastOrDefault();
+                if (lastChapter is null)
+                    return new Chapter[0];
 
                 var trimmedChapters =
-                    chapters
-                    .Select(chapter =>
-                    {
-                        if (chapter.StartTime > chapter.EndTime)
-                            throw new Exception("internal error (chapter.StartTime > chapter.EndTime)");
-                        return new
+                    new LinkedList<Chapter>(
+                        chapterList
+                        .Select((chapter, index) =>
                         {
-                            startTime = chapter.StartTime - from,
-                            endTime = chapter.EndTime - from,
-                            title = chapter.Title,
-                        };
-                    })
-                    .Where(chapter => chapter.endTime > TimeSpan.Zero && chapter.startTime < duration && chapter.startTime < chapter.endTime)
-                    .Select((chapter, chapterNumber) =>
+                            if (chapter.StartTime > chapter.EndTime)
+                                throw new Exception("internal error (chapter.StartTime > chapter.EndTime)");
+                            return new
+                            {
+                                startTime = chapter.StartTime - filterParameter.From,
+                                endTime = chapter.EndTime - filterParameter.From,
+                                title = chapter.Title,
+                            };
+                        })
+                        .Where(chapter => chapter.endTime >= TimeSpan.Zero && chapter.startTime <= duration)
+                        .Select(chapter =>
+                            new Chapter(
+                                chapter.startTime > TimeSpan.Zero ? chapter.startTime : TimeSpan.Zero,
+                                chapter.endTime < duration ? chapter.endTime : duration,
+                                chapter.title))
+                        .Where(chapter => filterParameter.KeepEmptyChapter || chapter.StartTime < chapter.EndTime));
+
+
+                // チャプターが2つ以上あり、かつ最初のチャプターの時間が非常に短い間繰り返す
+                while (trimmedChapters.First is not null && trimmedChapters.First.Next is not null)
+                {
+                    var firstChapterNode = trimmedChapters.First;
+                    var secondChapterNode = trimmedChapters.First.Next;
+                    if (firstChapterNode.Value.Duration >= filterParameter.MinimumDuration)
+                        break;
+                    var newChapter = MergeChapter(filterParameter, trimmedChapters, firstChapterNode.Value, secondChapterNode.Value);
+                    trimmedChapters.AddFirst(newChapter);
+                    trimmedChapters.Remove(firstChapterNode);
+                    trimmedChapters.Remove(secondChapterNode);
+                }
+
+                // チャプターが2つ以上あり、かつ2個目以降に時間が非常に短いチャプターが存在する間繰り返す
+                for (var currentChapterNode = trimmedChapters.First; currentChapterNode is not null && currentChapterNode.Next is not null; )
+                {
+                    var nextChapterNode = currentChapterNode.Next;
+                    if (nextChapterNode.Value.Duration < filterParameter.MinimumDuration)
+                    {
+                        var newChapter = MergeChapter(filterParameter, trimmedChapters, currentChapterNode.Value, nextChapterNode.Value);
+                        trimmedChapters.AddAfter(nextChapterNode, newChapter);
+                        trimmedChapters.Remove(currentChapterNode);
+                        trimmedChapters.Remove(nextChapterNode);
+                        currentChapterNode = trimmedChapters.First;
+                    }
+                    else
+                        currentChapterNode = currentChapterNode.Next;
+                }
+
+                var lastTrimmedChapterNode = trimmedChapters.Last;
+                if (lastTrimmedChapterNode is not null)
+                {
+                    // 元の最後のチャプターの終了時間を最後のチャプターの終了時間として設定する。
+                    // ※ エンコード時の誤差により、トリミングの終了時間が必ずしも動画の終了時間と一致しない可能性があるため、最後のチャプターの終了時間は「非常に大きい時間」のままにしておく。
+
+                    var newLastChapter =
                         new Chapter(
-                            chapter.startTime > TimeSpan.Zero ? chapter.startTime : TimeSpan.Zero,
-                            chapter.endTime < duration ? chapter.endTime : duration,
-                            !titles.ContainsKey(chapterNumber) ? chapter.title : titles[chapterNumber]))
-                    .ToList();
+                            lastTrimmedChapterNode.Value.StartTime,
+                            lastChapter.EndTime,
+                            lastTrimmedChapterNode.Value.Title);
+                    trimmedChapters.Remove(lastTrimmedChapterNode);
+                    trimmedChapters.AddLast(new LinkedListNode<Chapter>(newLastChapter));
+                }
 
                 var invalidTitle =
-                    titles
+                    filterParameter.Titles
                     .Where(item => item.Key >= trimmedChapters.Count)
                     .Select(item => new { chapterNumber = item.Key, chapterTitle = item.Value })
                     .FirstOrDefault();
                 if (invalidTitle is not null)
                     throw new Exception($"A chapter title was specified with the '--title:{invalidTitle.chapterNumber} \"{invalidTitle.chapterTitle}\"' option, but there is no corresponding chapter #{invalidTitle.chapterNumber}.");
 
-                return trimmedChapters;
+                return
+                    trimmedChapters
+                    .Select((chapter, chapterNumber) =>
+                        new Chapter(
+                            chapter.StartTime,
+                            chapter.EndTime,
+                            !filterParameter.Titles.ContainsKey(chapterNumber) ? chapter.Title : filterParameter.Titles[chapterNumber]));
             }
             catch (Exception ex)
             {
                 PrintErrorMessage(ex.Message);
                 return null;
             }
+        }
+
+        private static Chapter MergeChapter(ChapterFilterParameter filterParameter, LinkedList<Chapter> trimmedChapters, Chapter firstHalf, Chapter secondHalf)
+        {
+            var title = firstHalf.Title;
+            if (string.IsNullOrEmpty(title))
+                title = secondHalf.Title;
+            else if (!string.IsNullOrEmpty(secondHalf.Title))
+            {
+                var lostTitle = secondHalf.Title;
+                if (firstHalf.Duration < secondHalf.Duration)
+                {
+                    title = secondHalf.Title;
+                    lostTitle = firstHalf.Title;
+                }
+                PrintWarningMessage($"A very short chapter was merged with an adjacent chapter, resulting in the loss of the chapter name \"{lostTitle}\".");
+            }
+            else
+            {
+                // NOP
+            }
+            return new Chapter(firstHalf.StartTime, secondHalf.EndTime, title);
         }
 
         private static CommandLineOptions ParseOptions(string[] args)
@@ -417,6 +551,8 @@ namespace ChapterConverter
             var to = (TimeSpan?)null;
             var t = (TimeSpan?)null;
             var titles = new Dictionary<int, string>();
+            var minimumDuration = (TimeSpan?)null;
+            var keepEmptyChapter = (bool?)null;
             for (var index = 0; index < args.Length; index++)
             {
                 switch (args[index])
@@ -588,13 +724,13 @@ namespace ChapterConverter
                         }
                         ++index;
                         {
-                            if (!double.TryParse(args[index], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double maximumDurationValue) ||
-                                maximumDurationValue <= 0)
+                            var maximumDurationValue = Utility.ParseTime(args[index], false);
+                            if (maximumDurationValue is null)
                             {
-                                PrintErrorMessage("The value of the \"--maximum_duration\" option is non-numeric, negative or zero. Specify a positive number in seconds.");
+                                PrintErrorMessage($"The format of the value of the \"--maximum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
-                            maximumDuration = TimeSpan.FromSeconds(maximumDurationValue);
+                            maximumDuration = maximumDurationValue;
                         }
                         actionMode = ActionMode.Convert;
                         break;
@@ -680,6 +816,48 @@ namespace ChapterConverter
                             }
                             t = time;
                         }
+                        actionMode = ActionMode.Convert;
+                        break;
+                    case "--minimum_duration":
+                        if (actionMode == ActionMode.Help)
+                        {
+                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            return defaultReturnValue;
+                        }
+                        if (maximumDuration is not null)
+                        {
+                            PrintErrorMessage("The \"--minimum_duration\" option is specified more than once.");
+                            return defaultReturnValue;
+                        }
+                        if (index + 1 >= args.Length)
+                        {
+                            PrintErrorMessage("The value of the \"--minimum_duration\" option is not specified.");
+                            return defaultReturnValue;
+                        }
+                        ++index;
+                        {
+                            var minimumDurationValue = Utility.ParseTime(args[index], false);
+                            if (minimumDurationValue is null)
+                            {
+                                PrintErrorMessage($"The format of the value of the \"--minimum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
+                                return defaultReturnValue;
+                            }
+                            minimumDuration = minimumDurationValue;
+                        }
+                        actionMode = ActionMode.Convert;
+                        break;
+                    case "--keep_empty_chapter":
+                        if (actionMode == ActionMode.Help)
+                        {
+                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            return defaultReturnValue;
+                        }
+                        if (keepEmptyChapter is not null)
+                        {
+                            PrintErrorMessage("The \"--keep_empty_chapter\" option is specified more than once.");
+                            return defaultReturnValue;
+                        }
+                        keepEmptyChapter = true;
                         actionMode = ActionMode.Convert;
                         break;
                     default:
@@ -791,6 +969,8 @@ namespace ChapterConverter
                     From = actualFrom,
                     To = actualTo,
                     Titles = titles,
+                    MinimumDuration = minimumDuration ?? _defaultMinimumDuration,
+                    KeepEmptyChapter = keepEmptyChapter ?? false,
                 };
         }
 

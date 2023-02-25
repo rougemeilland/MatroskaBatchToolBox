@@ -8,11 +8,13 @@ namespace ChapterConverter
         {
             StartTime = startTime;
             EndTime= endTime;
+            Duration = endTime - startTime;
             Title = title;
         }
 
         public TimeSpan StartTime { get; }
         public TimeSpan EndTime { get; }
+        public TimeSpan Duration { get; }
         public string Title { get; }
     }
 }
