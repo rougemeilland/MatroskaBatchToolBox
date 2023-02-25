@@ -102,7 +102,7 @@ namespace ChapterConverter
                 .ToArray();
 
             if (chapters[0].startTime != TimeSpan.Zero)
-                throw new Exception($"The time of the first chapter in the input data is not zero.");
+                _parameter.ReportWarningMessage($"The time of the first chapter in the input data is not zero.");
 
             for (var index = 0; index < chapters.Length; ++index)
             {

@@ -32,7 +32,7 @@ namespace ChapterConverter
             }
 
             if (startTimes.First is not null && startTimes.First.Value.startTime != TimeSpan.Zero)
-                throw new Exception($"The time of the first chapter in the input data is not zero.");
+                _parameter.ReportWarningMessage($"The time of the first chapter in the input data is not zero.");
 
             for (var currentChapterItem = startTimes.First; currentChapterItem is not null; currentChapterItem = currentChapterItem.Next)
             {
