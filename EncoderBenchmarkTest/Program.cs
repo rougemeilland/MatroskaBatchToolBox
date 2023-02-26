@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using MatroskaBatchToolBox;
+using Utility;
 
 namespace EncoderBenchmarkTest
 {
@@ -88,7 +88,7 @@ namespace EncoderBenchmarkTest
                                 }
                                 else
                                 {
-                                    var gcd = ExtendedMath.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
+                                    var gcd = Numerics.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
                                     aspectRatioWidth = resolutionWidth / gcd;
                                     aspectRatioHeight = resolutionHeight / gcd;
                                 }
@@ -182,9 +182,9 @@ namespace EncoderBenchmarkTest
                 RedirectStandardError = true,
                 StandardErrorEncoding = Encoding.UTF8,
             };
-            var process = Process.Start(processStartInfo);
-            if (process is null)
-                throw new Exception("Failed to start child process.");
+            var process =
+                Process.Start(processStartInfo)
+                ?? throw new Exception("Failed to start child process.");
             try
             {
                 var cancelled = false;

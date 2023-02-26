@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Utility;
 
 namespace ChapterConverter
 {
@@ -17,7 +18,7 @@ namespace ChapterConverter
         static FFMetadataChapterFormatter()
         {
             _ffMetadataHeaderPattern = new Regex(@"^;FFMETADATA1\r?\nencoder=[^\r\n]+\r?\n", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-            _chapterPattern = new Regex(@"\[CHAPTER\]\r?\nTIMEBASE=(?<timeBaseNumerator>\d+)/(?<timeBaseDenominator>\d+)\r?\nSTART=(?<startTime>\d+)\r?\nEND=(?<endTime>\d+)\r?\n(title=(?<title>[^\r\n]*)\r?\n)?", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            _chapterPattern = new Regex(@"\[CHAPTER\]\r?\nTIMEBASE=(?<timeBase>\d+/\d+)\r?\nSTART=(?<startTime>\d+)\r?\nEND=(?<endTime>\d+)\r?\n(title=(?<title>[^\r\n]*)\r?\n)?", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         }
 
         public FFMetadataChapterFormatter(ChapterFormatterParameter parameter)
@@ -34,13 +35,13 @@ namespace ChapterConverter
                 _chapterPattern.Matches(rawText)
                 .Select(match =>
                 {
-                    var timeBaseNumerator = long.Parse(match.Groups["timeBaseNumerator"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-                    var timeBaseDenominator = long.Parse(match.Groups["timeBaseDenominator"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                    if (!Numerics.TryParseRationalNumber(match.Groups["timeBase"].Value, out long timeBaseNumerator, out long timeBaseDenominator))
+                        throw new Exception("internal error (illegal timeBase format)");
                     var timeBase = (double)timeBaseNumerator / timeBaseDenominator;
                     var startTimeText = match.Groups["startTime"].Value;
-                    var startTime = TimeSpan.FromSeconds(long.Parse(startTimeText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat) * timeBase);
+                    var startTime = Time.FromTimeBaseToTimeSpan(long.Parse(startTimeText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat), timeBaseNumerator, timeBaseDenominator);
                     var endTimeText = match.Groups["endTime"].Value;
-                    var endTime = TimeSpan.FromSeconds(long.Parse(endTimeText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat) * timeBase);
+                    var endTime = Time.FromTimeBaseToTimeSpan(long.Parse(endTimeText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat), timeBaseNumerator, timeBaseDenominator);
                     if (startTime > endTime)
                         throw new Exception($"In a chapter with input data, the end time is earlier than the start time.: START={startTimeText}, END={endTimeText}");
                     if (startTime >= _parameter.MaximumDuration)

@@ -9,10 +9,21 @@ namespace Utility.Models.Json
         public MovieInformationContainer()
         {
             Streams = new List<MovieStreamInfoContainer>();
+            Chapters = new List<MovieChapterContainer>();
         }
 
         [JsonPropertyName("streams")]
         public IList<MovieStreamInfoContainer> Streams { get; set; }
+
+        [JsonPropertyName("chapters")]
+        public IList<MovieChapterContainer> Chapters { get; set; }
+
+        internal IEnumerable<ChapterInfo> EnumerateChapters()
+        {
+            return
+                Chapters
+                .Select(chapter => new ChapterInfo(chapter));
+        }
 
         internal IEnumerable<VideoStreamInfo> EnumerateVideoStreams() =>
             Streams

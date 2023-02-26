@@ -1,9 +1,18 @@
 ﻿using System;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
-namespace MatroskaBatchToolBox
+namespace Utility
 {
-    internal static class ExtendedMath
+    public static class Numerics
     {
+        private static readonly Regex _rationalNumberPattern;
+
+        static Numerics()
+        {
+            _rationalNumberPattern = new Regex(@"^(?<numerator>\d+)/(?<denominator>\d+)$", RegexOptions.Compiled);
+        }
+
         public static int GreatestCommonDivisor(int u, int v)
         {
             if (u < 0)
@@ -109,6 +118,20 @@ namespace MatroskaBatchToolBox
                 while ((u & 1) == 0)
                     u >>= 1;
             }
+        }
+
+        public static bool TryParseRationalNumber(string s, out long numerator, out long denominator)
+        {
+            var match = _rationalNumberPattern.Match(s);
+            if (!match.Success)
+            {
+                numerator = default;
+                denominator = default;
+                return false;
+            }
+            numerator = long.Parse(match.Groups["numerator"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+            denominator = long.Parse(match.Groups["denominator"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+            return true;
         }
     }
 }

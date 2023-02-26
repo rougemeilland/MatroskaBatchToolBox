@@ -483,7 +483,7 @@ namespace MatroskaBatchToolBox
                 // 解像度指定で終わっている、または次がコメントである場合
 
                 // 解像度から整数比を求めてそれをアスペクト比とする。
-                var gcd = ExtendedMath.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
+                var gcd = Numerics.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
                 var aspectRatioWidth = resolutionWidth / gcd;
                 var aspectRatioHeight = resolutionHeight / gcd;
                 return (true, $"{resolutionWidth}x{resolutionHeight}", $"{aspectRatioWidth}:{aspectRatioHeight}", null);

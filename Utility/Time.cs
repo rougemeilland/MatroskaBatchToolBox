@@ -1,4 +1,5 @@
-﻿using System;
+﻿#define NEED_HIGH_PRECISION_FOR_TIME
+using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -14,7 +15,6 @@ namespace Utility
             _strictTimePattern = new Regex(@"^(?<hour>\d+):(?<minute>\d+):(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
             _lazyTimePattern = new Regex(@"^(((?<hour>\d+):)?(?<minute>\d+):)?(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         }
-
 
         public static TimeSpan? ParseTime(string s, bool strict)
         {
@@ -76,6 +76,23 @@ namespace Utility
             var minute = totalMinutes % 60;
             var hour = totalMinutes / 60;
             return $"{hour:D2}:{minute:D2}:{second.ToString(secondFormat)}";
+        }
+
+        public static TimeSpan FromTimeBaseToTimeSpan(long timeValue, long baseTimeNumerator, long baseTimeDenominator)
+        {
+#if NEED_HIGH_PRECISION_FOR_TIME
+            // longの有効桁数は18桁+αで、チャプターの時間の計算において baseTimeDenominator で想定される桁数は最低でも 9(+1) 桁。
+            // 1 秒を表す timeValue が 9(+1) 桁であることを考えると、10 秒以上の計算を行うと、途中でオーバーフローを起こすことはほぼ確実であり、運用に支障をきたす。。
+            // double 型を使用すればオーバーフローは回避できるが、精度が犠牲になる。(double型の仮数部の精度は 自明な先頭ビットを含めても53ビットしかなく、long 型に劣る)
+            // そのため、精度の確保のために途中計算を BigInteger 型で行う。
+            // まぁ、想定される運用がチャプターの時間の計算であり、チャプターのタイミングにナノセコンド単位の精度が求められることはないはずであるが…
+            var ticks = (System.Numerics.BigInteger)TimeSpan.TicksPerSecond * timeValue * baseTimeNumerator / baseTimeDenominator;
+            if (ticks > long.MaxValue)
+                throw new OverflowException($"\"{(double)timeValue * baseTimeNumerator / baseTimeDenominator}\" seconds cannot be represented in long type.: timeValue={timeValue}, baseTimeNumerator={baseTimeNumerator}, baseTimeDenominator={baseTimeDenominator}");
+            return TimeSpan.FromTicks((long)ticks);
+#else
+            return TimeSpan.FromSeconds((double)timeValue * baseTimeNumerator / baseTimeDenominator);
+#endif
         }
     }
 }
