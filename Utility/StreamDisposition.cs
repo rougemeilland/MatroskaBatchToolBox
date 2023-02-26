@@ -1,8 +1,8 @@
-﻿using MatroskaBatchToolBox.Model.Json;
+﻿using Utility.Models.Json;
 
-namespace MatroskaBatchToolBox.Model
+namespace Utility
 {
-    internal class StreamDisposition
+    public class StreamDisposition
     {
         public StreamDisposition(MovieStreamDispositionContainer disposition)
         {

@@ -11,7 +11,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EncoderBenchmarkTest", "Enc
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CalcVMAF", "CalcVMAF\CalcVMAF.csproj", "{361666FF-66E1-4A32-B63A-8512C49EDB35}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChapterConverter", "ChapterConverter\ChapterConverter.csproj", "{FE5EE9EB-7E51-4C4A-9840-3ED049F51F6C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ChapterConverter", "ChapterConverter\ChapterConverter.csproj", "{FE5EE9EB-7E51-4C4A-9840-3ED049F51F6C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utility", "Utility\Utility.csproj", "{72B2D0EA-4D02-4434-8AD8-F4A013943C95}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +41,10 @@ Global
 		{FE5EE9EB-7E51-4C4A-9840-3ED049F51F6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FE5EE9EB-7E51-4C4A-9840-3ED049F51F6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FE5EE9EB-7E51-4C4A-9840-3ED049F51F6C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{72B2D0EA-4D02-4434-8AD8-F4A013943C95}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{72B2D0EA-4D02-4434-8AD8-F4A013943C95}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{72B2D0EA-4D02-4434-8AD8-F4A013943C95}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{72B2D0EA-4D02-4434-8AD8-F4A013943C95}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

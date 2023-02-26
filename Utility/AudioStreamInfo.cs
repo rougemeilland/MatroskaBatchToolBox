@@ -1,8 +1,8 @@
-﻿using MatroskaBatchToolBox.Model.Json;
+﻿using Utility.Models.Json;
 
-namespace MatroskaBatchToolBox.Model
+namespace Utility
 {
-    internal class AudioStreamInfo
+    public class AudioStreamInfo
         : StreamInfo
     {
         public AudioStreamInfo(MovieStreamInfoContainer stream, int indexWithinAudioStream)

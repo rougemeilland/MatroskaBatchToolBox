@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Utility;
 
 namespace ChapterConverter
 {
@@ -18,17 +19,17 @@ namespace ChapterConverter
             var startTimes = new LinkedList<(TimeSpan startTime, string startTimeSpec)>();
             foreach (var timeSpec in rawText.Split(','))
             {
-                var time = Utility.ParseTime(timeSpec, false);
-                if (time is null)
-                    throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
+                var time =
+                    Time.ParseTime(timeSpec, false)
+                    ?? throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                 if (timeSpec.StartsWith('+'))
                 {
-                    var lastTime = startTimes.Last;
-                    if (lastTime is null)
-                        throw new Exception($"Do not prefix the start time of the first chapter with a plus sign (+).: \"{timeSpec}\" in \"{rawText}\"");
-                    time = time.Value + lastTime.Value.startTime;
+                    var lastTime =
+                        startTimes.Last
+                        ?? throw new Exception($"Do not prefix the start time of the first chapter with a plus sign (+).: \"{timeSpec}\" in \"{rawText}\"");
+                    time += lastTime.Value.startTime;
                 }
-                startTimes.AddLast(new LinkedListNode<(TimeSpan startTime, string startTimeSpec)>((time.Value, timeSpec)));
+                startTimes.AddLast(new LinkedListNode<(TimeSpan startTime, string startTimeSpec)>((time, timeSpec)));
             }
 
             if (startTimes.First is not null && startTimes.First.Value.startTime != TimeSpan.Zero)

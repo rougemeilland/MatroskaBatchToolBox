@@ -2,17 +2,17 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace ChapterConverter
+namespace Utility
 {
-    internal static class Utility
+    public static class Time
     {
         private static readonly Regex _strictTimePattern;
         private static readonly Regex _lazyTimePattern;
 
-        static Utility()
+        static Time()
         {
-            _strictTimePattern = new Regex(@"(?<hour>\d+):(?<minute>\d+):(?<second>\d+(\.\d+)?)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-            _lazyTimePattern = new Regex(@"(((?<hour>\d+):)?(?<minute>\d+):)?(?<second>\d+(\.\d+)?)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            _strictTimePattern = new Regex(@"^(?<hour>\d+):(?<minute>\d+):(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            _lazyTimePattern = new Regex(@"^(((?<hour>\d+):)?(?<minute>\d+):)?(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         }
 
 
@@ -69,7 +69,7 @@ namespace ChapterConverter
             if (precision > 9)
                 throw new ArgumentException($"internal error (precision > 9)");
 
-            var secondFormat = precision <= 0 ? "D2" :  $"00.{new string('0', precision)}";
+            var secondFormat = precision <= 0 ? "D2" : $"00.{new string('0', precision)}";
             var totalSeconds = (decimal)time.TotalSeconds;
             var totalMinutes = (int)Math.Floor(totalSeconds / 60);
             var second = totalSeconds - totalMinutes * 60;

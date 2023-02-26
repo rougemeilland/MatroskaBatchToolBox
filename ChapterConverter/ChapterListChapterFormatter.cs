@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Utility;
 
 namespace ChapterConverter
 {
@@ -40,10 +41,9 @@ namespace ChapterConverter
                         throw new Exception($"There are duplicate rows in the input data.: \"{currentLineText}\", \"{times[index].lineText}\"");
 
                     var timeText = match.Groups["time"].Value;
-                    var currentTime = Utility.ParseTime(timeText, true);
-                    if (currentTime is null)
-                        throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
-
+                    var currentTime =
+                        Time.ParseTime(timeText, true)
+                        ?? throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
                     if (currentTime >= _parameter.MaximumDuration)
                         throw new Exception($"The chapter start time is too large in the input data. Check the chapter start time or change the maximum chapter duration with the \"--maximum_duration\" option.: {currentLineText}");
 
@@ -63,7 +63,7 @@ namespace ChapterConverter
                     if (misorderedLineText2 is not null)
                         throw new Exception($"The chapters in the input data are not arranged in ascending chronological order.: \"{currentLineText}\", \"{misorderedLineText2}\"");
 
-                    times.Add(index, (currentTime.Value, currentLineText));
+                    times.Add(index, (currentTime, currentLineText));
                 }
                 else if (match.Groups["nameIndex"].Success)
                 {
@@ -129,7 +129,7 @@ namespace ChapterConverter
                     return
                         new[]
                         {
-                            $"CHAPTER{indexText}={Utility.FormatTime(summary.startTime, 3)}",
+                            $"CHAPTER{indexText}={Time.FormatTime(summary.startTime, 3)}",
                             $"CHAPTER{indexText}NAME={summary.name}",
                         };
                 });

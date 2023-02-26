@@ -1,9 +1,9 @@
-﻿using MatroskaBatchToolBox.Model.Json;
+﻿using Utility.Models.Json;
 using System;
 
-namespace MatroskaBatchToolBox.Model
+namespace Utility
 {
-    internal class VideoStreamInfo
+    public class VideoStreamInfo
         : StreamInfo
     {
         private const string _mpngVideoStreamName = "png";
@@ -13,8 +13,12 @@ namespace MatroskaBatchToolBox.Model
             : base(stream)
         {
             IndexWithinVideoStream = indexWithinVideoStream;
-            Width = stream.Width ?? throw new Exception($"Video stream #{indexWithinVideoStream} has no \"width\" property.");
-            Height = stream.Height ?? throw new Exception($"Video stream #{indexWithinVideoStream} has no \"height\" property.");
+            Width =
+                stream.Width
+                ?? throw new Exception($"Video stream #{indexWithinVideoStream} has no \"width\" property.");
+            Height =
+                stream.Height
+                ?? throw new Exception($"Video stream #{indexWithinVideoStream} has no \"height\" property.");
             DisplayAspectRatio = stream.DisplayAspectRatio;
             Resolution = $"{Width}x{Height}";
             IsImageVideoStream =

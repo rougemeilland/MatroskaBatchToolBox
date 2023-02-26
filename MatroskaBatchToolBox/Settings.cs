@@ -13,16 +13,15 @@ namespace MatroskaBatchToolBox
 
         static Settings()
         {
-            var baseDirectoryPath = Path.GetDirectoryName(typeof(Settings).Assembly.Location);
-            if (baseDirectoryPath is null)
-                throw new Exception("'settings.json' is not found.");
+            var baseDirectoryPath =
+                Path.GetDirectoryName(typeof(Settings).Assembly.Location)
+                ?? throw new Exception("'settings.json' is not found.");
             var settingsFilePath = Path.Combine(baseDirectoryPath, "settings.json");
             var settingsText = File.ReadAllText(settingsFilePath);
-            var settings = JsonSerializer.Deserialize<GlobalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas = true });
-            if (settings is null)
-                throw new Exception("Failed to parse 'settings.json'.");
-
-            FileInfo? ffmpegCommandFile = null;
+            var settings =
+                JsonSerializer.Deserialize<GlobalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas = true })
+                ?? throw new Exception("Failed to parse 'settings.json'.");
+            var ffmpegCommandFile = (FileInfo?)null;
             foreach (var executableFile in new DirectoryInfo(Path.GetDirectoryName(typeof(Settings).Assembly.Location) ?? ".").EnumerateFiles())
             {
                 if (Regex.IsMatch(executableFile.Name, @"^ffmpeg(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))

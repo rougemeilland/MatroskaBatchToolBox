@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Utility;
 
 namespace ChapterConverter
 {
@@ -31,16 +32,15 @@ namespace ChapterConverter
                     if (!match.Success)
                         throw new Exception($"Invalid row format in input data.: {lineText}");
 
-                    var time = Utility.ParseTime(match.Groups["time"].Value, false);
-                    if (time is null)
-                        throw new Exception($"Invalid row format in input data.: {lineText}");
-
+                    var time =
+                        Time.ParseTime(match.Groups["time"].Value, false)
+                        ?? throw new Exception($"Invalid row format in input data.: {lineText}");
                     if (time >= _parameter.MaximumDuration)
                         throw new Exception($"The chapter start time is too large in the input data. Check the chapter start time or change the maximum chapter duration with the \"--maximum_duration\" option.: {lineText}");
 
                     var name = match.Groups["name"].Value.Trim();
 
-                    return new { time = time.Value, name, lineText };
+                    return new { time, name, lineText };
                 })
                 .ToArray();
 
@@ -75,7 +75,7 @@ namespace ChapterConverter
 
         private string FormatRaw(TimeSpan time, string name)
         {
-            var timeText = Utility.FormatTime(time, 6);
+            var timeText = Time.FormatTime(time, 6);
             var modifiedName = name.Replace('\t', ' ');
             if (name.Contains('\t'))
                 _parameter.ReportWarningMessage($"In the output data, the TAB code is included in the chapter name, so replace the TAB code with white space.: time={timeText} ({time.TotalSeconds:F6}), name=\"{modifiedName}\"");

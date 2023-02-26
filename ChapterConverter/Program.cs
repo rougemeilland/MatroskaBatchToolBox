@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Utility;
 
 namespace ChapterConverter
 {
@@ -65,7 +66,7 @@ namespace ChapterConverter
             {
                 From = TimeSpan.Zero;
                 To = TimeSpan.Zero;
-                Titles = new Dictionary<int,string>();
+                Titles = new Dictionary<int, string>();
                 KeepEmptyChapter = false;
                 From = _defaultMinimumDuration;
             }
@@ -91,7 +92,7 @@ namespace ChapterConverter
         static Program()
         {
             _consoleLockObject = new object();
-            _thisProgramName =Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
+            _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
             _defaultMaximumDuration = TimeSpan.FromDays(7);
             _defaultMinimumDuration = TimeSpan.FromMilliseconds(10);
             _titleOptionPattern = new Regex(@"^(-tt|--title):(?<chapterNumber>\d+)$");
@@ -121,7 +122,7 @@ namespace ChapterConverter
 
         private static void HelpAction()
         {
-            var helpMessageTextLines = new []
+            var helpMessageTextLines = new[]
             {
                 $"Usage: {_thisProgramName} <option1> <option2> ... <optionN>",
                 $"",
@@ -423,7 +424,7 @@ namespace ChapterConverter
                 var chapterList = chapters.ToList();
                 var lastChapter = chapterList.LastOrDefault();
                 if (lastChapter is null)
-                    return new Chapter[0];
+                    return Array.Empty<Chapter>();
 
                 var trimmedChapters =
                     new LinkedList<Chapter>(
@@ -455,19 +456,19 @@ namespace ChapterConverter
                     var secondChapterNode = trimmedChapters.First.Next;
                     if (firstChapterNode.Value.Duration >= filterParameter.MinimumDuration)
                         break;
-                    var newChapter = MergeChapter(filterParameter, trimmedChapters, firstChapterNode.Value, secondChapterNode.Value);
+                    var newChapter = MergeChapter(firstChapterNode.Value, secondChapterNode.Value);
                     trimmedChapters.AddFirst(newChapter);
                     trimmedChapters.Remove(firstChapterNode);
                     trimmedChapters.Remove(secondChapterNode);
                 }
 
                 // チャプターが2つ以上あり、かつ2個目以降に時間が非常に短いチャプターが存在する間繰り返す
-                for (var currentChapterNode = trimmedChapters.First; currentChapterNode is not null && currentChapterNode.Next is not null; )
+                for (var currentChapterNode = trimmedChapters.First; currentChapterNode is not null && currentChapterNode.Next is not null;)
                 {
                     var nextChapterNode = currentChapterNode.Next;
                     if (nextChapterNode.Value.Duration < filterParameter.MinimumDuration)
                     {
-                        var newChapter = MergeChapter(filterParameter, trimmedChapters, currentChapterNode.Value, nextChapterNode.Value);
+                        var newChapter = MergeChapter(currentChapterNode.Value, nextChapterNode.Value);
                         trimmedChapters.AddAfter(nextChapterNode, newChapter);
                         trimmedChapters.Remove(currentChapterNode);
                         trimmedChapters.Remove(nextChapterNode);
@@ -515,7 +516,7 @@ namespace ChapterConverter
             }
         }
 
-        private static Chapter MergeChapter(ChapterFilterParameter filterParameter, LinkedList<Chapter> trimmedChapters, Chapter firstHalf, Chapter secondHalf)
+        private static Chapter MergeChapter(Chapter firstHalf, Chapter secondHalf)
         {
             var title = firstHalf.Title;
             if (string.IsNullOrEmpty(title))
@@ -724,7 +725,7 @@ namespace ChapterConverter
                         }
                         ++index;
                         {
-                            var maximumDurationValue = Utility.ParseTime(args[index], false);
+                            var maximumDurationValue = Time.ParseTime(args[index], false);
                             if (maximumDurationValue is null)
                             {
                                 PrintErrorMessage($"The format of the value of the \"--maximum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
@@ -752,7 +753,7 @@ namespace ChapterConverter
                         }
                         ++index;
                         {
-                            var time = Utility.ParseTime(args[index], false);
+                            var time = Time.ParseTime(args[index], false);
                             if (time is null)
                             {
                                 PrintErrorMessage($"The format of the value of the \"--ss\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
@@ -780,7 +781,7 @@ namespace ChapterConverter
                         }
                         ++index;
                         {
-                            var time = Utility.ParseTime(args[index], false);
+                            var time = Time.ParseTime(args[index], false);
                             if (time is null)
                             {
                                 PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
@@ -808,7 +809,7 @@ namespace ChapterConverter
                         }
                         ++index;
                         {
-                            var time = Utility.ParseTime(args[index], false);
+                            var time = Time.ParseTime(args[index], false);
                             if (time is null)
                             {
                                 PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
@@ -836,7 +837,7 @@ namespace ChapterConverter
                         }
                         ++index;
                         {
-                            var minimumDurationValue = Utility.ParseTime(args[index], false);
+                            var minimumDurationValue = Time.ParseTime(args[index], false);
                             if (minimumDurationValue is null)
                             {
                                 PrintErrorMessage($"The format of the value of the \"--minimum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
@@ -902,7 +903,7 @@ namespace ChapterConverter
             }
 
             if (actionMode == ActionMode.Help)
-                return new CommandLineOptions { ActionMode= ActionMode.Help };
+                return new CommandLineOptions { ActionMode = ActionMode.Help };
 
             if (inputFormat == ChapterFormat.NotSpecified)
             {
@@ -924,7 +925,7 @@ namespace ChapterConverter
             }
             else
             {
-                if (inputFilePath is not null&& !File.Exists(inputFilePath))
+                if (inputFilePath is not null && !File.Exists(inputFilePath))
                 {
                     PrintErrorMessage($"Input file does not exist.: \"{inputFilePath}\"");
                     return defaultReturnValue;

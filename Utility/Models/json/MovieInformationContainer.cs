@@ -2,11 +2,11 @@
 using System.Linq;
 using System.Text.Json.Serialization;
 
-namespace MatroskaBatchToolBox.Model.Json
+namespace Utility.Models.Json
 {
-    public class MovieStreamInfosContainer
+    public class MovieInformationContainer
     {
-        public MovieStreamInfosContainer()
+        public MovieInformationContainer()
         {
             Streams = new List<MovieStreamInfoContainer>();
         }

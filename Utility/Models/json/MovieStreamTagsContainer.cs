@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace MatroskaBatchToolBox.Model.Json
+namespace Utility.Models.Json
 {
     public class MovieStreamTagsContainer
     {

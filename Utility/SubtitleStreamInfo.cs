@@ -1,8 +1,8 @@
-﻿using MatroskaBatchToolBox.Model.Json;
+﻿using Utility.Models.Json;
 
-namespace MatroskaBatchToolBox.Model
+namespace Utility
 {
-    internal class SubtitleStreamInfo
+    public class SubtitleStreamInfo
         : StreamInfo
     {
         public SubtitleStreamInfo(MovieStreamInfoContainer stream, int indexWithinSubtitleStream)

@@ -5,7 +5,7 @@ namespace MatroskaBatchToolBox
 {
     internal class LocalSettingsCache
     {
-        private IDictionary<string, Settings> _cache;
+        private readonly IDictionary<string, Settings> _cache;
 
         public LocalSettingsCache()
         {

@@ -1,9 +1,9 @@
-﻿using MatroskaBatchToolBox.Model.Json;
-using System;
+﻿using System;
+using Utility.Models.Json;
 
-namespace MatroskaBatchToolBox.Model
+namespace Utility
 {
-    internal class StreamTags
+    public class StreamTags
     {
         public StreamTags(MovieStreamTagsContainer? tags)
         {

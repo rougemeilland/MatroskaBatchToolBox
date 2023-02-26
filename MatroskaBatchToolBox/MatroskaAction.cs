@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Utility;
 
 namespace MatroskaBatchToolBox
 {
@@ -111,11 +112,11 @@ namespace MatroskaBatchToolBox
                 }
                 switch (ExternalCommand.NormalizeAudioFile(logFile, sourceFile, audioEncoder, workingFile, progressReporter))
                 {
-                    case ExternalCommand.ExternalCommandResult.NotSupported:
+                    case CommandResult.NotSupported:
                         return (actionResult = ActionResult.Failed, true);
-                    case ExternalCommand.ExternalCommandResult.Cancelled:
+                    case CommandResult.Cancelled:
                         return (actionResult = ActionResult.Cancelled, false);
-                    case ExternalCommand.ExternalCommandResult.Completed:
+                    case CommandResult.Completed:
                     default:
                         break;
                 }
@@ -237,10 +238,17 @@ namespace MatroskaBatchToolBox
                     return actionResult = ActionResult.Failed;
                 }
 
-                var (commandResult, streams) = ExternalCommand.GetMovieStreamInfos(logFile, sourceFile);
-                if (commandResult == ExternalCommand.ExternalCommandResult.Cancelled)
+                var (commandResult, movieInfo) =
+                    Command.GetMovieInformation(
+                        localSettings.FFprobeCommandFile,
+                        sourceFile,
+                        (level, message) =>
+                            ExternalCommand.Log(
+                                logFile,
+                                new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }));
+                if (commandResult == CommandResult.Cancelled)
                     return actionResult = ActionResult.Cancelled;
-                if (streams is null)
+                if (movieInfo is null)
                 {
                     // このルートには到達しないはず
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Stream information could not be obtained from the movie file.: \"{sourceFile.FullName}\"", });
@@ -250,7 +258,7 @@ namespace MatroskaBatchToolBox
                 if (!string.IsNullOrEmpty(resolutionSpec))
                 {
                     var invalidStreams =
-                        streams.EnumerateVideoStreams()
+                        movieInfo.VideoStreams
                         .Where(stream =>
                             !stream.IsImageVideoStream &&
                             !string.Equals(stream.Resolution, resolutionSpec, StringComparison.InvariantCulture))
@@ -262,7 +270,7 @@ namespace MatroskaBatchToolBox
                     }
                 }
 
-                if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, null, aspectRatioSpec, VideoEncoderType.Copy, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, movieInfo, null, aspectRatioSpec, VideoEncoderType.Copy, workingFile, progressReporter) == CommandResult.Cancelled)
                     return actionResult = ActionResult.Cancelled;
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
@@ -363,8 +371,13 @@ namespace MatroskaBatchToolBox
                     return actionResult = ActionResult.Failed;
                 }
 
-                var (commandResult, streams) = ExternalCommand.GetMovieStreamInfos(logFile, sourceFile);
-                if (commandResult == ExternalCommand.ExternalCommandResult.Cancelled)
+                var (commandResult, streams) =
+                    Command.GetMovieInformation(
+                        localSettings.FFprobeCommandFile,
+                        sourceFile,
+                        (level, message) =>
+                            ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }));
+                if (commandResult == CommandResult.Cancelled)
                     return actionResult = ActionResult.Cancelled;
                 if (streams is null)
                 {
@@ -375,15 +388,15 @@ namespace MatroskaBatchToolBox
 
                 if (calculateVMAFScore)
                 {
-                    if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRatioSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRatioSpec, videoEncoder, workingFile, new Progress<double>(progress => progressReporter.Report(progress / 2))) == CommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
-                    if (ExternalCommand.CalculateVMAFScoreFromMovieFile(logFile, sourceFile, workingFile, resolutionSpec, out double vmafScore, new Progress<double>(progress => progressReporter.Report((1 + progress) / 2))) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.CalculateVMAFScoreFromMovieFile(logFile, sourceFile, workingFile, resolutionSpec, out double vmafScore, new Progress<double>(progress => progressReporter.Report((1 + progress) / 2))) == CommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: VMAF Score: {vmafScore:F6}" });
                 }
                 else
                 {
-                    if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRatioSpec, videoEncoder, workingFile, progressReporter) == ExternalCommand.ExternalCommandResult.Cancelled)
+                    if (ExternalCommand.ConvertMovieFile(localSettings, logFile, sourceFile, streams, resolutionSpec, aspectRatioSpec, videoEncoder, workingFile, progressReporter) == CommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                 }
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
