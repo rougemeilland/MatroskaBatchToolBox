@@ -181,7 +181,7 @@ namespace CalcVMAF
 
             for (var index = 0; index < args.Length; ++index)
             {
-                if (string.Equals(args[index], "--log", StringComparison.InvariantCulture))
+                if (string.Equals(args[index], "--log", StringComparison.Ordinal))
                 {
                     if (option.Log is not null)
                     {
@@ -190,8 +190,8 @@ namespace CalcVMAF
                     }
                     option.Log = true;
                 }
-                else if (args[index].StartsWith("-", StringComparison.InvariantCulture) ||
-                         args[index].StartsWith("--", StringComparison.InvariantCulture))
+                else if (args[index].StartsWith("-", StringComparison.Ordinal) ||
+                         args[index].StartsWith("--", StringComparison.Ordinal))
                 {
                     Console.Error.WriteLine($"An unsupported option was specified.: \"{args[index]}\"");
                     return (null, null, null);

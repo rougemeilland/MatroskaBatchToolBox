@@ -8,6 +8,7 @@ namespace Utility.Models.Json
         {
             Default = 0;
             Forced = 0;
+            AttachedPicture = 0;
         }
 
         [JsonPropertyName("default")]
@@ -15,5 +16,8 @@ namespace Utility.Models.Json
 
         [JsonPropertyName("forced")]
         public int Forced { get; set; }
+
+        [JsonPropertyName("attached_pic")]
+        public int AttachedPicture { get; set; }
     }
 }

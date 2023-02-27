@@ -19,7 +19,7 @@ namespace Utility
         {
             // 言語コード "und" は未定義 (null) とみなす。
             return
-                string.Equals(language, "und", StringComparison.InvariantCulture)
+                string.Equals(language, "und", StringComparison.Ordinal)
                 ? null
                 : language;
         }

@@ -64,11 +64,11 @@ namespace MatroskaBatchToolBox
         {
             if (string.IsNullOrEmpty(videoEncoderTypeText))
                 return null;
-            else if (string.Equals(videoEncoderTypeText, _libx264EncoderName, StringComparison.InvariantCulture))
+            else if (string.Equals(videoEncoderTypeText, _libx264EncoderName, StringComparison.Ordinal))
                 return VideoEncoderType.Libx264;
-            else if (string.Equals(videoEncoderTypeText, _libx265EncoderName, StringComparison.InvariantCulture))
+            else if (string.Equals(videoEncoderTypeText, _libx265EncoderName, StringComparison.Ordinal))
                 return VideoEncoderType.Libx265;
-            else if (string.Equals(videoEncoderTypeText, _libaomAV1EncoderName, StringComparison.InvariantCulture))
+            else if (string.Equals(videoEncoderTypeText, _libaomAV1EncoderName, StringComparison.Ordinal))
                 return VideoEncoderType.LibaomAV1;
             else
                 return null;

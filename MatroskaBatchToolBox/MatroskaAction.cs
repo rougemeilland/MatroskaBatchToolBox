@@ -261,7 +261,7 @@ namespace MatroskaBatchToolBox
                         movieInfo.VideoStreams
                         .Where(stream =>
                             !stream.IsImageVideoStream &&
-                            !string.Equals(stream.Resolution, resolutionSpec, StringComparison.InvariantCulture))
+                            !string.Equals(stream.Resolution, resolutionSpec, StringComparison.Ordinal))
                         .ToList();
                     if (invalidStreams.Any())
                     {

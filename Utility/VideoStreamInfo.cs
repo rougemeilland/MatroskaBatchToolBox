@@ -22,8 +22,9 @@ namespace Utility
             DisplayAspectRatio = stream.DisplayAspectRatio;
             Resolution = $"{Width}x{Height}";
             IsImageVideoStream =
-                string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison.InvariantCulture) ||
-                string.Equals(stream.CodecName, _mjpegVideoStreamName, StringComparison.InvariantCulture);
+                string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison. Ordinal) ||
+                string.Equals(stream.CodecName, _mjpegVideoStreamName, StringComparison.Ordinal) ||
+                Disposition.AttachedPicture;
         }
 
         public int IndexWithinVideoStream { get; }

@@ -196,7 +196,7 @@ namespace EncoderBenchmarkTest
                             var lineText = process.StandardError.ReadLine();
                             if (lineText is null)
                                 break;
-                            if (string.Equals(lineText, "[q] command received. Exiting.", StringComparison.InvariantCulture))
+                            if (string.Equals(lineText, "[q] command received. Exiting.", StringComparison.Ordinal))
                             {
                                 cancelled = true;
                                 break;
@@ -211,7 +211,7 @@ namespace EncoderBenchmarkTest
                                 {
                                 }
                             }
-                            if (lineText.StartsWith("frame=", StringComparison.InvariantCulture))
+                            if (lineText.StartsWith("frame=", StringComparison.Ordinal))
                                 Console.Write(lineText + "\r");
                             else
                                 Console.WriteLine(lineText);

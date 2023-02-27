@@ -133,7 +133,7 @@ namespace MatroskaBatchToolBox
                         //    実行中のプログラムに被害はないはず。
                         var targetProcesses =
                             Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Settings.GlobalSettings.FFmpegCommandFile.Name))
-                            .Where(proc => string.Equals(proc?.MainModule?.FileName ?? "", Settings.GlobalSettings.FFmpegCommandFile.FullName, StringComparison.InvariantCulture))
+                            .Where(proc => string.Equals(proc?.MainModule?.FileName ?? "", Settings.GlobalSettings.FFmpegCommandFile.FullName, StringComparison.Ordinal))
                             .ToList();
 
                         // 列挙されたプロセスをすべて kill する。
@@ -241,11 +241,11 @@ namespace MatroskaBatchToolBox
             };
 
             // 呼び出し元から解像度指定が与えられていて、かつ元動画のビデオストリームの中に与えられた解像度指定と異なるものがある場合に、ffmpeg に解像度指定を与える。
-            if (resolutionSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.Resolution, resolutionSpec, StringComparison.InvariantCulture)))
+            if (resolutionSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.Resolution, resolutionSpec, StringComparison.Ordinal)))
                 commandParameters.Add($"-s {resolutionSpec}");
 
             // 呼び出し元からアスペクト比が与えられていて、かつ元動画のビデオストリームの中に与えられたアスペクト比と異なるものがある場合に、ffmpeg にアスペクト比を与える。
-            if (aspectRatioSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.DisplayAspectRatio, aspectRatioSpec, StringComparison.InvariantCulture)))
+            if (aspectRatioSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.DisplayAspectRatio, aspectRatioSpec, StringComparison.Ordinal)))
                 commandParameters.Add($"-aspect {aspectRatioSpec}");
 
             // クロッピング指定があればオプションに追加

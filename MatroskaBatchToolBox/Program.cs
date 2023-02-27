@@ -49,12 +49,12 @@ namespace MatroskaBatchToolBox
                 var actionMode = ActionMode.None;
                 foreach (var arg in args)
                 {
-                    if (string.Equals(arg, _optionStringNormalizeAudio, StringComparison.InvariantCulture))
+                    if (string.Equals(arg, _optionStringNormalizeAudio, StringComparison.Ordinal))
                     {
                         actionMode = ActionMode.NormalizeAudio;
                         break;
                     }
-                    if (string.Equals(arg, _optionStringResizeResolution, StringComparison.InvariantCulture))
+                    if (string.Equals(arg, _optionStringResizeResolution, StringComparison.Ordinal))
                     {
                         actionMode = ActionMode.ConvertVideo;
                         break;
@@ -218,7 +218,7 @@ namespace MatroskaBatchToolBox
         private static IEnumerable<FileInfo> CreateSourceFileList(string[] args, ActionMode actionMode)
         {
             var sourceFileList =
-                EnumerateSourceFile(args.Where(arg => !arg.StartsWith("--", StringComparison.InvariantCulture)))
+                EnumerateSourceFile(args.Where(arg => !arg.StartsWith("--", StringComparison.Ordinal)))
                 .OrderBy(file => file.FullName)
                 .ToList();
             if (actionMode != ActionMode.ConvertVideo)
@@ -234,7 +234,7 @@ namespace MatroskaBatchToolBox
             foreach (var sourceFile in sourceFileList)
             {
                 var sourceFileDirectoryName = Path.GetFileName(Path.GetDirectoryName(sourceFile.FullName) ?? ".");
-                if (sourceFileDirectoryName.StartsWith("==", StringComparison.InvariantCulture))
+                if (sourceFileDirectoryName.StartsWith("==", StringComparison.Ordinal))
                     sourceQueueWithSimpleConversion.Enqueue(sourceFile);
                 else
                     sourceQueueWithComplexConversion.Enqueue(sourceFile);
@@ -320,14 +320,14 @@ namespace MatroskaBatchToolBox
 
         private static bool IsSourceFile(string sourceFilePath)
         {
-            if ((Path.GetFileName(sourceFilePath) ?? ".").StartsWith(".", StringComparison.InvariantCulture))
+            if ((Path.GetFileName(sourceFilePath) ?? ".").StartsWith(".", StringComparison.Ordinal))
                 return false;
             var extension = Path.GetExtension(sourceFilePath).ToUpperInvariant();
             return
-                string.Equals(extension, ".MKV", StringComparison.InvariantCulture) ||
-                string.Equals(extension, ".MP4", StringComparison.InvariantCulture) ||
-                string.Equals(extension, ".WMV", StringComparison.InvariantCulture) ||
-                string.Equals(extension, ".AVI", StringComparison.InvariantCulture);
+                string.Equals(extension, ".MKV", StringComparison.Ordinal) ||
+                string.Equals(extension, ".MP4", StringComparison.Ordinal) ||
+                string.Equals(extension, ".WMV", StringComparison.Ordinal) ||
+                string.Equals(extension, ".AVI", StringComparison.Ordinal);
         }
 
         private static bool IsRequestedCancellation()
