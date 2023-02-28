@@ -4,19 +4,6 @@ namespace MatroskaBatchToolBox.Model.Json
 {
     public class LocalSettingsContainer
     {
-        public LocalSettingsContainer()
-        {
-            FFmpegVideoEncoder = null;
-            FFmpegLibx264EncoderOption = null;
-            FFmpegLibx265EncoderOption = null;
-            FFmpegLibaomAV1EncoderOption = null;
-            FFmpegOption = null;
-            DeleteChapters = null;
-            DeleteImageVideoStream = null;
-            AllowMultipleVideoStreams = null;
-            CalculateVMAFScore = null;
-        }
-
         [JsonPropertyName("ffmpeg_video_encoder")]
         public string? FFmpegVideoEncoder { get; set; }
 
@@ -35,6 +22,9 @@ namespace MatroskaBatchToolBox.Model.Json
         [JsonPropertyName("delete_chapters")]
         public bool? DeleteChapters { get; set; }
 
+        [JsonPropertyName("keep_chapter_titles")]
+        public bool? KeepChapterTitles { get; }
+
         [JsonPropertyName("delete_metadata")]
         public bool? DeleteMetadata { get; set; }
 
@@ -43,6 +33,12 @@ namespace MatroskaBatchToolBox.Model.Json
 
         [JsonPropertyName("allow_multiple_vodeo_streams")]
         public bool? AllowMultipleVideoStreams { get; set; }
+
+        [JsonPropertyName("behavior_for_data_streams")]
+        public string? BehaviorForDataStreams { get; set; }
+
+        [JsonPropertyName("behavior_for_attachment_streams")]
+        public string? BehaviorForAttachmentStreams { get; set; }
 
         [JsonPropertyName("cropping")]
         public string? Cropping { get; set; }

@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using Utility;
 
 namespace MatroskaBatchToolBox.Model
@@ -7,19 +8,23 @@ namespace MatroskaBatchToolBox.Model
     {
         static TimeRange()
         {
-            DefaultValue = new TimeRange("", "");
+            DefaultValue = new TimeRange("", null, "", null);
         }
 
-        private TimeRange(string start, string end)
+        private TimeRange(string start, TimeSpan? startTime, string end, TimeSpan? endTime)
         {
             Start = start;
+            StartTime = startTime;
             End = end;
+            EndTime = endTime;
         }
 
         public string Start { get; }
+        public TimeSpan? StartTime { get; }
         public string End { get; }
-        public bool IsValid => !string.IsNullOrEmpty(Start) || !string.IsNullOrEmpty(End);
-        public static TimeRange DefaultValue{get;}
+        public TimeSpan? EndTime { get; }
+        public bool IsValid => StartTime is not null && EndTime is not null;
+        public static TimeRange DefaultValue { get; }
 
         public static bool TryParse(string text, [MaybeNullWhen(false)] out TimeRange timeRange)
         {
@@ -39,23 +44,26 @@ namespace MatroskaBatchToolBox.Model
                 return false;
             }
 
+            var startTime = Time.ParseTime(startTimeText, false);
             // 開始時間が空でなく、かつ書式が誤っている場合はエラーとする。
-            if (!string.IsNullOrEmpty(startTimeText) && Time.ParseTime(startTimeText, false) is null)
+            if (!string.IsNullOrEmpty(startTimeText) && startTime is null)
             {
                 timeRange = default;
                 return false;
             }
 
+            var endTime = Time.ParseTime(endTimeText, false);
             // 終了時間が空でなく、かつ書式が誤っている場合はエラーとする。
-            if (!string.IsNullOrEmpty(endTimeText) && Time.ParseTime(endTimeText, false) is null)
+            if (!string.IsNullOrEmpty(endTimeText) && endTime is null)
             {
                 timeRange = default;
                 return false;
             }
 
             // 少なくとも開始時間と終了時間のどちらかに正しい指定がされている場合は正常復帰する。
-            timeRange = new TimeRange(startTimeText, endTimeText);
+            timeRange = new TimeRange(startTimeText, startTime, endTimeText, endTime);
             return true;
         }
     }
 }
+

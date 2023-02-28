@@ -4,21 +4,6 @@ namespace MatroskaBatchToolBox.Model.Json
 {
     public class GlobalSettingsContainer
     {
-        public GlobalSettingsContainer()
-        {
-            FFmpegNormalizeCommandFilePath = null;
-            FFmpegVideoEncoder = null;
-            FFmpegLibx264EncoderOption = null;
-            FFmpegLibx265EncoderOption = null;
-            FFmpegLibaomAV1EncoderOption = null;
-            FFmpegOption = null;
-            DeleteChapters = null;
-            DeleteImageVideoStream = null;
-            AllowMultipleVideoStreams = null;
-            CalculateVMAFScore = null;
-            DegreeOfParallelism = null;
-        }
-
         [JsonPropertyName("ffmpeg_normalize_command_file_path")]
         public string? FFmpegNormalizeCommandFilePath { get; set; }
 
@@ -40,6 +25,9 @@ namespace MatroskaBatchToolBox.Model.Json
         [JsonPropertyName("delete_chapters")]
         public bool? DeleteChapters { get; set; }
 
+        [JsonPropertyName("do_not_keep_chapter_titles")]
+        public bool? KeepChapterTitles { get; }
+
         [JsonPropertyName("delete_metadata")]
         public bool? DeleteMetadata { get; set; }
 
@@ -48,6 +36,12 @@ namespace MatroskaBatchToolBox.Model.Json
 
         [JsonPropertyName("allow_multiple_vodeo_streams")]
         public bool? AllowMultipleVideoStreams { get; set; }
+
+        [JsonPropertyName("behavior_for_data_streams")]
+        public string? BehaviorForDataStreams { get; set; }
+
+        [JsonPropertyName("behavior_for_attachment_streams")]
+        public string? BehaviorForAttachmentStreams { get; set; }
 
         [JsonPropertyName("default_video_language")]
         public string? DefaultVideoLanguage { get; set; }

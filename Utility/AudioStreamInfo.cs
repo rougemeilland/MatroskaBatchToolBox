@@ -5,7 +5,7 @@ namespace Utility
     public class AudioStreamInfo
         : StreamInfo
     {
-        public AudioStreamInfo(MovieStreamInfoContainer stream, int indexWithinAudioStream)
+        internal AudioStreamInfo(MovieStreamInfoContainer stream, int indexWithinAudioStream)
             : base(stream)
         {
             IndexWithinAudioStream = indexWithinAudioStream;

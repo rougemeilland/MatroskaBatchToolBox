@@ -14,7 +14,7 @@ namespace ChapterConverter
             _parameter = parameter;
         }
 
-        IEnumerable<Chapter> IChapterFormatter.Parse(string rawText)
+        IEnumerable<ChapterInfo> IChapterFormatter.Parse(string rawText)
         {
             var startTimes = new LinkedList<(TimeSpan startTime, string startTimeSpec)>();
             foreach (var timeSpec in rawText.Split(','))
@@ -47,10 +47,10 @@ namespace ChapterConverter
                     else
                         throw new Exception($"The chapter start time is too large in the input data. Check the chapter start time or change the maximum chapter duration with the \"--maximum_duration\" option.: \"{currentChapterItem.Value.startTimeSpec}\" in \"{rawText}\"");
                 }
-                yield return new Chapter(startTime, endTime, "");
+                yield return new ChapterInfo(startTime, endTime, "");
             }
         }
 
-        string IChapterFormatter.Render(IEnumerable<Chapter> chapters) => throw new NotSupportedException($"It is not possible to output in \"immediate\" format.");
+        string IChapterFormatter.Render(IEnumerable<ChapterInfo> chapters) => throw new NotSupportedException($"It is not possible to output in \"immediate\" format.");
     }
 }

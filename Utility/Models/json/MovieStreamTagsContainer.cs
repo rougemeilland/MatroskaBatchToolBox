@@ -10,6 +10,9 @@ namespace Utility.Models.Json
             Title = null;
         }
 
+        [JsonPropertyName("DURATION")]
+        public string? Duration { get; set; }
+
         [JsonPropertyName("language")]
         public string? Language { get; set; }
 

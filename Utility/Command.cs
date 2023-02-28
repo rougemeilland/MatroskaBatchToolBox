@@ -31,6 +31,7 @@ namespace Utility
             commandParameter.Append("-hide_banner");
             commandParameter.Append(" -v error");
             commandParameter.Append(" -print_format json");
+            commandParameter.Append(" -show_chapters");
             commandParameter.Append(" -show_streams");
             commandParameter.Append($" -i \"{inFile.FullName}\"");
             var standardOutputTextLines = new List<string>();

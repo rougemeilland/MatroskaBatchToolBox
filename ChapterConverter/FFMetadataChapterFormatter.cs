@@ -10,7 +10,6 @@ namespace ChapterConverter
     internal class FFMetadataChapterFormatter
         : IChapterFormatter
     {
-        private const long _defaultTimeBaseDenominator = 1000000000;
         private static readonly Regex _ffMetadataHeaderPattern;
         private static readonly Regex _chapterPattern;
         private readonly ChapterFormatterParameter _parameter;
@@ -26,7 +25,7 @@ namespace ChapterConverter
             _parameter = parameter;
         }
 
-        IEnumerable<Chapter> IChapterFormatter.Parse(string rawText)
+        IEnumerable<ChapterInfo> IChapterFormatter.Parse(string rawText)
         {
             if (!_ffMetadataHeaderPattern.IsMatch(rawText))
                 throw new Exception("Input data is not in \"ffmetadata\" format.");
@@ -39,9 +38,9 @@ namespace ChapterConverter
                         throw new Exception("internal error (illegal timeBase format)");
                     var timeBase = (double)timeBaseNumerator / timeBaseDenominator;
                     var startTimeText = match.Groups["startTime"].Value;
-                    var startTime = Time.FromTimeBaseToTimeSpan(long.Parse(startTimeText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat), timeBaseNumerator, timeBaseDenominator);
+                    var startTime = Time.FromTimeCountToTimeSpan(long.Parse(startTimeText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat), timeBaseNumerator, timeBaseDenominator);
                     var endTimeText = match.Groups["endTime"].Value;
-                    var endTime = Time.FromTimeBaseToTimeSpan(long.Parse(endTimeText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat), timeBaseNumerator, timeBaseDenominator);
+                    var endTime = Time.FromTimeCountToTimeSpan(long.Parse(endTimeText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat), timeBaseNumerator, timeBaseDenominator);
                     if (startTime > endTime)
                         throw new Exception($"In a chapter with input data, the end time is earlier than the start time.: START={startTimeText}, END={endTimeText}");
                     if (startTime >= _parameter.MaximumDuration)
@@ -65,31 +64,9 @@ namespace ChapterConverter
             }
 
             foreach (var chapter in chapters)
-                yield return new Chapter(chapter.startTime, chapter.endTime, chapter.title);
+                yield return new ChapterInfo(chapter.startTime, chapter.endTime, chapter.title);
         }
 
-        string IChapterFormatter.Render(IEnumerable<Chapter> chapters)
-        {
-            return
-                string.Join(
-                    "\n",
-                    chapters
-                    .SelectMany(chapter =>
-                    {
-                        var chapterTextLines = new[]
-                        {
-                            "[CHAPTER]",
-                            $"TIMEBASE=1/{_defaultTimeBaseDenominator}",
-                            $"START={Convert.ToInt64(chapter.StartTime.TotalSeconds * _defaultTimeBaseDenominator)}",
-                            $"END={Convert.ToInt64(chapter.EndTime.TotalSeconds * _defaultTimeBaseDenominator)}",
-                        };
-                        if (string.IsNullOrEmpty(chapter.Title))
-                            return chapterTextLines;
-                        else
-                            return chapterTextLines.Append($"title={chapter.Title}");
-                    })
-                    .Prepend(";FFMETADATA1")
-                    .Append(""));
-        }
+        string IChapterFormatter.Render(IEnumerable<ChapterInfo> chapters) => chapters.ToMetadataString();
     }
 }

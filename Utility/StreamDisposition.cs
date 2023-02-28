@@ -4,7 +4,7 @@ namespace Utility
 {
     public class StreamDisposition
     {
-        public StreamDisposition(MovieStreamDispositionContainer disposition)
+        internal StreamDisposition(MovieStreamDispositionContainer disposition)
         {
             Default = disposition.Default != 0;
             Forced = disposition.Forced != 0;

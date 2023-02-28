@@ -5,6 +5,5 @@
   "ffmpeg_libx265_encoder_option": "-crf 19",
   "ffmpeg_libaom-av1_encoder_option": "-crf 23 -b:v 0 -cpu-used 5 -threads 2",
   "ffmpeg_option": null,
-  "calculate_vmaf_score": true,
   "degree_of_parallelism": 3
 }

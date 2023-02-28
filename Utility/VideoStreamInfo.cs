@@ -9,7 +9,7 @@ namespace Utility
         private const string _mpngVideoStreamName = "png";
         private const string _mjpegVideoStreamName = "mjpeg";
 
-        public VideoStreamInfo(MovieStreamInfoContainer stream, int indexWithinVideoStream)
+        internal VideoStreamInfo(MovieStreamInfoContainer stream, int indexWithinVideoStream)
             : base(stream)
         {
             IndexWithinVideoStream = indexWithinVideoStream;

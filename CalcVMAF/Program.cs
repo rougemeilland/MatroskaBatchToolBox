@@ -111,7 +111,7 @@ namespace CalcVMAF
                             var blockText = new string(buffer, 0, length);
                             Console.Error.Write(blockText);
                             logWriter?.Write(blockText);
-                            cache = cache + blockText;
+                            cache += blockText;
                             foreach (var match in vmafScorePattern.Matches(cache).Cast<Match>())
                             {
                                 vmafScore = match.Groups["vmafScore"].Value;
@@ -120,7 +120,7 @@ namespace CalcVMAF
                             }
                             var indexOfLastNewLine = cache.LastIndexOfAny(new[] { '\r', '\n' });
                             if (indexOfLastNewLine >= 0)
-                                cache = cache.Substring(indexOfLastNewLine + 1);
+                                cache = cache[(indexOfLastNewLine + 1)..];
                         }
                     });
                     standardOutputProcessTask.Wait();

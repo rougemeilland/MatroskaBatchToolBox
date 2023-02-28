@@ -78,8 +78,11 @@ namespace Utility
             return $"{hour:D2}:{minute:D2}:{second.ToString(secondFormat)}";
         }
 
-        public static TimeSpan FromTimeBaseToTimeSpan(long timeValue, long baseTimeNumerator, long baseTimeDenominator)
+        public static TimeSpan FromTimeCountToTimeSpan(long timeValue, long baseTimeNumerator, long baseTimeDenominator)
         {
+            if (timeValue < 0)
+                throw new Exception("internal error (timeValue < 0)");
+
 #if NEED_HIGH_PRECISION_FOR_TIME
             // longの有効桁数は18桁+αで、チャプターの時間の計算において baseTimeDenominator で想定される桁数は最低でも 9(+1) 桁。
             // 1 秒を表す timeValue が 9(+1) 桁であることを考えると、10 秒以上の計算を行うと、途中でオーバーフローを起こすことはほぼ確実であり、運用に支障をきたす。。
@@ -92,6 +95,21 @@ namespace Utility
             return TimeSpan.FromTicks((long)ticks);
 #else
             return TimeSpan.FromSeconds((double)timeValue * baseTimeNumerator / baseTimeDenominator);
+#endif
+        }
+
+        public static long FromTimeSpanToTimeCount(TimeSpan time, long baseTimeNumerator, long baseTimeDenominator)
+        {
+            if (time < TimeSpan.Zero)
+                throw new Exception("internal error (time < TimeSpan.Zero)");
+
+#if NEED_HIGH_PRECISION_FOR_TIME
+            var timeCount = (System.Numerics.BigInteger)time.Ticks * baseTimeDenominator / baseTimeNumerator / TimeSpan.TicksPerSecond;
+            if (timeCount > long.MaxValue)
+                throw new OverflowException($"\"{time.TotalSeconds}\" seconds cannot be represented on the timescale \"{baseTimeNumerator}/{baseTimeDenominator}\".");
+            return (long)timeCount;
+#else
+            return Convert.ToInt64(time.TotalSeconds * baseTimeDenominator / baseTimeNumerator);
 #endif
         }
     }

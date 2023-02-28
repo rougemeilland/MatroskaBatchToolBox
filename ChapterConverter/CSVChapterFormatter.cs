@@ -22,7 +22,7 @@ namespace ChapterConverter
             _parameter = parameter;
         }
 
-        IEnumerable<Chapter> IChapterFormatter.Parse(string rawText)
+        IEnumerable<ChapterInfo> IChapterFormatter.Parse(string rawText)
         {
             var chapterSummaries =
                 rawText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
@@ -59,11 +59,11 @@ namespace ChapterConverter
             {
                 var summary = chapterSummaries[index];
                 var endTime = index + 1 < chapterSummaries.Length ? chapterSummaries[index + 1].time : _parameter.MaximumDuration;
-                yield return new Chapter(summary.time, endTime, summary.name);
+                yield return new ChapterInfo(summary.time, endTime, summary.name);
             }
         }
 
-        string IChapterFormatter.Render(IEnumerable<Chapter> chapters)
+        string IChapterFormatter.Render(IEnumerable<ChapterInfo> chapters)
         {
             return
                 string.Join(

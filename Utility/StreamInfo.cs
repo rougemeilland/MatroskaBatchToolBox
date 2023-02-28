@@ -5,7 +5,7 @@ namespace Utility
 {
     public abstract class StreamInfo
     {
-        public StreamInfo(MovieStreamInfoContainer stream)
+        internal StreamInfo(MovieStreamInfoContainer stream)
         {
             Index =
                 stream.Index

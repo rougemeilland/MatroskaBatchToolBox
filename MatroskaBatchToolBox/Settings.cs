@@ -3,6 +3,7 @@ using MatroskaBatchToolBox.Model.Json;
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace MatroskaBatchToolBox
@@ -89,9 +90,12 @@ namespace MatroskaBatchToolBox
             var ffmpegLibaomAV1EncoderOption = settings.FFmpegLibaomAV1EncoderOption ?? "-crf 23";
             var ffmpegOption = settings.FFmpegOption ?? "";
             var deleteChapters = settings.DeleteChapters ?? false;
+            var keepChapterTitles = settings.KeepChapterTitles ?? true;
             var deleteMetadata = settings.DeleteMetadata ?? false;
             var deleteImageVideoStream = settings.DeleteImageVideoStream ?? false;
             var allowMultipleVideoStreams = settings.AllowMultipleVideoStreams ?? false;
+            var behaviorForDataStreams = ParseStreamOperationType(settings.BehaviorForDataStreams, "behavior_for_data_streams");
+            var behaviorForAttachmentStreams = ParseStreamOperationType(settings.BehaviorForAttachmentStreams, "behavior_for_attachment_streams");
             var defaultVideoLanguage = (string?)null;
             var defaultAudioLanguage = (string?)null;
             var resetForceStream = false;
@@ -110,9 +114,12 @@ namespace MatroskaBatchToolBox
                     ffmpegLibaomAV1EncoderOption,
                     ffmpegOption,
                     deleteChapters,
+                    keepChapterTitles,
                     deleteMetadata,
                     deleteImageVideoStream,
                     allowMultipleVideoStreams,
+                    behaviorForDataStreams,
+                    behaviorForAttachmentStreams,
                     Rectangle.DefaultValue,
                     TimeRange.DefaultValue,
                     defaultVideoLanguage,
@@ -148,9 +155,12 @@ namespace MatroskaBatchToolBox
             string ffmpegLibaomAV1EncoderOption,
             string ffmpegOption,
             bool deleteChapters,
+            bool keepChapterTitles,
             bool deleteMetadata,
             bool deleteImageVideoStream,
             bool allowMultipleVideoStreams,
+            StreamOperationType behaviorForDataStreams,
+            StreamOperationType behaviorForAttachmentStreams,
             Rectangle cropping,
             TimeRange trimming,
             string? defaultVideoLanguage,
@@ -170,9 +180,12 @@ namespace MatroskaBatchToolBox
             FFmpegLibaomAV1EncoderOption = ffmpegLibaomAV1EncoderOption;
             FFmpegOption = ffmpegOption;
             DeleteChapters = deleteChapters;
+            KeepChapterTitles = keepChapterTitles;
             DeleteMetadata = deleteMetadata;
             DeleteImageVideoStream = deleteImageVideoStream;
             AllowMultipleVideoStreams = allowMultipleVideoStreams;
+            BehaviorForDataStreams = behaviorForDataStreams;
+            BehaviorForAttachmentStreams = behaviorForAttachmentStreams;
             Cropping = cropping;
             Trimming = trimming;
             CalculateVMAFScore = calculateVMAFScore;
@@ -193,9 +206,12 @@ namespace MatroskaBatchToolBox
         public string FFmpegLibaomAV1EncoderOption { get; }
         public string FFmpegOption { get; }
         public bool DeleteChapters { get; }
+        public bool KeepChapterTitles { get; }
         public bool DeleteMetadata { get; }
         public bool DeleteImageVideoStream { get; }
         public bool AllowMultipleVideoStreams { get; }
+        public StreamOperationType BehaviorForDataStreams { get; set; }
+        public StreamOperationType BehaviorForAttachmentStreams { get; set; }
         public Rectangle Cropping { get; set; }
         public TimeRange Trimming { get; set; }
         public string? DefaultVideoLanguage { get; set; }
@@ -232,9 +248,12 @@ namespace MatroskaBatchToolBox
                         localSettings.FFmpegLibaomAV1EncoderOption ?? FFmpegLibaomAV1EncoderOption,
                         localSettings.FFmpegOption ?? FFmpegOption,
                         localSettings.DeleteChapters ?? DeleteChapters,
+                        localSettings.KeepChapterTitles ?? KeepChapterTitles,
                         localSettings.DeleteMetadata ?? DeleteMetadata,
                         localSettings.DeleteImageVideoStream ?? DeleteImageVideoStream,
                         localSettings.AllowMultipleVideoStreams ?? AllowMultipleVideoStreams,
+                        DeriveStreamOperation(BehaviorForDataStreams, localSettings.BehaviorForDataStreams, "behavior_for_data_streams"),
+                        DeriveStreamOperation(BehaviorForAttachmentStreams, localSettings.BehaviorForAttachmentStreams, "behavior_for_attachment_streams"),
                         DeriveRectangle(Cropping, localSettings.Cropping),
                         DeriveTimeRange(Trimming, localSettings.Trimming),
                         localSettings.DefaultVideoLanguage ?? DefaultVideoLanguage,
@@ -251,12 +270,38 @@ namespace MatroskaBatchToolBox
             }
         }
 
+        private static StreamOperationType ParseStreamOperationType(string? valueText, string propertyName)
+        {
+            return
+                valueText switch
+                {
+                    null => StreamOperationType.Keep,
+                    "keep" => StreamOperationType.Keep,
+                    "delete" => StreamOperationType.Delete,
+                    "error" => StreamOperationType.Error,
+                    _ => throw new Exception($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{valueText}\""),
+                };
+        }
+
+        private static StreamOperationType DeriveStreamOperation(StreamOperationType originalValue, string? newValueText, string propertyName)
+        {
+            return
+                newValueText switch
+                {
+                    null => originalValue,
+                    "keep" => StreamOperationType.Keep,
+                    "delete" => StreamOperationType.Delete,
+                    "error" => StreamOperationType.Error,
+                    _ => throw new Exception($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{newValueText}\""),
+                };
+        }
+
         private static TimeRange DeriveTimeRange(TimeRange originalValue, string? newValueText)
         {
             if (newValueText is null)
                 return originalValue;
             if (!TimeRange.TryParse(newValueText, out TimeRange? newValue))
-                throw new Exception("Invalid time range format.");
+                throw new Exception($"Invalid time range format.: \"{newValueText}\"");
             return newValue;
         }
 
@@ -265,7 +310,7 @@ namespace MatroskaBatchToolBox
             if (newValueText is null)
                 return originalValue;
             if (!Rectangle.TryParse(newValueText, out Rectangle? newValue))
-                throw new Exception("Invalid rectangle format.");
+                throw new Exception($"Invalid rectangle format.: {newValueText}");
             return newValue;
         }
     }

@@ -23,7 +23,7 @@ namespace ChapterConverter
             _parameter = parameter;
         }
 
-        IEnumerable<Chapter> IChapterFormatter.Parse(string rawText)
+        IEnumerable<ChapterInfo> IChapterFormatter.Parse(string rawText)
         {
             var times = new Dictionary<int, (TimeSpan time, string lineText)>();
             var names = new Dictionary<int, (string name, string lineText)>();
@@ -37,8 +37,8 @@ namespace ChapterConverter
                     var indexText = match.Groups["timeIndex"].Value;
                     if (!int.TryParse(indexText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int index) || index < 0)
                         throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
-                    if (times.ContainsKey(index))
-                        throw new Exception($"There are duplicate rows in the input data.: \"{currentLineText}\", \"{times[index].lineText}\"");
+                    if (times.TryGetValue(index, out (TimeSpan time, string lineText) value))
+                        throw new Exception($"There are duplicate rows in the input data.: \"{currentLineText}\", \"{value.lineText}\"");
 
                     var timeText = match.Groups["time"].Value;
                     var currentTime =
@@ -70,8 +70,8 @@ namespace ChapterConverter
                     var indexText = match.Groups["nameIndex"].Value;
                     if (!int.TryParse(indexText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int index) || index < 0)
                         throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
-                    if (names.ContainsKey(index))
-                        throw new Exception($"There are duplicate rows in the input data.: \"{currentLineText}\", \"{names[index].lineText}\"");
+                    if (names.TryGetValue(index, out (string name, string lineText) value))
+                        throw new Exception($"There are duplicate rows in the input data.: \"{currentLineText}\", \"{value.lineText}\"");
 
                     var name = match.Groups["name"].Value.Trim();
 
@@ -96,7 +96,7 @@ namespace ChapterConverter
                 {
                     index = item.Key,
                     startTime = item.Value.time,
-                    name = names.ContainsKey(item.Key) ? names[item.Key].name : "",
+                    name = names.TryGetValue(item.Key, out (string name, string lineText) value) ? value.name : "",
                     item.Value.lineText,
                 })
                 .ToArray();
@@ -108,11 +108,11 @@ namespace ChapterConverter
             {
                 var currentChapter = chapters[index];
                 var nextStartTime = index + 1 < chapters.Length ? chapters[index + 1].startTime : _parameter.MaximumDuration;
-                yield return new Chapter(currentChapter.startTime, nextStartTime, currentChapter.name);
+                yield return new ChapterInfo(currentChapter.startTime, nextStartTime, currentChapter.name);
             }
         }
 
-        string IChapterFormatter.Render(IEnumerable<Chapter> chapters)
+        string IChapterFormatter.Render(IEnumerable<ChapterInfo> chapters)
         {
             var chapterSummaries =
                 chapters

@@ -5,7 +5,7 @@ namespace Utility
     public class SubtitleStreamInfo
         : StreamInfo
     {
-        public SubtitleStreamInfo(MovieStreamInfoContainer stream, int indexWithinSubtitleStream)
+        internal SubtitleStreamInfo(MovieStreamInfoContainer stream, int indexWithinSubtitleStream)
             : base(stream)
         {
             IndexWithinSubtitleStream = indexWithinSubtitleStream;

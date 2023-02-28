@@ -29,7 +29,7 @@ namespace Utility.Models.Json
         [JsonPropertyName("end_time")]
         public string EndTime { get; set; } // 秒単位の文字列
 
-        [JsonPropertyName("end_time")]
+        [JsonPropertyName("tags")]
         public MovieChapterTagContainer? Tags { get; set; }
     }
 }

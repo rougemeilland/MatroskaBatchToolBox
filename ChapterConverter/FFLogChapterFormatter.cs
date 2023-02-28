@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Utility;
 
 namespace ChapterConverter
 {
@@ -24,7 +25,7 @@ namespace ChapterConverter
             _parameter = parameter;
         }
 
-        IEnumerable<Chapter> IChapterFormatter.Parse(string rawText)
+        IEnumerable<ChapterInfo> IChapterFormatter.Parse(string rawText)
         {
             var firstMatch = _firstPattern.Match(rawText);
             if (!firstMatch.Success)
@@ -48,9 +49,9 @@ namespace ChapterConverter
                 yield return chapter.chapter;
         }
 
-        string IChapterFormatter.Render(IEnumerable<Chapter> chapters) => throw new NotSupportedException($"It is not possible to output in \"fflog\" format.");
+        string IChapterFormatter.Render(IEnumerable<ChapterInfo> chapters) => throw new NotSupportedException($"It is not possible to output in \"fflog\" format.");
 
-        private IEnumerable<(Chapter chapter, string key)> EnumerateChapters(string rawText)
+        private IEnumerable<(ChapterInfo chapter, string key)> EnumerateChapters(string rawText)
         {
             while (rawText.Length > 0)
             {
@@ -65,7 +66,7 @@ namespace ChapterConverter
                 if (startTime >= _parameter.MaximumDuration.TotalSeconds)
                     throw new Exception($"The chapter start time is too large in the input data. Change the maximum chapter duration with the \"--maximum_duration\" option.: {key}");
                 var title = match.Groups["title"].Success ? match.Groups["title"].Value : "";
-                yield return (new Chapter(TimeSpan.FromSeconds(startTime), TimeSpan.FromSeconds(endTime), title), key);
+                yield return (new ChapterInfo(TimeSpan.FromSeconds(startTime), TimeSpan.FromSeconds(endTime), title), key);
                 rawText = rawText[(match.Index + match.Length)..];
             }
         }

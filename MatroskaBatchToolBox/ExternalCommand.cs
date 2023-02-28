@@ -166,11 +166,28 @@ namespace MatroskaBatchToolBox
             return CommandResult.Completed;
         }
 
-        public static CommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieInformation movieInfo, string? resolutionSpec, string? aspectRatioSpec, VideoEncoderType videoEncoder, FileInfo outFile, IProgress<double> progressReporter)
+        public static CommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieInformation movieInfo, string? resolutionSpec, string? aspectRatioSpec, VideoEncoderType videoEncoder, bool deleteMetadata, bool setDisposition, bool setMetadata, bool setChapterTitles, bool passthroughStreams, FileInfo outFile, IProgress<double> progressReporter)
         {
+            // ffmpeg ではメタデータの削除とタイトル付きチャプターの設定を同時に指定するとチャプターのタイトルが設定されないため、以下の条件での呼び出しを禁止する
+            if (deleteMetadata && setChapterTitles)
+                throw new Exception("internal error (deleteMetadata && setChapterTitles)");
+
+            if (passthroughStreams && resolutionSpec != null)
+                throw new Exception("internal error (passthroughStreams && resolutionSpec != null)");
+            if (passthroughStreams && aspectRatioSpec != null)
+                throw new Exception("internal error (passthroughStreams && aspectRatioSpec != null)");
+            if (passthroughStreams && videoEncoder != VideoEncoderType.Copy)
+                throw new Exception("internal error (passthroughStreams && videoEncoder != VideoEncoderType.Copy)");
+
             var videoStreams = movieInfo.VideoStreams.ToList();
             var audioStreams = movieInfo.AudioStreams.ToList();
             var subtitleStreams = movieInfo.SubtitleStreams.ToList();
+            var dataStreams = movieInfo.DataStreams.ToList();
+            if (localSettings.BehaviorForDataStreams == StreamOperationType.Error && dataStreams.Any())
+                throw new Exception("Abort the conversion as there is a data stream in the movie.");
+            var attachmentStreams = movieInfo.AttachmentStreams.ToList();
+            if (localSettings.BehaviorForAttachmentStreams == StreamOperationType.Error && attachmentStreams.Any())
+                throw new Exception("Abort the conversion as there is a attachment stream in the movie.");
 
             var outputVideoStreams =
                 videoStreams
@@ -214,6 +231,34 @@ namespace MatroskaBatchToolBox
                 })
                 .ToList();
 
+            var outputDataStreamSummaries =
+                dataStreams
+                .Where(stream => localSettings.BehaviorForDataStreams == StreamOperationType.Keep)
+                .Select((stream, index) => new
+                {
+                    inIndex = stream.IndexWithinDataStream,
+                    streamTypeSymbol = "d",
+                    outIndex = index,
+                    encodrOptions = new[] { $"-c:d:{index} copy" }.AsEnumerable(),
+                    language = stream.Tags.Language ?? "",
+                    title = stream.Tags.Title ?? "",
+                })
+                .ToList();
+
+            var outputAttachmentStreamSummaries =
+                attachmentStreams
+                .Where(stream => localSettings.BehaviorForAttachmentStreams == StreamOperationType.Keep)
+                .Select((stream, index) => new
+                {
+                    inIndex = stream.IndexWithinAttachmentStream,
+                    streamTypeSymbol = "t",
+                    outIndex = index,
+                    encodrOptions = new[] { $"-c:t:{index} copy" }.AsEnumerable(),
+                    language = stream.Tags.Language ?? "",
+                    title = stream.Tags.Title ?? "",
+                })
+                .ToList();
+
             // 出力対象のビデオストリームが存在するかどうかの確認
             if (outputVideoStreamSummaries.Count <= 0)
             {
@@ -240,91 +285,124 @@ namespace MatroskaBatchToolBox
                 $"-i \"{inFile.FullName}\""
             };
 
-            // 呼び出し元から解像度指定が与えられていて、かつ元動画のビデオストリームの中に与えられた解像度指定と異なるものがある場合に、ffmpeg に解像度指定を与える。
-            if (resolutionSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.Resolution, resolutionSpec, StringComparison.Ordinal)))
-                commandParameters.Add($"-s {resolutionSpec}");
-
-            // 呼び出し元からアスペクト比が与えられていて、かつ元動画のビデオストリームの中に与えられたアスペクト比と異なるものがある場合に、ffmpeg にアスペクト比を与える。
-            if (aspectRatioSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.DisplayAspectRatio, aspectRatioSpec, StringComparison.Ordinal)))
-                commandParameters.Add($"-aspect {aspectRatioSpec}");
-
-            // クロッピング指定があればオプションに追加
-            if (localSettings.Cropping.IsValid)
+            var metadataFilePath = (string?)null;
+            try
             {
-                if (videoEncoder == VideoEncoderType.Copy)
-                    Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: WARNING: Simple movie conversion ignores the \"cropping\" property." });
-                else
-                    commandParameters.Add($"-vf crop={localSettings.Cropping.Width}:{localSettings.Cropping.Height}:{localSettings.Cropping.Left}:{localSettings.Cropping.Top}");
-            }
+                if (setChapterTitles)
+                {
+                    metadataFilePath = CreateTemporaryMetadataFile(movieInfo, localSettings, logFile);
+                    commandParameters.Add($"-f ffmetadata -i \"{metadataFilePath}\"");
+                }
 
-            // トリミング指定があればオプションに追加
-            if (localSettings.Trimming.IsValid)
-            {
-                if (videoEncoder == VideoEncoderType.Copy)
-                    Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: WARNING: The \"trimming\" property is specified. The movie will be trimmed, but keep in mind that trimming in a simple conversion can result in unexpected gaps in the video and audio." });
-                if (!string.IsNullOrEmpty(localSettings.Trimming.Start))
-                    commandParameters.Add($"-ss {localSettings.Trimming.Start}");
-                if (!string.IsNullOrEmpty(localSettings.Trimming.End))
-                    commandParameters.Add($"-to {localSettings.Trimming.End}");
-            }
+                // 呼び出し元から解像度指定が与えられていて、かつ元動画のビデオストリームの中に与えられた解像度指定と異なるものがある場合に、ffmpeg に解像度指定を与える。
+                if (!passthroughStreams && resolutionSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.Resolution, resolutionSpec, StringComparison.Ordinal)))
+                    commandParameters.Add($"-s {resolutionSpec}");
 
-            // ストリームごとのオプションを追加
-            foreach (var outputStream in outputVideoStreamSummaries.Concat(outputAudioStreamSummaries).Concat(outputSubtitleStreamSummaries))
-            {
-                // エンコーダオプションとストリームマッピングの設定
-                foreach (var encoderOption in outputStream.encodrOptions)
-                    commandParameters.Add(encoderOption);
-                commandParameters.Add($"-map 0:{outputStream.streamTypeSymbol}:{outputStream.inIndex}");
+                // 呼び出し元からアスペクト比が与えられていて、かつ元動画のビデオストリームの中に与えられたアスペクト比と異なるものがある場合に、ffmpeg にアスペクト比を与える。
+                if (!passthroughStreams && aspectRatioSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.DisplayAspectRatio, aspectRatioSpec, StringComparison.Ordinal)))
+                    commandParameters.Add($"-aspect {aspectRatioSpec}");
 
-                // disposition の設定
-                if (localSettings.ResetDefaultStream || localSettings.ResetForcedStream)
-                    commandParameters.Add($"-disposition:{outputStream.streamTypeSymbol}:{outputStream.outIndex} {(localSettings.ResetDefaultStream ? "-default" : "")}{(localSettings.ResetForcedStream ? "-forced" : "")}");
+                // クロッピング指定があればオプションに追加
+                if (!passthroughStreams && localSettings.Cropping.IsValid)
+                {
+                    if (videoEncoder == VideoEncoderType.Copy)
+                        Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: WARNING: Simple movie conversion ignores the \"cropping\" property." });
+                    else
+                        commandParameters.Add($"-vf crop={localSettings.Cropping.Width}:{localSettings.Cropping.Height}:{localSettings.Cropping.Left}:{localSettings.Cropping.Top}");
+                }
 
-                // メタデータ (言語及びタイトル) の設定
-                if (string.IsNullOrEmpty(outputStream.language))
-                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} language=");
-                else
-                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} language=\"{outputStream.language}\"");
-                if (string.IsNullOrEmpty(outputStream.title))
-                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=");
-                else
-                    commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=\"{outputStream.title}\"");
-            }
+                // トリミング指定があればオプションに追加
+                if (!passthroughStreams && localSettings.Trimming.IsValid)
+                {
+                    if (videoEncoder == VideoEncoderType.Copy)
+                        Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: WARNING: The \"trimming\" property is specified. The movie will be trimmed, but keep in mind that trimming in a simple conversion can result in unexpected gaps in the video and audio." });
+                    if (!string.IsNullOrEmpty(localSettings.Trimming.Start))
+                        commandParameters.Add($"-ss {localSettings.Trimming.Start}");
+                    if (!string.IsNullOrEmpty(localSettings.Trimming.End))
+                        commandParameters.Add($"-to {localSettings.Trimming.End}");
+                }
 
-            // その他のオプションを追加
-            if (localSettings.DeleteChapters)
-                commandParameters.Add("-map_chapters -1");
-            if (localSettings.DeleteMetadata)
-                commandParameters.Add("-map_metadata -1");
-            if (videoEncoder != VideoEncoderType.Copy)
-                commandParameters.Add("-g 240");
-            if (!string.IsNullOrEmpty(localSettings.FFmpegOption))
-                commandParameters.Add(localSettings.FFmpegOption);
-            commandParameters.Add($"\"{outFile.FullName}\"");
+                // ストリームごとのオプションを追加
+                foreach (var outputStream in outputVideoStreamSummaries.Concat(outputAudioStreamSummaries).Concat(outputSubtitleStreamSummaries).Concat(outputDataStreamSummaries).Concat(outputAttachmentStreamSummaries))
+                {
+                    // エンコーダオプションとストリームマッピングの設定
+                    foreach (var encoderOption in outputStream.encodrOptions)
+                        commandParameters.Add(encoderOption);
+                    commandParameters.Add($"-map 0:{outputStream.streamTypeSymbol}:{outputStream.inIndex}");
 
-            var detectedToQuit = false;
-            var maximumDurationSeconds = double.NaN;
-            var vmafScore = double.NaN; // この値は使用されない
-            var (cancelled, exitCode) =
-                Command.ExecuteCommand(
-                    Settings.GlobalSettings.FFmpegCommandFile,
-                    string.Join(" ", commandParameters),
-                    Encoding.UTF8,
-                    (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScore, progressReporter),
-                    (level, message) => Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }),
-                    proc =>
+                    // disposition の設定
+                    if (setDisposition)
                     {
-                        proc.StandardInput.Write("q");
-                    });
-            if (detectedToQuit || cancelled)
-            {
-                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
-                return CommandResult.Cancelled;
+                        if (localSettings.ResetDefaultStream || localSettings.ResetForcedStream)
+                            commandParameters.Add($"-disposition:{outputStream.streamTypeSymbol}:{outputStream.outIndex} {(localSettings.ResetDefaultStream ? "-default" : "")}{(localSettings.ResetForcedStream ? "-forced" : "")}");
+                    }
+
+                    // メタデータ (言語及びタイトル) の設定
+                    if (setMetadata)
+                    {
+                        if (string.IsNullOrEmpty(outputStream.language))
+                            commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} language=");
+                        else
+                            commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} language=\"{outputStream.language}\"");
+                        if (string.IsNullOrEmpty(outputStream.title))
+                            commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=");
+                        else
+                            commandParameters.Add($"-metadata:s:{outputStream.streamTypeSymbol}:{outputStream.outIndex} title=\"{outputStream.title}\"");
+                    }
+                }
+
+                // その他のオプションを追加
+                if (localSettings.DeleteChapters)
+                    commandParameters.Add("-map_chapters -1");
+                else if (setChapterTitles)
+                    commandParameters.Add("-map_chapters 1");
+                else
+                {
+                    // NOP
+                }
+                if (deleteMetadata)
+                    commandParameters.Add("-map_metadata -1");
+                if (!passthroughStreams && videoEncoder != VideoEncoderType.Copy)
+                    commandParameters.Add("-g 240");
+                if (!passthroughStreams && !string.IsNullOrEmpty(localSettings.FFmpegOption))
+                    commandParameters.Add(localSettings.FFmpegOption);
+                commandParameters.Add($"\"{outFile.FullName}\"");
+
+                var detectedToQuit = false;
+                var maximumDurationSeconds = double.NaN;
+                var vmafScore = double.NaN; // この値は使用されない
+                var (cancelled, exitCode) =
+                    Command.ExecuteCommand(
+                        Settings.GlobalSettings.FFmpegCommandFile,
+                        string.Join(" ", commandParameters),
+                        Encoding.UTF8,
+                        (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScore, progressReporter),
+                        (level, message) => Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }),
+                        proc =>
+                        {
+                            proc.StandardInput.Write("q");
+                        });
+                if (detectedToQuit || cancelled)
+                {
+                    Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
+                    return CommandResult.Cancelled;
+                }
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
+                if (exitCode != 0)
+                    throw new Exception($"ffmpeg failed. (exit code {exitCode})");
+                return CommandResult.Completed;
             }
-            Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
-            if (exitCode != 0)
-                throw new Exception($"ffmpeg failed. (exit code {exitCode})");
-            return CommandResult.Completed;
+            finally
+            {
+                try
+                {
+                    if (metadataFilePath is not null && File.Exists(metadataFilePath))
+                        File.Delete(metadataFilePath);
+                }
+                catch (Exception)
+                {
+                }
+            }
         }
 
         public static CommandResult CalculateVMAFScoreFromMovieFile(FileInfo logFile, FileInfo originalFile, FileInfo modifiedFile, string resolutionSpec, out double vmafScore, IProgress<double> progressReporter)
@@ -503,6 +581,24 @@ namespace MatroskaBatchToolBox
                 progressReporter.Report(progress);
                 return;
             }
+        }
+
+        private static string CreateTemporaryMetadataFile(MovieInformation movieInfo, Settings localSettings, FileInfo logFile)
+        {
+            var startTime = localSettings.Trimming.StartTime ?? TimeSpan.Zero;
+            var endTime = localSettings.Trimming.EndTime ?? ChapterInfo.DefaultMaximumDuration;
+            var chapterFilterParameter = new ChapterFilterParameter
+            {
+                From = startTime,
+                To = endTime,
+                KeepEmptyChapter = false,
+                WarningMessageReporter = message => Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: WARNING: {message}" }),
+            };
+
+            var metadataFilePath = Path.GetTempFileName();
+            using var writer = new StreamWriter(metadataFilePath, false, new UTF8Encoding(false));
+            writer.Write(movieInfo.Chapters.ChapterFilter(chapterFilterParameter).ToMetadataString());
+            return metadataFilePath;
         }
     }
 }
