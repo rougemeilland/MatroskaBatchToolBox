@@ -356,3 +356,5 @@ MigrationBackup/
 /CalcVMAF/ffmpeg.exe
 /MatroskaBatchToolBox/TODO.txt
 /ChapterConverter/Properties/launchSettings.json
+/CalcVMAF/Properties/launchSettings.json
+*.exe
