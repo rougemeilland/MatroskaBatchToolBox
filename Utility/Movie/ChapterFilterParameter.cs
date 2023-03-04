@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Utility
+namespace Utility.Movie
 {
     public class ChapterFilterParameter
     {
@@ -11,7 +11,7 @@ namespace Utility
             To = TimeSpan.MaxValue;
             Titles = new Dictionary<int, string>();
             KeepEmptyChapter = false;
-            MinimumDuration = ChapterInfo.DefaultMinimumDuration;
+            MinimumDuration = SimpleChapterElement.DefaultMinimumDuration;
             WarningMessageReporter = message => { };
         }
 

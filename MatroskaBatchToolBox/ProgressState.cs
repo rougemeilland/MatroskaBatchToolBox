@@ -1,10 +1,10 @@
-﻿using MatroskaBatchToolBox.Properties;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using MatroskaBatchToolBox.Properties;
+using Utility;
 
 namespace MatroskaBatchToolBox
 {
@@ -131,7 +131,7 @@ namespace MatroskaBatchToolBox
 
         public void UpdateProgress(int sourceFieId, double progress)
         {
-            if (progress < 0 || progress > 1)
+            if (!progress.IsInRange(0, 1))
                 throw new Exception($"Invalid {nameof(progress)} value: {nameof(progress)} = {progress}");
 
             lock (this)
@@ -144,6 +144,7 @@ namespace MatroskaBatchToolBox
                     // そのため、エラーにはせずに何もせずに復帰する。
                     return;
                 }
+
                 item.Progress = progress;
 
                 var totalProgress = GetProgressValue();
@@ -273,7 +274,7 @@ namespace MatroskaBatchToolBox
         private static IEnumerable<SourceFileInfo> EnumerateSourceFileInfo(IEnumerable<FileInfo> sourceFiles)
         {
             // Lengthプロパティの参照で例外が発生した場合は、そのファイルは結果のリストからは除く
-            foreach (var item in sourceFiles.Select((sourceFile, index) => new { index, sourceFile}))
+            foreach (var item in sourceFiles.Select((sourceFile, index) => new { index, sourceFile }))
             {
                 FileInfo? sourceFile = null;
                 int? index = null;
@@ -297,6 +298,7 @@ namespace MatroskaBatchToolBox
                 catch (IOException)
                 {
                 }
+
                 if (sourceFile is not null && index is not null && sourceFileLength is not null)
                     yield return new SourceFileInfo(index.Value, sourceFile, sourceFileLength.Value);
             }
@@ -328,27 +330,20 @@ namespace MatroskaBatchToolBox
             return progress;
         }
 
-
         private static string FormatDateTimeFriendly(DateTime localDateTime, DateTime localNow)
-        {
-            if (localDateTime.Year != localNow.Year)
-                return string.Format(Resource.CompletionDateTimeFriendlyFormat1Text, localDateTime.Year, localDateTime.Month, localDateTime.Day, localDateTime.Hour, localDateTime.Minute);
-            else if (localDateTime.Month != localNow.Month || localDateTime.Day != localNow.Day)
-                return string.Format(Resource.CompletionDateTimeFriendlyFormat2Text, localDateTime.Month, localDateTime.Day, localDateTime.Hour, localDateTime.Minute);
-            else
-                return string.Format(Resource.CompletionDateTimeFriendlyFormat3Text, localDateTime.Hour, localDateTime.Minute);
-        }
+            => localDateTime.Year != localNow.Year
+                ? string.Format(Resource.CompletionDateTimeFriendlyFormat1Text, localDateTime.Year, localDateTime.Month, localDateTime.Day, localDateTime.Hour, localDateTime.Minute)
+                : localDateTime.Month != localNow.Month || localDateTime.Day != localNow.Day
+                ? string.Format(Resource.CompletionDateTimeFriendlyFormat2Text, localDateTime.Month, localDateTime.Day, localDateTime.Hour, localDateTime.Minute)
+                : string.Format(Resource.CompletionDateTimeFriendlyFormat3Text, localDateTime.Hour, localDateTime.Minute);
 
         private static string FormatTimeSpanFriendly(TimeSpan time)
-        {
-            if (time >= TimeSpan.FromDays(1))
-                return string.Format(Resource.TimeSpanFriendlyFormat1Text, time.Days, time.Hours, time.Minutes);
-            else if (time >= TimeSpan.FromHours(1))
-                return string.Format(Resource.TimeSpanFriendlyFormat2Text, time.Hours, time.Minutes);
-            else if (time >= TimeSpan.FromMinutes(1))
-                return string.Format(Resource.TimeSpanFriendlyFormat3Text, time.Minutes);
-            else
-                return Resource.TimeSpanFriendlyFormat4Text;
-        }
+            => time >= TimeSpan.FromDays(1)
+                ? string.Format(Resource.TimeSpanFriendlyFormat1Text, time.Days, time.Hours, time.Minutes)
+                : time >= TimeSpan.FromHours(1)
+                ? string.Format(Resource.TimeSpanFriendlyFormat2Text, time.Hours, time.Minutes)
+                : time >= TimeSpan.FromMinutes(1)
+                ? string.Format(Resource.TimeSpanFriendlyFormat3Text, time.Minutes)
+                : Resource.TimeSpanFriendlyFormat4Text;
     }
 }

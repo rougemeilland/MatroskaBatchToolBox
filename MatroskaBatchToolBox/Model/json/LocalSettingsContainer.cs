@@ -5,19 +5,19 @@ namespace MatroskaBatchToolBox.Model.Json
     public class LocalSettingsContainer
     {
         [JsonPropertyName("ffmpeg_video_encoder")]
-        public string? FFmpegVideoEncoder { get; set; }
+        public string? FfmpegVideoEncoder { get; set; }
 
         [JsonPropertyName("ffmpeg_libx264_encoder_option")]
-        public string? FFmpegLibx264EncoderOption { get; set; }
+        public string? FfmpegLibx264EncoderOption { get; set; }
 
         [JsonPropertyName("ffmpeg_libx265_encoder_option")]
-        public string? FFmpegLibx265EncoderOption { get; set; }
+        public string? FfmpegLibx265EncoderOption { get; set; }
 
         [JsonPropertyName("ffmpeg_libaom-av1_encoder_option")]
-        public string? FFmpegLibaomAV1EncoderOption { get; set; }
+        public string? FfmpegLibaomAv1EncoderOption { get; set; }
 
         [JsonPropertyName("ffmpeg_option")]
-        public string? FFmpegOption { get; set; }
+        public string? FfmpegOption { get; set; }
 
         [JsonPropertyName("delete_chapters")]
         public bool? DeleteChapters { get; set; }
@@ -59,7 +59,7 @@ namespace MatroskaBatchToolBox.Model.Json
         public bool? ResetDefaultStream { get; set; }
 
         [JsonPropertyName("calculate_vmaf_score")]
-        public bool? CalculateVMAFScore { get; set; }
+        public bool? CalculateVmafScore { get; set; }
 
         [JsonPropertyName("do_not_convert")]
         public bool? DoNotConvert { get; set; }

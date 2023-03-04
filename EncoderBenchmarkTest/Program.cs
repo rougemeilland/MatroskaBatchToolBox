@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -69,20 +68,20 @@ namespace EncoderBenchmarkTest
                                 if (!match.Success)
                                     throw new Exception($"The filename does not contain a resolution specification.: \"{sourceFile.Name}\"");
 
-                                int resolutionWidth = int.Parse(match.Groups["resolutionWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                                int resolutionWidth = match.Groups["resolutionWidth"].Value.ParseAsInt32();
                                 if (resolutionWidth <= 0)
                                     throw new Exception($"There is an error in the resolution specified in the file name.: \"{sourceFile.Name}\"");
-                                int resolutionHeight = int.Parse(match.Groups["resolutionHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                                int resolutionHeight = match.Groups["resolutionHeight"].Value.ParseAsInt32();
                                 if (resolutionHeight <= 0)
                                     throw new Exception($"There is an error in the resolution specified in the file name.: \"{sourceFile.Name}\"");
                                 int aspectRatioWidth;
                                 int aspectRatioHeight;
                                 if (match.Groups["aspectRatioWidth"].Success && match.Groups["aspectRatioHeight"].Success)
                                 {
-                                    aspectRatioWidth = int.Parse(match.Groups["aspectRatioWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                                    aspectRatioWidth = match.Groups["aspectRatioWidth"].Value.ParseAsInt32();
                                     if (aspectRatioWidth <= 0)
                                         throw new Exception($"There is an error in the aspect ratio specified in the file name.: \"{sourceFile.Name}\"");
-                                    aspectRatioHeight = int.Parse(match.Groups["aspectRatioHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                                    aspectRatioHeight = match.Groups["aspectRatioHeight"].Value.ParseAsInt32();
                                     if (aspectRatioHeight <= 0)
                                         throw new Exception($"There is an error in the aspect ratio specified in the file name.: \"{sourceFile.Name}\"");
                                 }
@@ -92,12 +91,13 @@ namespace EncoderBenchmarkTest
                                     aspectRatioWidth = resolutionWidth / gcd;
                                     aspectRatioHeight = resolutionHeight / gcd;
                                 }
+
                                 try
                                 {
                                     var (elapsedTime, fileSize, commandLine) = ConvertMovieFile(ffmpegCommandPath, sourceFile, encodedFile, resolutionWidth, resolutionHeight, aspectRatioWidth, aspectRatioHeight, item.encoder, item.parameter);
                                     Console.WriteLine(new string('-', 40));
-                                    var vmafScore = CalculateVMAF(ffmpegCommandPath, sourceFile, encodedFile, resolutionWidth, resolutionHeight);
-                                    var resultItems = new[] { Path.GetFileName(sourceFilePath) ?? "???", sourceFileLength.ToString("N0"), item.friendlyEncoderName, encodedFile.Length.ToString("N0"), elapsedTime.TotalSeconds.ToString("F2"), vmafScore.ToString("F6"), ((double)encodedFile.Length / sourceFileLength).ToString("F6"), commandLine};
+                                    var vmafScore = CalculateVmaf(ffmpegCommandPath, sourceFile, encodedFile, resolutionWidth, resolutionHeight);
+                                    var resultItems = new[] { Path.GetFileName(sourceFilePath) ?? "???", sourceFileLength.ToString("N0"), item.friendlyEncoderName, encodedFile.Length.ToString("N0"), elapsedTime.TotalSeconds.ToString("F2"), vmafScore.ToString("F6"), ((double)encodedFile.Length / sourceFileLength).ToString("F6"), commandLine };
                                     logWriter.WriteLine(string.Join("\t", resultItems));
                                     logWriter.Flush();
                                     Console.WriteLine(string.Join(", ", resultItems));
@@ -115,62 +115,63 @@ namespace EncoderBenchmarkTest
                     }
                 }
             }
+
             Console.WriteLine("Complete");
             Console.Beep();
-            Console.ReadLine();
+            _ = Console.ReadLine();
         }
 
         private static (TimeSpan cpuTime, long encodedFileLength, string commandLine) ConvertMovieFile(string ffmpegCommandPath, FileInfo sourceFile, FileInfo encodedFile, int resolutionWidth, int resolutionHeight, int aspectRatioWidth, int aspectRatioHeight, string encoder, string encoderDependentParameters)
         {
             var commandParameter = new StringBuilder();
-            commandParameter.Append("-hide_banner");
-            commandParameter.Append(" -y");
-            commandParameter.Append($" -i \"{sourceFile.FullName}\"");
-            commandParameter.Append($" -s {resolutionWidth}x{resolutionHeight}");
-            commandParameter.Append($" -aspect {aspectRatioWidth}:{aspectRatioHeight}");
-            commandParameter.Append($" -c:v {encoder}");
+            _ = commandParameter.Append("-hide_banner");
+            _ = commandParameter.Append(" -y");
+            _ = commandParameter.Append($" -i \"{sourceFile.FullName}\"");
+            _ = commandParameter.Append($" -s {resolutionWidth}x{resolutionHeight}");
+            _ = commandParameter.Append($" -aspect {aspectRatioWidth}:{aspectRatioHeight}");
+            _ = commandParameter.Append($" -c:v {encoder}");
             if (!string.IsNullOrEmpty(encoderDependentParameters))
-                commandParameter.Append($" {encoderDependentParameters}");
-            commandParameter.Append($" -g 240");
-            commandParameter.Append($" -an");
-            commandParameter.Append($" -sn");
-            commandParameter.Append($" \"{encodedFile.FullName}\"");
+                _ = commandParameter.Append($" {encoderDependentParameters}");
+            _ = commandParameter.Append($" -g 240");
+            _ = commandParameter.Append($" -an");
+            _ = commandParameter.Append($" -sn");
+            _ = commandParameter.Append($" \"{encodedFile.FullName}\"");
             var summaryOfCommandLine = $"{Path.GetFileName(ffmpegCommandPath)} {commandParameter.ToString().Replace(sourceFile.FullName, sourceFile.Name).Replace(encodedFile.FullName, encodedFile.Name)}";
             Console.WriteLine($"commandLine: {summaryOfCommandLine}");
-            var totalProcessorTime = ExecuteFFmpegCommand(ffmpegCommandPath, commandParameter.ToString());
+            var totalProcessorTime = ExecuteFfmpegCommand(ffmpegCommandPath, commandParameter.ToString());
             var encodedFileLength = encodedFile.Length;
             return (totalProcessorTime, encodedFileLength, summaryOfCommandLine);
         }
 
-        private static double CalculateVMAF(string ffmpegCommandPath, FileInfo sourceFile, FileInfo encodedFile, int resolutionWidth, int resolutionHeight)
+        private static double CalculateVmaf(string ffmpegCommandPath, FileInfo sourceFile, FileInfo encodedFile, int resolutionWidth, int resolutionHeight)
         {
             var commandParameter = new StringBuilder();
-            commandParameter.Append("-hide_banner");
-            commandParameter.Append($" -i \"{sourceFile.FullName}\"");
-            commandParameter.Append($" -i \"{encodedFile.FullName}\"");
-            commandParameter.Append($" -filter_complex \"scale={resolutionWidth}x{resolutionHeight},[1]libvmaf\"");
-            commandParameter.Append(" -an -sn");
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-                commandParameter.Append(" -f NULL -");
-            else
-                commandParameter.Append(" -f null /dev/null");
+            _ = commandParameter.Append("-hide_banner");
+            _ = commandParameter.Append($" -i \"{sourceFile.FullName}\"");
+            _ = commandParameter.Append($" -i \"{encodedFile.FullName}\"");
+            _ = commandParameter.Append($" -filter_complex \"scale={resolutionWidth}x{resolutionHeight},[1]libvmaf\"");
+            _ = commandParameter.Append(" -an -sn");
+            _ = Environment.OSVersion.Platform == PlatformID.Win32NT
+                ? commandParameter.Append(" -f NULL -")
+                : commandParameter.Append(" -f null /dev/null");
             double? vmafScore = null;
-            var _ =
-                ExecuteFFmpegCommand(
-                    ffmpegCommandPath,
-                    commandParameter.ToString(),
-                    textLine =>
-                    {
-                        var match = _vmafScorePattern.Match(textLine);
-                        if (match.Success && double.TryParse(match.Groups["vmafScore"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double vmafScoreValue))
-                            vmafScore = vmafScoreValue;   
-                    });
-            if (vmafScore is null)
-                throw new Exception("VMAF score was not reported.");
-            return vmafScore.Value;
+            _ =
+               ExecuteFfmpegCommand(
+                   ffmpegCommandPath,
+                   commandParameter.ToString(),
+                   textLine =>
+                   {
+                       var match = _vmafScorePattern.Match(textLine);
+                       if (match.Success && match.Groups["vmafScore"].Value.TryParse(out double vmafScoreValue))
+                           vmafScore = vmafScoreValue;
+                   });
+            return
+                vmafScore is not null
+                ? vmafScore.Value
+                : throw new Exception("VMAF score was not reported.");
         }
 
-        private static TimeSpan ExecuteFFmpegCommand(string ffmpegCommandPath, string commandParameter, Action<string>? textLineHander = null)
+        private static TimeSpan ExecuteFfmpegCommand(string ffmpegCommandPath, string commandParameter, Action<string>? textLineHander = null)
         {
             var processStartInfo = new ProcessStartInfo()
             {
@@ -196,11 +197,12 @@ namespace EncoderBenchmarkTest
                             var lineText = process.StandardError.ReadLine();
                             if (lineText is null)
                                 break;
-                            if (string.Equals(lineText, "[q] command received. Exiting.", StringComparison.Ordinal))
+                            if (lineText == "[q] command received. Exiting.")
                             {
                                 cancelled = true;
                                 break;
                             }
+
                             if (textLineHander is not null)
                             {
                                 try
@@ -211,6 +213,7 @@ namespace EncoderBenchmarkTest
                                 {
                                 }
                             }
+
                             if (lineText.StartsWith("frame=", StringComparison.Ordinal))
                                 Console.Write(lineText + "\r");
                             else
@@ -222,9 +225,10 @@ namespace EncoderBenchmarkTest
                 if (cancelled)
                     throw new Exception("A child process was aborted by a user.");
                 var exitCode = process.ExitCode;
-                if (exitCode != 0)
-                    throw new Exception($"Process terminated abnormally. : exitCode={exitCode}");
-                return process.TotalProcessorTime;
+                return
+                    exitCode == 0
+                    ? process.TotalProcessorTime
+                    : throw new Exception($"Process terminated abnormally. : exitCode={exitCode}");
             }
             finally
             {

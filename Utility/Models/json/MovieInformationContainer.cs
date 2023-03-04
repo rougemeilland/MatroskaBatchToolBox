@@ -7,48 +7,35 @@ namespace Utility.Models.Json
 {
     public class MovieInformationContainer
     {
-        public MovieInformationContainer()
-        {
-            Streams = new List<MovieStreamInfoContainer>();
-            Chapters = new List<MovieChapterContainer>();
-        }
-
         [JsonPropertyName("streams")]
-        public IList<MovieStreamInfoContainer> Streams { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public IList<MovieStreamInfoContainer>? Streams { get; set; }
 
         [JsonPropertyName("chapters")]
-        public IList<MovieChapterContainer> Chapters { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public IList<MovieChapterContainer>? Chapters { get; set; }
 
-        internal IEnumerable<ChapterInfo> EnumerateChapters()
-        {
-            return
-                Chapters
-                .Select(chapter => new ChapterInfo(chapter));
-        }
+        internal IEnumerable<MovieChapterContainer> EnumerateChapters()
+            => Chapters ?? throw new Exception("\"chapters\" property does not exist.");
 
-        internal IEnumerable<VideoStreamInfo> EnumerateVideoStreams() =>
-            Streams
-            .Where(stream => string.Equals(stream.CodecType, "video", StringComparison.Ordinal))
-            .Select((stream, index) => new VideoStreamInfo(stream, index));
+        internal IEnumerable<MovieStreamInfoContainer> EnumerateVideoStreams()
+            => (Streams ?? throw new Exception("\"streams\" property does not exist."))
+            .Where(stream => stream.CodecType == "video");
 
-        internal IEnumerable<AudioStreamInfo> EnumerateAudioStreams() =>
-            Streams
-            .Where(stream => string.Equals(stream.CodecType, "audio", StringComparison.Ordinal))
-            .Select((stream, index) => new AudioStreamInfo(stream, index));
+        internal IEnumerable<MovieStreamInfoContainer> EnumerateAudioStreams()
+            => (Streams ?? throw new Exception("\"streams\" property does not exist."))
+            .Where(stream => stream.CodecType == "audio");
 
-        internal IEnumerable<SubtitleStreamInfo> EnumerateSubtitleStreams() =>
-            Streams
-            .Where(stream => string.Equals(stream.CodecType, "subtitle", StringComparison.Ordinal))
-            .Select((stream, index) => new SubtitleStreamInfo(stream, index));
+        internal IEnumerable<MovieStreamInfoContainer> EnumerateSubtitleStreams()
+            => (Streams ?? throw new Exception("\"streams\" property does not exist."))
+            .Where(stream => stream.CodecType == "subtitle");
 
-        internal IEnumerable<DataStreamInfo> EnumerateDataStreams() =>
-            Streams
-            .Where(stream => string.Equals(stream.CodecType, "data", StringComparison.Ordinal))
-            .Select((stream, index) => new DataStreamInfo(stream, index));
+        internal IEnumerable<MovieStreamInfoContainer> EnumerateDataStreams()
+            => (Streams ?? throw new Exception("\"streams\" property does not exist."))
+            .Where(stream => stream.CodecType == "data");
 
-        internal IEnumerable<AttachmentStreamInfo> EnumerateAttachmentStreams() =>
-            Streams
-            .Where(stream => string.Equals(stream.CodecType, "attachment", StringComparison.Ordinal))
-            .Select((stream, index) => new AttachmentStreamInfo(stream, index));
+        internal IEnumerable<MovieStreamInfoContainer> EnumerateAttachmentStreams()
+            => (Streams ?? throw new Exception("\"streams\" property does not exist."))
+            .Where(stream => stream.CodecType == "attachment");
     }
 }

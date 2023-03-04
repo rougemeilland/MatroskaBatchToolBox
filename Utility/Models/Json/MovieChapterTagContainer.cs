@@ -4,12 +4,8 @@ namespace Utility.Models.Json
 {
     public class MovieChapterTagContainer
     {
-        public MovieChapterTagContainer()
-        {
-            Title = null;
-        }
-
         [JsonPropertyName("title")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Title { get; set; }
     }
 }

@@ -1,14 +1,17 @@
 ﻿using System;
 using Utility.Models.Json;
 
-namespace Utility
+namespace Utility.Movie
 {
     public class StreamTags
     {
         internal StreamTags(MovieStreamTagsContainer? tags)
         {
             var durationText = tags?.Duration;
-            Duration = durationText is not null ? Time.ParseTime(durationText, false) : null;
+            Duration =
+                durationText is null || !durationText.TryParse(false, out TimeSpan duration)
+                ? null
+                : duration;
             Title = tags?.Title;
             Language = NormalizeLanguageCode(tags?.Language);
         }
@@ -29,12 +32,8 @@ namespace Utility
         public string? Language { get; }
 
         private static string? NormalizeLanguageCode(string? language)
-        {
             // 言語コード "und" は未定義 (null) とみなす。
-            return
-                string.Equals(language, "und", StringComparison.Ordinal)
-                ? null
-                : language;
-        }
+            => language == "und" ? null : language;
+
     }
 }

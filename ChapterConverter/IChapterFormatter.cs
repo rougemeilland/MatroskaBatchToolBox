@@ -5,7 +5,7 @@ namespace ChapterConverter
 {
     internal interface IChapterFormatter
     {
-        IEnumerable<ChapterInfo> Parse(string rawText);
-        string Render(IEnumerable<ChapterInfo> chapters);
+        IEnumerable<SimpleChapterElement> Parse(string rawText);
+        string Render(IEnumerable<SimpleChapterElement> chapters);
     }
 }

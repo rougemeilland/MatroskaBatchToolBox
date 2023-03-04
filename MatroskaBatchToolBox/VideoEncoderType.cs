@@ -3,7 +3,7 @@
     internal enum VideoEncoderType
     {
         Copy,
-        LibaomAV1,
+        LibaomAv1,
         Libx264,
         Libx265,
     }

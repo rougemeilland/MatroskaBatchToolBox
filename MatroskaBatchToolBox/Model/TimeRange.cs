@@ -7,9 +7,7 @@ namespace MatroskaBatchToolBox.Model
     internal class TimeRange
     {
         static TimeRange()
-        {
-            DefaultValue = new TimeRange("", null, "", null);
-        }
+            => DefaultValue = new TimeRange("", null, "", null);
 
         private TimeRange(string start, TimeSpan? startTime, string end, TimeSpan? endTime)
         {
@@ -34,6 +32,7 @@ namespace MatroskaBatchToolBox.Model
                 timeRange = default;
                 return false;
             }
+
             var startTimeText = timeSpecs[0];
             var endTimeText = timeSpecs[1];
 
@@ -44,17 +43,17 @@ namespace MatroskaBatchToolBox.Model
                 return false;
             }
 
-            var startTime = Time.ParseTime(startTimeText, false);
             // 開始時間が空でなく、かつ書式が誤っている場合はエラーとする。
-            if (!string.IsNullOrEmpty(startTimeText) && startTime is null)
+            var (success1, startTime) = ParseTime(startTimeText);
+            if (!success1)
             {
                 timeRange = default;
                 return false;
             }
 
-            var endTime = Time.ParseTime(endTimeText, false);
             // 終了時間が空でなく、かつ書式が誤っている場合はエラーとする。
-            if (!string.IsNullOrEmpty(endTimeText) && endTime is null)
+            var (success2, endTime) = ParseTime(endTimeText);
+            if (!success2)
             {
                 timeRange = default;
                 return false;
@@ -64,6 +63,12 @@ namespace MatroskaBatchToolBox.Model
             timeRange = new TimeRange(startTimeText, startTime, endTimeText, endTime);
             return true;
         }
+
+        private static (bool success, TimeSpan? time) ParseTime(string s)
+            => string.IsNullOrEmpty(s)
+            ? (true, null)
+            : s.TryParse(false, out TimeSpan time)
+            ? (true, time)
+            : (false, null);
     }
 }
-

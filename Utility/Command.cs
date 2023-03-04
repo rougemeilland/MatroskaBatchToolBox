@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
-using Utility.Models.Json;
+using Utility.Movie;
 
 namespace Utility
 {
@@ -21,19 +20,19 @@ namespace Utility
         }
 
         public static void AbortExternalCommands()
-        {
-            _requestedCancellation = true;
-        }
+            => _requestedCancellation = true;
 
-        public static (CommandResult result, MovieInformation? streams) GetMovieInformation(FileInfo ffprobeCommandFile, FileInfo inFile, Action<string, string> logger)
+        public static (CommandResult result, MovieInformation? streams) GetMovieInformation(FileInfo ffprobeCommandFile, FileInfo inFile, MovieInformationType requestedInfo, Action<string, string> logger)
         {
             var commandParameter = new StringBuilder();
-            commandParameter.Append("-hide_banner");
-            commandParameter.Append(" -v error");
-            commandParameter.Append(" -print_format json");
-            commandParameter.Append(" -show_chapters");
-            commandParameter.Append(" -show_streams");
-            commandParameter.Append($" -i \"{inFile.FullName}\"");
+            _ = commandParameter.Append("-hide_banner");
+            _ = commandParameter.Append(" -v error");
+            _ = commandParameter.Append(" -print_format json");
+            if ((requestedInfo & MovieInformationType.Chapters) != MovieInformationType.None)
+                _ = commandParameter.Append(" -show_chapters");
+            if ((requestedInfo & MovieInformationType.Streams) != MovieInformationType.None)
+                _ = commandParameter.Append(" -show_streams");
+            _ = commandParameter.Append($" -i \"{inFile.FullName}\"");
             var standardOutputTextLines = new List<string>();
             var (cancelled, exitCode) =
                 Command.ExecuteCommand(
@@ -46,28 +45,21 @@ namespace Utility
                             standardOutputTextLines.Add(text);
                     },
                     logger,
-                    proc =>
-                    {
-                        proc.StandardInput.Write("q");
-                    });
+                    proc => proc.StandardInput.Write("q"));
             if (cancelled)
             {
                 logger("INFO", $"ffprobe aborted at user request.");
                 return (CommandResult.Cancelled, null);
             }
+
             logger("INFO", $"ffprobe exited with exit code {exitCode}.");
             if (exitCode != 0)
                 throw new Exception($"ffprobe failed. (exit code {exitCode})");
 
-            string jsonText = string.Join("\r\n", standardOutputTextLines);
+            var jsonText = string.Join("\r\n", standardOutputTextLines);
             try
             {
-                var movieInformationContainer =
-                    JsonSerializer.Deserialize<MovieInformationContainer>(
-                        jsonText,
-                        new JsonSerializerOptions { AllowTrailingCommas = true })
-                    ?? throw new Exception("ffprobe returned no information.");
-                return (CommandResult.Completed, new MovieInformation(movieInformationContainer));
+                return (CommandResult.Completed, MovieInformation.ParseFromJson(jsonText));
             }
             catch (Exception ex)
             {
@@ -108,7 +100,10 @@ namespace Utility
                     {
                         if (childProcessCcanceller is not null)
                         {
-                            while (!_requestedCancellation && !process.WaitForExit(1000)) ;
+                            while (!_requestedCancellation && !process.WaitForExit(1000))
+                            {
+                            }
+
                             if (_requestedCancellation)
                             {
 #if DEBUG && false
@@ -146,17 +141,13 @@ namespace Utility
 
                 var standardOutputReaderTask =
                     Task.Run(() =>
-                    {
                         // 同じ子プロセスの標準出力と標準エラーからの OutputReader() 呼び出しが(できるだけ)混じらないように、ロックオブジェクトには子プロセスのオブジェクトを指定する。
-                        ProcessChildOutput(process, OutputReader, OutputStreamType.StandardOutput, process.StandardOutput);
-                    });
+                        ProcessChildOutput(process, OutputReader, OutputStreamType.StandardOutput, process.StandardOutput));
 
                 var standardErrorReaderTask =
                     Task.Run(() =>
-                    {
                         // 同じ子プロセスの標準出力と標準エラーからの OutputReader() 呼び出しが(できるだけ)混じらないように、ロックオブジェクトには子プロセスのオブジェクトを指定する。
-                        ProcessChildOutput(process, OutputReader, OutputStreamType.StandardError, process.StandardError);
-                    });
+                        ProcessChildOutput(process, OutputReader, OutputStreamType.StandardError, process.StandardError));
                 standardErrorReaderTask.Wait();
                 standardOutputReaderTask.Wait();
                 cancellationWatcherTask.Wait();
@@ -205,6 +196,7 @@ namespace Utility
                                     // 次の読み込みで含まれる文字列も同じ行に含まれなければならないので、OutputReader() は呼び出さずにループを中断する。
                                     break;
                                 }
+
                                 if (cache[endOfLine] == '\r')
                                 {
                                     // 見つかった改行文字が '\r' だった場合
@@ -227,6 +219,7 @@ namespace Utility
                                         catch (Exception)
                                         {
                                         }
+
                                         cache = cache[(endOfLine + 2)..];
                                     }
                                     else
@@ -241,6 +234,7 @@ namespace Utility
                                         catch (Exception)
                                         {
                                         }
+
                                         cache = cache[(endOfLine + 1)..];
                                     }
                                 }
@@ -256,10 +250,13 @@ namespace Utility
                                     catch (Exception)
                                     {
                                     }
+
                                     cache = cache[(endOfLine + 1)..];
                                 }
                                 else
+                                {
                                     throw new Exception("internal error");
+                                }
                             }
                         }
                     }

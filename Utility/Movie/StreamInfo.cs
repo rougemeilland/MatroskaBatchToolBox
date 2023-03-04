@@ -1,7 +1,7 @@
-﻿using Utility.Models.Json;
-using System;
+﻿using System;
+using Utility.Models.Json;
 
-namespace Utility
+namespace Utility.Movie
 {
     public abstract class StreamInfo
     {

@@ -1,10 +1,9 @@
-﻿using MatroskaBatchToolBox.Model;
-using MatroskaBatchToolBox.Model.Json;
-using System;
+﻿using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using MatroskaBatchToolBox.Model;
+using MatroskaBatchToolBox.Model.Json;
 
 namespace MatroskaBatchToolBox
 {
@@ -28,6 +27,7 @@ namespace MatroskaBatchToolBox
                 if (Regex.IsMatch(executableFile.Name, @"^ffmpeg(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
                     ffmpegCommandFile = executableFile;
             }
+
             if (ffmpegCommandFile is null)
             {
                 var message = $"'ffmpeg' is not installed.";
@@ -41,6 +41,7 @@ namespace MatroskaBatchToolBox
                 if (Regex.IsMatch(executableFile.Name, @"^ffprobe(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
                     ffprobeCommandFile = executableFile;
             }
+
             if (ffprobeCommandFile is null)
             {
                 var message = $"'ffprobe' is not installed.";
@@ -49,15 +50,16 @@ namespace MatroskaBatchToolBox
             }
 
             FileInfo? ffmpegNormalizeCommandFile;
-            if (string.IsNullOrEmpty(settings.FFmpegNormalizeCommandFilePath))
+            if (string.IsNullOrEmpty(settings.FfmpegNormalizeCommandFilePath))
             {
-                var message = $"'{nameof(settings.FFmpegNormalizeCommandFilePath)}' is not set in 'settings.json'.";
+                var message = $"'{nameof(settings.FfmpegNormalizeCommandFilePath)}' is not set in 'settings.json'.";
                 PrintFatalMessage(message);
                 throw new Exception(); // can't reach here
             }
+
             try
             {
-                ffmpegNormalizeCommandFile = new FileInfo(settings.FFmpegNormalizeCommandFilePath);
+                ffmpegNormalizeCommandFile = new FileInfo(settings.FfmpegNormalizeCommandFilePath);
                 if (!ffmpegNormalizeCommandFile.Exists)
                     ffmpegNormalizeCommandFile = null;
             }
@@ -65,18 +67,19 @@ namespace MatroskaBatchToolBox
             {
                 ffmpegNormalizeCommandFile = null;
             }
+
             if (ffmpegNormalizeCommandFile is null)
             {
-                var message = $"The path name \"{settings.FFmpegNormalizeCommandFilePath}\" set in \"{nameof(settings.FFmpegNormalizeCommandFilePath)}\" does not exist.";
+                var message = $"The path name \"{settings.FfmpegNormalizeCommandFilePath}\" set in \"{nameof(settings.FfmpegNormalizeCommandFilePath)}\" does not exist.";
                 PrintFatalMessage(message);
                 throw new Exception(); // can't reach here
             }
 
-            var videoEncoderOnComplexConversion = settings.FFmpegVideoEncoder.TryParseAsVideoEncoderType();
+            var videoEncoderOnComplexConversion = settings.FfmpegVideoEncoder.TryParseAsVideoEncoderType();
             if (videoEncoderOnComplexConversion is null)
             {
                 // サポートしていないエンコーダーが設定されていた場合
-                var message = $"Video encoders set to \"VideoEncoderOnComplexConversion\" are not supported.: {(settings.FFmpegVideoEncoder is null ? "null" : $"\"{settings.FFmpegVideoEncoder}\"")}";
+                var message = $"Video encoders set to \"VideoEncoderOnComplexConversion\" are not supported.: {(settings.FfmpegVideoEncoder is null ? "null" : $"\"{settings.FfmpegVideoEncoder}\"")}";
                 PrintFatalMessage(message);
                 throw new Exception(); // can't reach here
             }
@@ -85,10 +88,10 @@ namespace MatroskaBatchToolBox
             // ※ CRFの値は各エンコーダの「通常扱うであろう動画変換において視覚的に無損失と見なせる値」を選択した。
             //     参考: https://trac.ffmpeg.org/wiki/Encode/AV1 (AV1 ビデオ エンコーディング ガイド)
             //     参考: https://trac.ffmpeg.org/wiki/Encode/H.265 (H.265/HEVC ビデオ エンコーディング ガイド)
-            var ffmpegLibx264EncoderOption = settings.FFmpegLibx264EncoderOption ?? "-crf 19";
-            var ffmpegLibx265EncoderOption = settings.FFmpegLibx265EncoderOption ?? "-crf 19";
-            var ffmpegLibaomAV1EncoderOption = settings.FFmpegLibaomAV1EncoderOption ?? "-crf 23";
-            var ffmpegOption = settings.FFmpegOption ?? "";
+            var ffmpegLibx264EncoderOption = settings.FfmpegLibx264EncoderOption ?? "-crf 19";
+            var ffmpegLibx265EncoderOption = settings.FfmpegLibx265EncoderOption ?? "-crf 19";
+            var ffmpegLibaomAv1EncoderOption = settings.FfmpegLibaomAv1EncoderOption ?? "-crf 23";
+            var ffmpegOption = settings.FfmpegOption ?? "";
             var deleteChapters = settings.DeleteChapters ?? false;
             var keepChapterTitles = settings.KeepChapterTitles ?? true;
             var deleteMetadata = settings.DeleteMetadata ?? false;
@@ -100,7 +103,7 @@ namespace MatroskaBatchToolBox
             var defaultAudioLanguage = (string?)null;
             var resetForceStream = false;
             var resetDefaultStream = false;
-            var calculateVMAFScore = settings.CalculateVMAFScore ?? false;
+            var calculateVmafScore = settings.CalculateVmafScore ?? false;
             var doNotConvert = false;
             var degreeOfParallelism = settings.DegreeOfParallelism ?? 1;
             GlobalSettings =
@@ -111,7 +114,7 @@ namespace MatroskaBatchToolBox
                     videoEncoderOnComplexConversion.Value,
                     ffmpegLibx264EncoderOption,
                     ffmpegLibx265EncoderOption,
-                    ffmpegLibaomAV1EncoderOption,
+                    ffmpegLibaomAv1EncoderOption,
                     ffmpegOption,
                     deleteChapters,
                     keepChapterTitles,
@@ -126,7 +129,7 @@ namespace MatroskaBatchToolBox
                     defaultAudioLanguage,
                     resetForceStream,
                     resetDefaultStream,
-                    calculateVMAFScore,
+                    calculateVmafScore,
                     doNotConvert,
                     degreeOfParallelism);
         }
@@ -141,7 +144,7 @@ namespace MatroskaBatchToolBox
             Console.ForegroundColor = previousColor;
             Console.Beep();
             Console.WriteLine("Press ENTER key to exit.");
-            Console.ReadLine();
+            _ = Console.ReadLine();
             Environment.Exit(1);
         }
 
@@ -152,7 +155,7 @@ namespace MatroskaBatchToolBox
             VideoEncoderType ffmpegVideoEncoder,
             string ffmpegLibx264EncoderOption,
             string ffmpegLibx265EncoderOption,
-            string ffmpegLibaomAV1EncoderOption,
+            string ffmpegLibaomAv1EncoderOption,
             string ffmpegOption,
             bool deleteChapters,
             bool keepChapterTitles,
@@ -167,18 +170,18 @@ namespace MatroskaBatchToolBox
             string? defaultAudioLanguage,
             bool resetForceStream,
             bool resetDefaultStream,
-            bool calculateVMAFScore,
+            bool calculateVmafScore,
             bool doNotConvert,
             int degreeOfParallelism)
         {
-            FFmpegNormalizeCommandFile = ffmpegNormalizeCommandFile;
-            FFprobeCommandFile = ffprobeCommandFile;
-            FFmpegCommandFile = ffmpegCommandFile;
-            FFmpegVideoEncoder = ffmpegVideoEncoder;
-            FFmpegLibx264EncoderOption = ffmpegLibx264EncoderOption;
-            FFmpegLibx265EncoderOption = ffmpegLibx265EncoderOption;
-            FFmpegLibaomAV1EncoderOption = ffmpegLibaomAV1EncoderOption;
-            FFmpegOption = ffmpegOption;
+            FfmpegNormalizeCommandFile = ffmpegNormalizeCommandFile;
+            FfprobeCommandFile = ffprobeCommandFile;
+            FfmpegCommandFile = ffmpegCommandFile;
+            FfmpegVideoEncoder = ffmpegVideoEncoder;
+            FfmpegLibx264EncoderOption = ffmpegLibx264EncoderOption;
+            FfmpegLibx265EncoderOption = ffmpegLibx265EncoderOption;
+            FfmpegLibaomAv1EncoderOption = ffmpegLibaomAv1EncoderOption;
+            FfmpegOption = ffmpegOption;
             DeleteChapters = deleteChapters;
             KeepChapterTitles = keepChapterTitles;
             DeleteMetadata = deleteMetadata;
@@ -188,7 +191,7 @@ namespace MatroskaBatchToolBox
             BehaviorForAttachmentStreams = behaviorForAttachmentStreams;
             Cropping = cropping;
             Trimming = trimming;
-            CalculateVMAFScore = calculateVMAFScore;
+            CalculateVmafScore = calculateVmafScore;
             DoNotConvert = doNotConvert;
             DegreeOfParallelism = degreeOfParallelism;
             DefaultVideoLanguage = defaultVideoLanguage;
@@ -197,14 +200,14 @@ namespace MatroskaBatchToolBox
             ResetDefaultStream = resetDefaultStream;
         }
 
-        public FileInfo FFmpegNormalizeCommandFile { get; }
-        public FileInfo FFprobeCommandFile { get;  }
-        public FileInfo FFmpegCommandFile { get; }
-        public VideoEncoderType FFmpegVideoEncoder { get; }
-        public string FFmpegLibx264EncoderOption { get; }
-        public string FFmpegLibx265EncoderOption { get; }
-        public string FFmpegLibaomAV1EncoderOption { get; }
-        public string FFmpegOption { get; }
+        public FileInfo FfmpegNormalizeCommandFile { get; }
+        public FileInfo FfprobeCommandFile { get; }
+        public FileInfo FfmpegCommandFile { get; }
+        public VideoEncoderType FfmpegVideoEncoder { get; }
+        public string FfmpegLibx264EncoderOption { get; }
+        public string FfmpegLibx265EncoderOption { get; }
+        public string FfmpegLibaomAv1EncoderOption { get; }
+        public string FfmpegOption { get; }
         public bool DeleteChapters { get; }
         public bool KeepChapterTitles { get; }
         public bool DeleteMetadata { get; }
@@ -218,10 +221,10 @@ namespace MatroskaBatchToolBox
         public string? DefaultAudioLanguage { get; set; }
         public bool ResetForcedStream { get; set; }
         public bool ResetDefaultStream { get; set; }
-        public bool CalculateVMAFScore { get; }
+        public bool CalculateVmafScore { get; }
         public bool DoNotConvert { get; set; }
         public int DegreeOfParallelism { get; }
-        public static Settings GlobalSettings { get;  }
+        public static Settings GlobalSettings { get; }
 
         public Settings GetLocalSettings(DirectoryInfo movieFileDirectory)
         {
@@ -231,7 +234,7 @@ namespace MatroskaBatchToolBox
                 if (!File.Exists(localSettingFilePath))
                     return this;
                 var settingsText = File.ReadAllText(localSettingFilePath);
-                var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas= true });
+                var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas = true });
                 if (localSettings is null)
                     return this;
 #if DEBUG && true
@@ -239,14 +242,14 @@ namespace MatroskaBatchToolBox
 #endif
                 return
                     new Settings(
-                        FFmpegNormalizeCommandFile,
-                        FFprobeCommandFile,
-                        FFmpegCommandFile,
-                        localSettings.FFmpegVideoEncoder.TryParseAsVideoEncoderType() ?? FFmpegVideoEncoder,
-                        localSettings.FFmpegLibx264EncoderOption ?? FFmpegLibx264EncoderOption,
-                        localSettings.FFmpegLibx265EncoderOption ?? FFmpegLibx265EncoderOption,
-                        localSettings.FFmpegLibaomAV1EncoderOption ?? FFmpegLibaomAV1EncoderOption,
-                        localSettings.FFmpegOption ?? FFmpegOption,
+                        FfmpegNormalizeCommandFile,
+                        FfprobeCommandFile,
+                        FfmpegCommandFile,
+                        localSettings.FfmpegVideoEncoder.TryParseAsVideoEncoderType() ?? FfmpegVideoEncoder,
+                        localSettings.FfmpegLibx264EncoderOption ?? FfmpegLibx264EncoderOption,
+                        localSettings.FfmpegLibx265EncoderOption ?? FfmpegLibx265EncoderOption,
+                        localSettings.FfmpegLibaomAv1EncoderOption ?? FfmpegLibaomAv1EncoderOption,
+                        localSettings.FfmpegOption ?? FfmpegOption,
                         localSettings.DeleteChapters ?? DeleteChapters,
                         localSettings.KeepChapterTitles ?? KeepChapterTitles,
                         localSettings.DeleteMetadata ?? DeleteMetadata,
@@ -260,7 +263,7 @@ namespace MatroskaBatchToolBox
                         localSettings.DefaultAudioLanguage ?? DefaultAudioLanguage,
                         localSettings.ResetForcedStream ?? ResetForcedStream,
                         localSettings.ResetDefaultStream ?? ResetDefaultStream,
-                        localSettings.CalculateVMAFScore ?? CalculateVMAFScore,
+                        localSettings.CalculateVmafScore ?? CalculateVmafScore,
                         localSettings.DoNotConvert ?? DoNotConvert,
                         DegreeOfParallelism);
             }
@@ -271,47 +274,37 @@ namespace MatroskaBatchToolBox
         }
 
         private static StreamOperationType ParseStreamOperationType(string? valueText, string propertyName)
-        {
-            return
-                valueText switch
-                {
-                    null => StreamOperationType.Keep,
-                    "keep" => StreamOperationType.Keep,
-                    "delete" => StreamOperationType.Delete,
-                    "error" => StreamOperationType.Error,
-                    _ => throw new Exception($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{valueText}\""),
-                };
-        }
+            => valueText switch
+            {
+                null => StreamOperationType.Keep,
+                "keep" => StreamOperationType.Keep,
+                "delete" => StreamOperationType.Delete,
+                "error" => StreamOperationType.Error,
+                _ => throw new Exception($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{valueText}\""),
+            };
 
         private static StreamOperationType DeriveStreamOperation(StreamOperationType originalValue, string? newValueText, string propertyName)
-        {
-            return
-                newValueText switch
-                {
-                    null => originalValue,
-                    "keep" => StreamOperationType.Keep,
-                    "delete" => StreamOperationType.Delete,
-                    "error" => StreamOperationType.Error,
-                    _ => throw new Exception($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{newValueText}\""),
-                };
-        }
+            => newValueText switch
+            {
+                null => originalValue,
+                "keep" => StreamOperationType.Keep,
+                "delete" => StreamOperationType.Delete,
+                "error" => StreamOperationType.Error,
+                _ => throw new Exception($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{newValueText}\""),
+            };
 
         private static TimeRange DeriveTimeRange(TimeRange originalValue, string? newValueText)
-        {
-            if (newValueText is null)
-                return originalValue;
-            if (!TimeRange.TryParse(newValueText, out TimeRange? newValue))
-                throw new Exception($"Invalid time range format.: \"{newValueText}\"");
-            return newValue;
-        }
+            => newValueText is null
+                ? originalValue
+                : TimeRange.TryParse(newValueText, out TimeRange? newValue)
+                ? newValue
+                : throw new Exception($"Invalid time range format.: \"{newValueText}\"");
 
         private static Rectangle DeriveRectangle(Rectangle originalValue, string? newValueText)
-        {
-            if (newValueText is null)
-                return originalValue;
-            if (!Rectangle.TryParse(newValueText, out Rectangle? newValue))
-                throw new Exception($"Invalid rectangle format.: {newValueText}");
-            return newValue;
-        }
+            => newValueText is null
+                ? originalValue
+                : Rectangle.TryParse(newValueText, out Rectangle? newValue)
+                ? newValue
+                : throw new Exception($"Invalid rectangle format.: {newValueText}");
     }
 }

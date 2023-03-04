@@ -5,14 +5,7 @@ namespace Utility.Models.Json
     public class MovieStreamInfoContainer
     {
         public MovieStreamInfoContainer()
-        {
-            Index = null;
-            CodecName = null;
-            CodecLongName = null;
-            CodecType = null;
-            Disposition = new MovieStreamDispositionContainer();
-            Tags = new MovieStreamTagsContainer();
-        }
+            => Disposition = new MovieStreamDispositionContainer();
 
         [JsonPropertyName("index")]
         public int? Index { get; set; }
@@ -30,7 +23,8 @@ namespace Utility.Models.Json
         public MovieStreamDispositionContainer Disposition { get; set; }
 
         [JsonPropertyName("tags")]
-        public MovieStreamTagsContainer Tags { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public MovieStreamTagsContainer? Tags { get; set; }
 
         [JsonPropertyName("width")]
         public int? Width { get; set; }

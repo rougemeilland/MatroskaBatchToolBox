@@ -4,19 +4,16 @@ namespace Utility.Models.Json
 {
     public class MovieStreamTagsContainer
     {
-        public MovieStreamTagsContainer()
-        {
-            Language = null;
-            Title = null;
-        }
-
         [JsonPropertyName("DURATION")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Duration { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("language")]
         public string? Language { get; set; }
 
         [JsonPropertyName("title")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Title { get; set; }
     }
 }

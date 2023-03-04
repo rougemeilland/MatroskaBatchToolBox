@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Experiment": {
+      "commandName": "Project",
+      "commandLineArgs": "\"D:\\テストデータ\\chapter\\format_ffprobe_csv_with_title.txt\""
+    }
+  }
+}

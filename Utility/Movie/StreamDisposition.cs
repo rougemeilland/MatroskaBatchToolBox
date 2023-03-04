@@ -1,6 +1,6 @@
 ﻿using Utility.Models.Json;
 
-namespace Utility
+namespace Utility.Movie
 {
     public class StreamDisposition
     {

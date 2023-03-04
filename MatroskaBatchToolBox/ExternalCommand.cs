@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Utility;
+using Utility.Movie;
 
 namespace MatroskaBatchToolBox
 {
@@ -16,43 +16,41 @@ namespace MatroskaBatchToolBox
         private const string _ffmpegPathEnvironmentVariableName = "FFMPEG_PATH";
         private static readonly object _loggingLockObject;
         private static readonly Regex _ffmpegNormalizeProgressPattern;
-        private static readonly Regex _logsToIgnoreInFFmpegNormalize;
-        private static readonly Regex _libopusNotAvailableOnFFmpegNormalizeInLogs;
+        private static readonly Regex _logsToIgnoreInFfmpegNormalize;
+        private static readonly Regex _libopusNotAvailableOnFfmpegNormalizeInLogs;
         private static readonly Regex _moveStreamInfoPattern;
         private static readonly Regex _moveStreamInfoAudioDetailPattern;
         private static readonly Regex _audioChannelLayoutPattern;
         private static readonly Regex _ffmpegConversionDurationPattern;
         private static readonly Regex _ffmpegConversionProgressPattern;
-        private static readonly Regex _ffmpegVMAFScoreCalculationResultPattern;
+        private static readonly Regex _ffmpegVmafScoreCalculationResultPattern;
 
         static ExternalCommand()
         {
             _loggingLockObject = new object();
             _ffmpegNormalizeProgressPattern = new Regex(@"^(((?<phase>Stream)\s+(?<currentStream>\d+)/(?<totalStream>\d+))|(?<phase>Second Pass)|(?<phase>File)):\s+(?<Percentage>\d+)%\|", RegexOptions.Compiled);
-            _logsToIgnoreInFFmpegNormalize = new Regex(@"^(frame|fps|stream_\d+_\d+_q|bitrate|total_size|out_time_us|out_time_ms|out_time|dup_frames|drop_frames|speed|progress)=", RegexOptions.Compiled);
-            _libopusNotAvailableOnFFmpegNormalizeInLogs = new Regex(@"^\[libopus @ [0-9a-fA-F]+\] Invalid channel layout 5.1\(side\) for specified mapping family -1\.", RegexOptions.Compiled);
+            _logsToIgnoreInFfmpegNormalize = new Regex(@"^(frame|fps|stream_\d+_\d+_q|bitrate|total_size|out_time_us|out_time_ms|out_time|dup_frames|drop_frames|speed|progress)=", RegexOptions.Compiled);
+            _libopusNotAvailableOnFfmpegNormalizeInLogs = new Regex(@"^\[libopus @ [0-9a-fA-F]+\] Invalid channel layout 5.1\(side\) for specified mapping family -1\.", RegexOptions.Compiled);
             _moveStreamInfoPattern = new Regex(@"^  Stream #0:(?<id>\d+)(?<language>\([^\)]+\))?: (?<streamType>Video|Audio|Subtitle): (?<detail>.*)$", RegexOptions.Compiled);
             _moveStreamInfoAudioDetailPattern = new Regex(@"^\s*(?<codec>[^ ,][^,]*[^ ,])\s*,\s*(?<samplingFrequency>[^ ,][^,]*[^ ,]) Hz\s*,\s*(?<channelLayout>[^ ,][^,]*[^ ,])\s*,", RegexOptions.Compiled);
             _audioChannelLayoutPattern = new Regex(@"(?<layoutType>[^\(]+)(\([^\)]+\))?", RegexOptions.Compiled);
-            _ffmpegConversionDurationPattern = new Regex(@"\s*(Duration|DURATION)\s*:\s*(?<hours>\d+):(?<minutes>\d+):(?<seconds>[\d\.]+)", RegexOptions.Compiled);
-            _ffmpegConversionProgressPattern = new Regex(@" time=(?<hours>\d+):(?<minutes>\d+):(?<seconds>[\d\.]+) ", RegexOptions.Compiled);
-            _ffmpegVMAFScoreCalculationResultPattern = new Regex(@"^\[Parsed_libvmaf_\d+\s*@\s*[a-fA-F0-9]+\]\s*VMAF\s+score:\s*(?<vmafScoreValue>\d+(\.\d+)?)$", RegexOptions.Compiled);
+            _ffmpegConversionDurationPattern = new Regex(@"\s*(Duration|DURATION)\s*:\s*(?<time>\d+:\d+:\d+(\.\d+)?)", RegexOptions.Compiled);
+            _ffmpegConversionProgressPattern = new Regex(@" time=(?<time>\d+:\d+:\d+(\.\d+)?) ", RegexOptions.Compiled);
+            _ffmpegVmafScoreCalculationResultPattern = new Regex(@"^\[Parsed_libvmaf_\d+\s*@\s*[a-fA-F0-9]+\]\s*VMAF\s+score:\s*(?<vmafScoreValue>\d+(\.\d+)?)$", RegexOptions.Compiled);
         }
 
         public static void AbortExternalCommands()
-        {
-            Command.AbortExternalCommands();
-        }
+            => Command.AbortExternalCommands();
 
         public static CommandResult NormalizeAudioFile(FileInfo logFile, FileInfo inFile, AudioEncoderType audioEncoder, FileInfo outFile, IProgress<double> progressReporter)
         {
-            Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, Settings.GlobalSettings.FFmpegCommandFile.FullName);
+            Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, Settings.GlobalSettings.FfmpegCommandFile.FullName);
             var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr -v -d --keep-loudness-range-target --audio-codec {audioEncoder.ToCodecSpec()}";
             var totalStream = 1;
             var isNotAvailableCodec = false;
             var (cancelled, exitCode) =
                 Command.ExecuteCommand(
-                    Settings.GlobalSettings.FFmpegNormalizeCommandFile,
+                    Settings.GlobalSettings.FfmpegNormalizeCommandFile,
                     commandParameter,
 
                     // ffmpeg-normalize 自体のエンコーディングはおそらくデフォルトエンコーディング (端末のローカルエンコーディング 日本のPCなら shift_jis) だが、
@@ -68,36 +66,37 @@ namespace MatroskaBatchToolBox
                             return;
                         if (string.IsNullOrEmpty(text))
                             return;
-                        if (audioEncoder == AudioEncoderType.Libopus && _libopusNotAvailableOnFFmpegNormalizeInLogs.IsMatch(text))
+                        if (audioEncoder == AudioEncoderType.Libopus && _libopusNotAvailableOnFfmpegNormalizeInLogs.IsMatch(text))
                         {
                             // libopus が一部のチャネルレイアウトをサポートしていないために発生する
                             isNotAvailableCodec = true;
                             return;
                         }
+
                         var match = _ffmpegNormalizeProgressPattern.Match(text);
                         if (!match.Success)
                         {
                             // 進行状況などで頻出して、かつトラブル分析用としては重要ではない項目はログに記録しない。
-                            if (!_logsToIgnoreInFFmpegNormalize.IsMatch(text))
+                            if (!_logsToIgnoreInFfmpegNormalize.IsMatch(text))
                                 Log(logFile, new[] { text });
                             return;
                         }
+
                         var phaseText = match.Groups["phase"].Value;
                         var percentageText = match.Groups["Percentage"].Value;
                         int phase;
                         switch (phaseText)
                         {
                             case "Stream":
-                                {
-                                    var currentStreamText = match.Groups["currentStream"].Value;
-                                    if (!int.TryParse(currentStreamText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int currentStream))
-                                        return;
-                                    var totalStreamText = match.Groups["totalStream"].Value;
-                                    if (!int.TryParse(totalStreamText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out totalStream))
-                                        return;
-                                    phase = currentStream - 1;
-                                }
-                                break;
+                            {
+                                if (!match.Groups["currentStream"].Value.TryParse(out int currentStream))
+                                    return;
+                                if (!match.Groups["totalStream"].Value.TryParse(out totalStream))
+                                    return;
+                                phase = currentStream - 1;
+                            }
+
+                            break;
                             case "Second Pass":
                                 phase = totalStream;
                                 break;
@@ -106,15 +105,14 @@ namespace MatroskaBatchToolBox
                             default:
                                 return; // NOP
                         }
-                        if (!int.TryParse(percentageText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int percentage))
+
+                        if (!percentageText.TryParse(out int percentage))
                             return;
 
                         // この時点で、 phase は完了しているフェーズの数、 totalStream + 1 は全フェーズの数、現在のフェーズの完了状況(%)は percentage
                         var progress = (phase + percentage / 100.0) / (totalStream + 1);
 #if DEBUG && false
-                        if (progress < 0)
-                            throw new Exception();
-                        if (progress > 1.0)
+                        if (progress.IsOutOfRange(0,  1))
                             throw new Exception();
 #endif
                         progressReporter.Report(progress);
@@ -132,8 +130,8 @@ namespace MatroskaBatchToolBox
                         //    環境変数 FFMPEG_PATH で与えられた ffmpeg を  優先的に実行するので、kill したとしても MatroskaBatchToolBox 以外の
                         //    実行中のプログラムに被害はないはず。
                         var targetProcesses =
-                            Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Settings.GlobalSettings.FFmpegCommandFile.Name))
-                            .Where(proc => string.Equals(proc?.MainModule?.FileName ?? "", Settings.GlobalSettings.FFmpegCommandFile.FullName, StringComparison.Ordinal))
+                            Process.GetProcessesByName(Path.GetFileNameWithoutExtension(Settings.GlobalSettings.FfmpegCommandFile.Name))
+                            .Where(proc => string.Equals(proc?.MainModule?.FileName ?? "", Settings.GlobalSettings.FfmpegCommandFile.FullName, StringComparison.OrdinalIgnoreCase))
                             .ToList();
 
                         // 列挙されたプロセスをすべて kill する。
@@ -155,15 +153,18 @@ namespace MatroskaBatchToolBox
                 Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg-normalize aborted at user request." });
                 return CommandResult.Cancelled;
             }
+
             Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg-normalize exited with exit code {exitCode}." });
             if (isNotAvailableCodec)
             {
                 Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: The specified movie's audio was not supported by libopus." });
                 return CommandResult.NotSupported;
             }
-            if (exitCode != 0)
-                throw new Exception($"Failed in ffmpeg-normalize. (exit code: {exitCode})");
-            return CommandResult.Completed;
+
+            return
+                exitCode == 0
+                ? CommandResult.Completed
+                : throw new Exception($"Failed in ffmpeg-normalize. (exit code: {exitCode})");
         }
 
         public static CommandResult ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieInformation movieInfo, string? resolutionSpec, string? aspectRatioSpec, VideoEncoderType videoEncoder, bool deleteMetadata, bool setDisposition, bool setMetadata, bool setChapterTitles, bool passthroughStreams, FileInfo outFile, IProgress<double> progressReporter)
@@ -295,11 +296,11 @@ namespace MatroskaBatchToolBox
                 }
 
                 // 呼び出し元から解像度指定が与えられていて、かつ元動画のビデオストリームの中に与えられた解像度指定と異なるものがある場合に、ffmpeg に解像度指定を与える。
-                if (!passthroughStreams && resolutionSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.Resolution, resolutionSpec, StringComparison.Ordinal)))
+                if (!passthroughStreams && resolutionSpec is not null && !outputVideoStreams.All(stream => stream.Resolution == resolutionSpec))
                     commandParameters.Add($"-s {resolutionSpec}");
 
                 // 呼び出し元からアスペクト比が与えられていて、かつ元動画のビデオストリームの中に与えられたアスペクト比と異なるものがある場合に、ffmpeg にアスペクト比を与える。
-                if (!passthroughStreams && aspectRatioSpec is not null && !outputVideoStreams.All(stream => string.Equals(stream.DisplayAspectRatio, aspectRatioSpec, StringComparison.Ordinal)))
+                if (!passthroughStreams && aspectRatioSpec is not null && !outputVideoStreams.All(stream => stream.DisplayAspectRatio == aspectRatioSpec))
                     commandParameters.Add($"-aspect {aspectRatioSpec}");
 
                 // クロッピング指定があればオプションに追加
@@ -356,16 +357,13 @@ namespace MatroskaBatchToolBox
                     commandParameters.Add("-map_chapters -1");
                 else if (setChapterTitles)
                     commandParameters.Add("-map_chapters 1");
-                else
-                {
-                    // NOP
-                }
+
                 if (deleteMetadata)
                     commandParameters.Add("-map_metadata -1");
                 if (!passthroughStreams && videoEncoder != VideoEncoderType.Copy)
                     commandParameters.Add("-g 240");
-                if (!passthroughStreams && !string.IsNullOrEmpty(localSettings.FFmpegOption))
-                    commandParameters.Add(localSettings.FFmpegOption);
+                if (!passthroughStreams && !string.IsNullOrEmpty(localSettings.FfmpegOption))
+                    commandParameters.Add(localSettings.FfmpegOption);
                 commandParameters.Add($"\"{outFile.FullName}\"");
 
                 var detectedToQuit = false;
@@ -373,24 +371,23 @@ namespace MatroskaBatchToolBox
                 var vmafScore = double.NaN; // この値は使用されない
                 var (cancelled, exitCode) =
                     Command.ExecuteCommand(
-                        Settings.GlobalSettings.FFmpegCommandFile,
+                        Settings.GlobalSettings.FfmpegCommandFile,
                         string.Join(" ", commandParameters),
                         Encoding.UTF8,
-                        (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScore, progressReporter),
+                        (type, text) => ProcessFfmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScore, progressReporter),
                         (level, message) => Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }),
-                        proc =>
-                        {
-                            proc.StandardInput.Write("q");
-                        });
+                        proc => proc.StandardInput.Write("q"));
                 if (detectedToQuit || cancelled)
                 {
                     Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
                     return CommandResult.Cancelled;
                 }
+
                 Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
-                if (exitCode != 0)
-                    throw new Exception($"ffmpeg failed. (exit code {exitCode})");
-                return CommandResult.Completed;
+                return
+                    exitCode == 0
+                    ? CommandResult.Completed
+                    : throw new Exception($"ffmpeg failed. (exit code {exitCode})");
             }
             finally
             {
@@ -405,7 +402,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static CommandResult CalculateVMAFScoreFromMovieFile(FileInfo logFile, FileInfo originalFile, FileInfo modifiedFile, string resolutionSpec, out double vmafScore, IProgress<double> progressReporter)
+        public static CommandResult CalculateVmafScoreFromMovieFile(FileInfo logFile, FileInfo originalFile, FileInfo modifiedFile, string resolutionSpec, out double vmafScore, IProgress<double> progressReporter)
         {
             var commandParameter = new StringBuilder();
             commandParameter.Append("-hide_banner");
@@ -424,21 +421,19 @@ namespace MatroskaBatchToolBox
             var vmafScoreValue = double.NaN;
             var (cancelled, exitCode) =
                 Command.ExecuteCommand(
-                    Settings.GlobalSettings.FFmpegCommandFile,
+                    Settings.GlobalSettings.FfmpegCommandFile,
                     commandParameter.ToString(),
                     Encoding.UTF8,
-                    (type, text) => ProcessFFmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScoreValue, progressReporter),
+                    (type, text) => ProcessFfmpegOutput(logFile, text, ref detectedToQuit, ref maximumDurationSeconds, ref vmafScoreValue, progressReporter),
                     (level, message) => Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }),
-                    proc =>
-                    {
-                        proc.StandardInput.Write("q");
-                    });
+                    proc => proc.StandardInput.Write("q"));
             if (detectedToQuit || cancelled)
             {
                 Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
                 vmafScore = double.NaN;
                 return CommandResult.Cancelled;
             }
+
             Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
             if (exitCode != 0)
                 throw new Exception($"ffmpeg failed. (exit code {exitCode})");
@@ -482,6 +477,7 @@ namespace MatroskaBatchToolBox
                 Console.WriteLine(innerEx.Message);
                 Console.WriteLine(innerEx.StackTrace ?? "");
             }
+
             Console.WriteLine("----------");
         }
 
@@ -493,13 +489,14 @@ namespace MatroskaBatchToolBox
             Log(logFile, new[] { "----------" });
         }
 
-        private static void ProcessFFmpegOutput(FileInfo logFile, string lineText, ref bool detectedToQuit, ref double maximumDurationSeconds, ref double vmafCalculationResult, IProgress<double> progressReporter)
+        private static void ProcessFfmpegOutput(FileInfo logFile, string lineText, ref bool detectedToQuit, ref double maximumDurationSeconds, ref double vmafCalculationResult, IProgress<double> progressReporter)
         {
-            if (string.Equals(lineText, "[q] command received. Exiting.", StringComparison.InvariantCulture))
+            if (lineText == "[q] command received. Exiting.")
             {
                 detectedToQuit = true;
                 return;
             }
+
             if (!lineText.StartsWith("frame=", StringComparison.InvariantCulture))
             {
                 Log(logFile, new[] { lineText });
@@ -507,17 +504,7 @@ namespace MatroskaBatchToolBox
                 var durationMatch = _ffmpegConversionDurationPattern.Match(lineText);
                 if (durationMatch.Success)
                 {
-
-                    if (!int.TryParse(durationMatch.Groups["hours"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int hours) ||
-                        !int.TryParse(durationMatch.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int minutes) ||
-                        !double.TryParse(durationMatch.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double seconds))
-                    {
-                        // Ignore unknown format
-                        return;
-                    }
-
-                    // If the duration is parsed successfully and is greater than the maximumDurationSeconds, replace the maximumDurationSeconds.
-                    var duration = hours * 3600 + minutes * 60 + seconds;
+                    var duration = durationMatch.Groups["time"].Value.ParseAsTimeSpan(false).TotalSeconds;
                     if (double.IsNaN(maximumDurationSeconds) || duration > maximumDurationSeconds)
                         maximumDurationSeconds = duration;
 
@@ -525,12 +512,11 @@ namespace MatroskaBatchToolBox
                 }
                 else
                 {
-                    var vmafSoreMatch = _ffmpegVMAFScoreCalculationResultPattern.Match(lineText);
+                    var vmafSoreMatch = _ffmpegVmafScoreCalculationResultPattern.Match(lineText);
                     if (vmafSoreMatch.Success)
                     {
-                        var vmafScoreValueText = vmafSoreMatch.Groups["vmafScoreValue"].Value;
-                        if (double.TryParse(vmafScoreValueText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double vmafScoreValue) &&
-                            vmafScoreValue >= 0.0 && vmafScoreValue <= 100.0)
+                        if (vmafSoreMatch.Groups["vmafScoreValue"].Value.TryParse(out double vmafScoreValue) &&
+                            vmafScoreValue.IsInRange(0.0, 100.0))
                         {
                             vmafCalculationResult = vmafScoreValue;
                         }
@@ -562,17 +548,7 @@ namespace MatroskaBatchToolBox
                     return;
                 }
 
-                if (!int.TryParse(match.Groups["hours"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int hours) ||
-                    !int.TryParse(match.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int minutes) ||
-                    !double.TryParse(match.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double seconds))
-                {
-                    // Ignore unknown format
-                    return;
-                }
-
-                var timeSeconds = hours * 3600 + minutes * 60 + seconds;
-
-                var progress = timeSeconds / maximumDurationSeconds;
+                var progress = match.Groups["time"].Value.ParseAsTimeSpan(false).TotalSeconds / maximumDurationSeconds;
                 if (progress < 0)
                     progress = 0;
                 if (progress > 1)
@@ -586,7 +562,7 @@ namespace MatroskaBatchToolBox
         private static string CreateTemporaryMetadataFile(MovieInformation movieInfo, Settings localSettings, FileInfo logFile)
         {
             var startTime = localSettings.Trimming.StartTime ?? TimeSpan.Zero;
-            var endTime = localSettings.Trimming.EndTime ?? ChapterInfo.DefaultMaximumDuration;
+            var endTime = localSettings.Trimming.EndTime ?? Utility.SimpleChapterElement.DefaultMaximumDuration;
             var chapterFilterParameter = new ChapterFilterParameter
             {
                 From = startTime,

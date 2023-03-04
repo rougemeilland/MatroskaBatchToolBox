@@ -4,13 +4,6 @@ namespace Utility.Models.Json
 {
     public class MovieStreamDispositionContainer
     {
-        public MovieStreamDispositionContainer()
-        {
-            Default = 0;
-            Forced = 0;
-            AttachedPicture = 0;
-        }
-
         [JsonPropertyName("default")]
         public int Default { get; set; }
 

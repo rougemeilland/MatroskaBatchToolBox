@@ -7,12 +7,12 @@ namespace Utility.Models.Json
         public MovieChapterContainer()
         {
             TimeBase = "";
-            Start = 0;
             StartTime = "";
-            End = 0;
             EndTime = "";
-            Tags = null;
         }
+
+        [JsonPropertyName("id")]
+        public int Id { get; set; }
 
         [JsonPropertyName("time_base")]
         public string TimeBase { get; set; } // 1/1000000000 などの文字列
@@ -30,6 +30,7 @@ namespace Utility.Models.Json
         public string EndTime { get; set; } // 秒単位の文字列
 
         [JsonPropertyName("tags")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public MovieChapterTagContainer? Tags { get; set; }
     }
 }

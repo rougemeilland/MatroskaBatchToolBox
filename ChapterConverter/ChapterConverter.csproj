@@ -32,4 +32,10 @@
     <ProjectReference Include="..\Utility\Utility.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="ffprobe.exe">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

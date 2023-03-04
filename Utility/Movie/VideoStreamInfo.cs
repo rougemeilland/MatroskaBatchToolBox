@@ -1,7 +1,7 @@
-﻿using Utility.Models.Json;
-using System;
+﻿using System;
+using Utility.Models.Json;
 
-namespace Utility
+namespace Utility.Movie
 {
     public class VideoStreamInfo
         : StreamInfo
@@ -22,8 +22,7 @@ namespace Utility
             DisplayAspectRatio = stream.DisplayAspectRatio;
             Resolution = $"{Width}x{Height}";
             IsImageVideoStream =
-                string.Equals(stream.CodecName, _mpngVideoStreamName, StringComparison. Ordinal) ||
-                string.Equals(stream.CodecName, _mjpegVideoStreamName, StringComparison.Ordinal) ||
+                stream.CodecName is not null && stream.CodecName.IsAnyOf(_mpngVideoStreamName, _mjpegVideoStreamName) ||
                 Disposition.AttachedPicture;
         }
 

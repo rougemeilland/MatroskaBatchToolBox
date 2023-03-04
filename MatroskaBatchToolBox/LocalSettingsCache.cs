@@ -8,9 +8,7 @@ namespace MatroskaBatchToolBox
         private readonly IDictionary<string, Settings> _cache;
 
         public LocalSettingsCache()
-        {
-            _cache = new Dictionary<string, Settings>();
-        }
+            => _cache = new Dictionary<string, Settings>();
 
         public Settings this[DirectoryInfo? sourceFileDirectory]
         {

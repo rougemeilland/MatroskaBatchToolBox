@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Utility;
+using Utility.Movie;
 
 namespace ChapterConverter
 {
@@ -22,11 +22,15 @@ namespace ChapterConverter
         private enum ChapterFormat
         {
             NotSpecified,
-            CSV,
-            FFMetadata,
-            FFLog,
+            Csv,
+            Ffmetadata,
+            Fflog,
             ChapterList,
             Immediate,
+            FfprobeCsv,
+            FfprobeFlat,
+            FfprobeJson,
+            Movie,
         }
 
         private class CommandLineOptions
@@ -40,9 +44,9 @@ namespace ChapterConverter
                 OutputFilePath = null;
                 Force = false;
                 From = TimeSpan.Zero;
-                To = ChapterInfo.DefaultMaximumDuration;
+                To = SimpleChapterElement.DefaultMaximumDuration;
                 Titles = new Dictionary<int, string>();
-                MaximumDuration = ChapterInfo.DefaultMinimumDuration;
+                MaximumDuration = SimpleChapterElement.DefaultMinimumDuration;
                 KeepEmptyChapter = false;
             }
 
@@ -60,11 +64,15 @@ namespace ChapterConverter
             public bool KeepEmptyChapter { get; set; }
         }
 
-        private const string _fileFormat_CSV = "csv";
-        private const string _fileFormat_FFMetadata = "ffmetadata";
-        private const string _fileFormat_FFLog = "fflog";
-        private const string _fileFormat_ChapterList = "chapter_list";
-        private const string _fileFormat_Immediate = "immediate";
+        private const string _fileFormatCsv = "csv";
+        private const string _fileFormatFfmetadata = "ffmetadata";
+        private const string _fileFormatFfllog = "fflog";
+        private const string _fileFormatChapterList = "chapter_list";
+        private const string _fileFormatImmediate = "immediate";
+        private const string _fileFormatFfprobeCsv = "ffprobe_csv";
+        private const string _fileFormatFfprobeFlat = "ffprobe_flat";
+        private const string _fileFormatFfprobeJson = "ffprobe_json";
+        private const string _fileFormatMovie = "movie";
         private static readonly object _consoleLockObject;
         private static readonly string _thisProgramName;
         private static readonly Regex _titleOptionPattern;
@@ -87,9 +95,19 @@ namespace ChapterConverter
             else if (options.ActionMode == ActionMode.Convert)
             {
                 if (ConvertAction(options))
+                {
+#if DEBUG
+                    System.Diagnostics.Debug.WriteLine("OK");
+#endif
                     return 0;
+                }
                 else
+                {
+#if DEBUG
+                    System.Diagnostics.Debug.WriteLine("NG");
+#endif
                     return 1;
+                }
             }
             else
             {
@@ -103,6 +121,8 @@ namespace ChapterConverter
             var helpMessageTextLines = new[]
             {
                 $"Usage: {_thisProgramName} <option1> <option2> ... <optionN>",
+                $"",
+                $"  * You can specify the options in any order. However, the \"-help\" option cannot be specified together with other options.",
                 $"",
                 $"  [Options]",
                 $"    -help",
@@ -152,7 +172,7 @@ namespace ChapterConverter
                 $"      * Don't forget to enclose the title in double quotes if the chapter title contains spaces.",
                 $"",
                 $"    --keep_empty_chapter",
-                $"      Causes zero-length chapters to be output as-is.",
+                $"      (Optional) Causes zero-length chapters to be output as-is.",
                 $"      By default chapconv automatically removes zero length chapters.",
                 $"",
                 $"    --maximum_duration <duratuon time>",
@@ -184,12 +204,12 @@ namespace ChapterConverter
                 $"        If you want to suppress these operations, specify the \"--minimum_duration 0\" option.",
                 $"",
                 $"  [File formats]",
-                $"    {_fileFormat_FFMetadata}:",
+                $"    {_fileFormatFfmetadata}:",
                 $"      Same format as ffmpeg metadata.",
                 $"      An encoder must also be specified if this format is used in the output.",
                 $"        Example: --ffencoder \"Lavf59.27.100\"",
                 $"",
-                $"    {_fileFormat_FFLog}:",
+                $"    {_fileFormatFfllog}:",
                 $"      This is the format displayed in the execution log of ffmpeg/ffprobe.",
                 $"      For example:",
                 $"",
@@ -207,7 +227,7 @@ namespace ChapterConverter
                 $"        And reading ends when data other than chapters is found.",
                 $"      * This format can only be specified on input.",
                 $"",
-                $"    {_fileFormat_ChapterList}:",
+                $"    {_fileFormatChapterList}:",
                 $"      Text in the following format:",
                 $"",
                 $"        CHAPTER000=00:00:00.000",
@@ -223,17 +243,16 @@ namespace ChapterConverter
                 $"        You can also use fractions for seconds.",
                 $"        Note that <hour> and <minute> cannot be omitted.",
                 $"",
-                $"    {_fileFormat_CSV}:",
-                $"      CSV format. The delimiter is TAB, the first column of each line represents the chapter start time, and the second column represents the chapter name.",
-                $"",
-                $"        <start-time><TAB><chapter-name>",
+                $"    {_fileFormatCsv}:",
+                $"      It's a very simple CSV format.",
+                $"      Each line contains information for one chapter.",
+                $"      Each row consists of two columns, each separated by a TAB code.",
+                $"      The first column represents the chapter start time and the second column represents the chapter title.",
                 $"",
                 $"      * Character encoding is UTF-8.",
-                $"      * Do not enclose each column in quotation marks.",
                 $"      * The start time can be expressed in hour-minute-second format (eg 00:23:15.952) or seconds format (eg 1823.555).",
-                $"      * Chapter names cannot contain TAB codes.",
                 $"",
-                $"    {_fileFormat_Immediate}:",
+                $"    {_fileFormatImmediate}:",
                 $"      This is the format for specifying the chapter start time directly with a command parameter.",
                 $"      This format can only be specified as an input format.",
                 $"      When specifying this format, the \"-i\" or \"--input\" option must specify a comma-separated list of chapter start times instead of input file pathnames.",
@@ -247,6 +266,23 @@ namespace ChapterConverter
                 $"          -if immediate -i 0,+0:01:41.835,+0:01:49.309,+0:01:44.971",
                 $"",
                 $"      * Chapter titles cannot be specified in the \"immediate\" format. To specify the chapter title, add the \"-tt\" option or \"--title\" option.",
+                $"",
+                $"    {_fileFormatFfprobeCsv}:",
+                $"      This format is equivalent to the data obtained by specifying the \"-print_format csv\" option to the \"ffprobe\" command.",
+                $"",
+                $"    {_fileFormatFfprobeFlat}:",
+                $"      This format is equivalent to the data obtained by specifying the \"-print_format flat\" option to the \"ffprobe\" command.",
+                $"",
+                $"    {_fileFormatFfprobeJson}:",
+                $"      This format is equivalent to the data obtained by specifying the \"-print_format json\" option to the \"ffprobe\" command.",
+                $"",
+                $"    {_fileFormatMovie}:",
+                $"      This format means that the data is a movie file.",
+                $"      This format can only be specified on input.",
+                $"      If you specify this format, you must specify the path name of the movie file in the \"-i\" option or \"-input\" option.",
+                $"",
+                $"      * The specified video file path name extension must be appropriate for the type of movie file.",
+                $"          For example: extensions such as \".mp4\" and \".mkv\" are allowed, but extensions such as \".tmp\" are not.",
                 $"",
             };
             foreach (var message in helpMessageTextLines)
@@ -264,11 +300,15 @@ namespace ChapterConverter
             var inputChapterFormatter =
                 options.InputFormat switch
                 {
-                    ChapterFormat.CSV => new CSVChapterFormatter(formatterParameter),
-                    ChapterFormat.FFMetadata => new FFMetadataChapterFormatter(formatterParameter),
-                    ChapterFormat.FFLog => new FFLogChapterFormatter(formatterParameter),
+                    ChapterFormat.Csv => new CsvChapterFormatter(formatterParameter),
+                    ChapterFormat.Ffmetadata => new FfmetadataChapterFormatter(formatterParameter),
+                    ChapterFormat.Fflog => new FflogChapterFormatter(formatterParameter),
                     ChapterFormat.ChapterList => new ChapterListChapterFormatter(formatterParameter),
                     ChapterFormat.Immediate => new ImmediateChapterFormatter(formatterParameter),
+                    ChapterFormat.FfprobeCsv => new FfprobeCsvChapterFormatter(formatterParameter),
+                    ChapterFormat.FfprobeFlat => new FfprobeFlatChapterFormatter(formatterParameter),
+                    ChapterFormat.FfprobeJson => new FfprobeJsonChapterFormatter(formatterParameter),
+                    ChapterFormat.Movie => new MovieChapterFormatter(formatterParameter),
                     _ => (IChapterFormatter?)null,
                 };
             if (inputChapterFormatter is null)
@@ -281,16 +321,19 @@ namespace ChapterConverter
             if (chapters is null)
                 return false;
 
-            IEnumerable<ChapterInfo>? updatedChapters = ChapterFilter(chapters, options);
+            var updatedChapters = ChapterFilter(chapters, options);
             if (updatedChapters is null)
                 return false;
 
             var outputChapterFormatter =
                 options.OutputFormat switch
                 {
-                    ChapterFormat.CSV => new CSVChapterFormatter(formatterParameter),
-                    ChapterFormat.FFMetadata => new FFMetadataChapterFormatter(formatterParameter),
+                    ChapterFormat.Csv => new CsvChapterFormatter(formatterParameter),
+                    ChapterFormat.Ffmetadata => new FfmetadataChapterFormatter(formatterParameter),
                     ChapterFormat.ChapterList => new ChapterListChapterFormatter(formatterParameter),
+                    ChapterFormat.FfprobeCsv => new FfprobeCsvChapterFormatter(formatterParameter),
+                    ChapterFormat.FfprobeFlat => new FfprobeFlatChapterFormatter(formatterParameter),
+                    ChapterFormat.FfprobeJson => new FfprobeJsonChapterFormatter(formatterParameter),
                     _ => (IChapterFormatter?)null,
                 };
             if (outputChapterFormatter is null)
@@ -300,16 +343,12 @@ namespace ChapterConverter
             }
 
             var outputRawText = RenderChapters(outputChapterFormatter, updatedChapters);
-            if (outputRawText is null)
-                return false;
-
-            if (!WriteRawText(options.OutputFilePath, outputRawText, options.Force))
-                return false;
-
-            return true;
+            return
+                outputRawText is not null &&
+                WriteRawText(options.OutputFilePath, outputRawText, options.Force);
         }
 
-        private static IEnumerable<ChapterInfo>? ChapterFilter(IEnumerable<ChapterInfo> chapters, CommandLineOptions options)
+        private static IEnumerable<SimpleChapterElement>? ChapterFilter(IEnumerable<SimpleChapterElement> chapters, CommandLineOptions options)
         {
             try
             {
@@ -322,6 +361,7 @@ namespace ChapterConverter
                             Titles = options.Titles,
                             MinimumDuration = options.MinimumDuration,
                             KeepEmptyChapter = options.KeepEmptyChapter,
+                            WarningMessageReporter = PrintWarningMessage,
                         });
             }
             catch (Exception ex)
@@ -335,11 +375,12 @@ namespace ChapterConverter
         {
             try
             {
-                if (inputFormat == ChapterFormat.Immediate)
+                if (inputFormat is ChapterFormat.Immediate or ChapterFormat.Movie)
                 {
-                    if (inputFilePath is null)
-                        throw new Exception("internal error (inputFormat == ChapterFormat.Immediate && inputFilePath is null)");
-                    return inputFilePath;
+                    return
+                        inputFilePath is not null
+                        ? inputFilePath
+                        : throw new Exception("internal error ((inputFormat == ChapterFormat.Immediate || inputFormat == ChapterFormat.Movie) && inputFilePath is null)");
                 }
                 else
                 {
@@ -376,7 +417,7 @@ namespace ChapterConverter
             }
         }
 
-        private static IEnumerable<ChapterInfo>? ParseChapters(IChapterFormatter inputChapterFormatter, string inputRawText)
+        private static IEnumerable<SimpleChapterElement>? ParseChapters(IChapterFormatter inputChapterFormatter, string inputRawText)
         {
             try
             {
@@ -384,12 +425,13 @@ namespace ChapterConverter
             }
             catch (Exception ex)
             {
-                PrintErrorMessage(ex.Message);
+                for (var exception = ex; exception is not null; exception = exception.InnerException)
+                    PrintErrorMessage(exception.Message);
                 return null;
             }
         }
 
-        private static string? RenderChapters(IChapterFormatter outputChapterFormatter, IEnumerable<ChapterInfo> chapters)
+        private static string? RenderChapters(IChapterFormatter outputChapterFormatter, IEnumerable<SimpleChapterElement> chapters)
         {
             try
             {
@@ -397,7 +439,8 @@ namespace ChapterConverter
             }
             catch (Exception ex)
             {
-                PrintErrorMessage(ex.Message);
+                for (var exception = ex; exception is not null; exception = exception.InnerException)
+                    PrintErrorMessage(exception.Message);
                 return null;
             }
         }
@@ -428,11 +471,13 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (actionMode == ActionMode.Convert)
                         {
                             PrintErrorMessage("The '-help' option must be specified alone.");
                             return defaultReturnValue;
                         }
+
                         actionMode = ActionMode.Help;
                         break;
                     case "-if":
@@ -442,38 +487,44 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (inputFormat != ChapterFormat.NotSpecified)
                         {
                             PrintErrorMessage("The \"-if\" option or \"--input_format\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (index + 1 >= args.Length)
                         {
                             PrintErrorMessage("The value of the \"-if\" option or \"--input_format\" option is not specified.");
                             return defaultReturnValue;
                         }
+
                         ++index;
-                        switch (args[index])
                         {
-                            case _fileFormat_ChapterList:
-                                inputFormat = ChapterFormat.ChapterList;
-                                break;
-                            case _fileFormat_CSV:
-                                inputFormat = ChapterFormat.CSV;
-                                break;
-                            case _fileFormat_FFLog:
-                                inputFormat = ChapterFormat.FFLog;
-                                break;
-                            case _fileFormat_FFMetadata:
-                                inputFormat = ChapterFormat.FFMetadata;
-                                break;
-                            case _fileFormat_Immediate:
-                                inputFormat = ChapterFormat.Immediate;
-                                break;
-                            default:
+                            var optionValue =
+                                args[index] switch
+                                {
+                                    _fileFormatChapterList => ChapterFormat.ChapterList,
+                                    _fileFormatCsv => ChapterFormat.Csv,
+                                    _fileFormatFfllog => ChapterFormat.Fflog,
+                                    _fileFormatFfmetadata => ChapterFormat.Ffmetadata,
+                                    _fileFormatImmediate => ChapterFormat.Immediate,
+                                    _fileFormatFfprobeCsv => ChapterFormat.FfprobeCsv,
+                                    _fileFormatFfprobeFlat => ChapterFormat.FfprobeFlat,
+                                    _fileFormatFfprobeJson => ChapterFormat.FfprobeJson,
+                                    _fileFormatMovie => ChapterFormat.Movie,
+                                    _ => ChapterFormat.NotSpecified,
+                                };
+                            if (optionValue == ChapterFormat.NotSpecified)
+                            {
                                 PrintErrorMessage($"The value of the \"-if\" option or \"--input_format\" option is an unsupported value.: \"{args[index]}\"");
                                 return defaultReturnValue;
+                            }
+
+                            inputFormat = optionValue;
                         }
+
                         actionMode = ActionMode.Convert;
                         break;
                     case "-i":
@@ -483,16 +534,19 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (inputFilePath is not null)
                         {
                             PrintErrorMessage("The \"-i\" option or \"--input\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (index + 1 >= args.Length)
                         {
                             PrintErrorMessage("The value of the \"-i\" option or \"--input\" option is not specified.");
                             return defaultReturnValue;
                         }
+
                         ++index;
                         inputFilePath = args[index];
                         actionMode = ActionMode.Convert;
@@ -504,35 +558,42 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (outputFormat != ChapterFormat.NotSpecified)
                         {
                             PrintErrorMessage("The \"-of\" option or \"--output_format\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (index + 1 >= args.Length)
                         {
                             PrintErrorMessage("The value of the \"-if\" option or \"--input_format\" option is not specified.");
                             return defaultReturnValue;
                         }
+
                         ++index;
-                        switch (args[index])
                         {
-                            case _fileFormat_ChapterList:
-                                outputFormat = ChapterFormat.ChapterList;
-                                break;
-                            case _fileFormat_CSV:
-                                outputFormat = ChapterFormat.CSV;
-                                break;
-                            case _fileFormat_FFLog:
-                                outputFormat = ChapterFormat.FFLog;
-                                break;
-                            case _fileFormat_FFMetadata:
-                                outputFormat = ChapterFormat.FFMetadata;
-                                break;
-                            default:
+                            var optionValue =
+                                args[index] switch
+                                {
+                                    _fileFormatChapterList => ChapterFormat.ChapterList,
+                                    _fileFormatCsv => ChapterFormat.Csv,
+                                    _fileFormatFfllog => ChapterFormat.Fflog,
+                                    _fileFormatFfmetadata => ChapterFormat.Ffmetadata,
+                                    _fileFormatFfprobeCsv => ChapterFormat.FfprobeCsv,
+                                    _fileFormatFfprobeFlat => ChapterFormat.FfprobeFlat,
+                                    _fileFormatFfprobeJson => ChapterFormat.FfprobeJson,
+                                    _ => ChapterFormat.NotSpecified,
+                                };
+                            if (optionValue == ChapterFormat.NotSpecified)
+                            {
                                 PrintErrorMessage($"The value of the \"-of\" option or \"--output_format\" option is an unsupported value.: \"{args[index]}\"");
                                 return defaultReturnValue;
+                            }
+
+                            outputFormat = optionValue;
                         }
+
                         actionMode = ActionMode.Convert;
                         break;
                     case "-o":
@@ -542,16 +603,19 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (outputFilePath is not null)
                         {
                             PrintErrorMessage("The \"-o\" option or \"--output\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (index + 1 >= args.Length)
                         {
                             PrintErrorMessage("The value of the \"-o\" option or \"--output\" option is not specified.");
                             return defaultReturnValue;
                         }
+
                         ++index;
                         outputFilePath = args[index];
                         actionMode = ActionMode.Convert;
@@ -563,11 +627,13 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (force is not null)
                         {
                             PrintErrorMessage("The \"-f\" option or \"--force\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         force = true;
                         actionMode = ActionMode.Convert;
                         break;
@@ -577,26 +643,30 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (maximumDuration is not null)
                         {
                             PrintErrorMessage("The \"--maximum_duration\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (index + 1 >= args.Length)
                         {
                             PrintErrorMessage("The value of the \"--maximum_duration\" option is not specified.");
                             return defaultReturnValue;
                         }
+
                         ++index;
                         {
-                            var maximumDurationValue = Time.ParseTime(args[index], false);
-                            if (maximumDurationValue is null)
+                            if (!args[index].TryParse(false, out TimeSpan maximumDurationValue))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--maximum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
+
                             maximumDuration = maximumDurationValue;
                         }
+
                         actionMode = ActionMode.Convert;
                         break;
                     case "-ss":
@@ -605,26 +675,30 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (from is not null)
                         {
                             PrintErrorMessage("The \"-ss\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (index + 1 >= args.Length)
                         {
                             PrintErrorMessage("The value of the \"-ss\" option is not specified.");
                             return defaultReturnValue;
                         }
+
                         ++index;
                         {
-                            var time = Time.ParseTime(args[index], false);
-                            if (time is null)
+                            if (!args[index].TryParse(false, out TimeSpan time))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--ss\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
+
                             from = time;
                         }
+
                         actionMode = ActionMode.Convert;
                         break;
                     case "-to":
@@ -633,26 +707,30 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (to is not null)
                         {
                             PrintErrorMessage("The \"-to\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (index + 1 >= args.Length)
                         {
                             PrintErrorMessage("The value of the \"-to\" option is not specified.");
                             return defaultReturnValue;
                         }
+
                         ++index;
                         {
-                            var time = Time.ParseTime(args[index], false);
-                            if (time is null)
+                            if (!args[index].TryParse(false, out TimeSpan time))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
+
                             to = time;
                         }
+
                         actionMode = ActionMode.Convert;
                         break;
                     case "-t":
@@ -661,26 +739,30 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (t is not null)
                         {
                             PrintErrorMessage("The \"-to\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (index + 1 >= args.Length)
                         {
                             PrintErrorMessage("The value of the \"-to\" option is not specified.");
                             return defaultReturnValue;
                         }
+
                         ++index;
                         {
-                            var time = Time.ParseTime(args[index], false);
-                            if (time is null)
+                            if (!args[index].TryParse(false, out TimeSpan time))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
+
                             t = time;
                         }
+
                         actionMode = ActionMode.Convert;
                         break;
                     case "--minimum_duration":
@@ -689,26 +771,30 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (maximumDuration is not null)
                         {
                             PrintErrorMessage("The \"--minimum_duration\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (index + 1 >= args.Length)
                         {
                             PrintErrorMessage("The value of the \"--minimum_duration\" option is not specified.");
                             return defaultReturnValue;
                         }
+
                         ++index;
                         {
-                            var minimumDurationValue = Time.ParseTime(args[index], false);
-                            if (minimumDurationValue is null)
+                            if (!args[index].TryParse(false, out TimeSpan minimumDurationValue))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--minimum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
+
                             minimumDuration = minimumDurationValue;
                         }
+
                         actionMode = ActionMode.Convert;
                         break;
                     case "--keep_empty_chapter":
@@ -717,49 +803,56 @@ namespace ChapterConverter
                             PrintErrorMessage("The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         if (keepEmptyChapter is not null)
                         {
                             PrintErrorMessage("The \"--keep_empty_chapter\" option is specified more than once.");
                             return defaultReturnValue;
                         }
+
                         keepEmptyChapter = true;
                         actionMode = ActionMode.Convert;
                         break;
                     default:
+                    {
+                        var match = _titleOptionPattern.Match(args[index]);
+                        if (match.Success)
                         {
-                            var match = _titleOptionPattern.Match(args[index]);
-                            if (match.Success)
+                            if (actionMode == ActionMode.Help)
                             {
-                                if (actionMode == ActionMode.Help)
-                                {
-                                    PrintErrorMessage("The '-help' option is specified more than once.");
-                                    return defaultReturnValue;
-                                }
-                                var chapterNumber = int.Parse(match.Groups["chapterNumber"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-                                if (index + 1 >= args.Length)
-                                {
-                                    PrintErrorMessage($"The value of the \"-tt:{chapterNumber}\" option or \"--title\" option is not specified.");
-                                    return defaultReturnValue;
-                                }
-                                ++index;
-                                var chapterName = args[index];
-                                if (titles.ContainsKey(chapterNumber))
-                                {
-                                    PrintErrorMessage($"The \"-tt:{chapterNumber}\" option or \"--title:{chapterNumber}\" option is specified more than once.");
-                                    return defaultReturnValue;
-                                }
-                                titles.Add(chapterNumber, chapterName);
-                            }
-                            else
-                            {
-                                PrintErrorMessage($"Incorrect option specified. : \"{args[index]}\"");
+                                PrintErrorMessage("The '-help' option is specified more than once.");
                                 return defaultReturnValue;
                             }
-                            actionMode = ActionMode.Convert;
-                            break;
+
+                            var chapterNumber = match.Groups["chapterNumber"].Value.ParseAsInt32();
+                            if (index + 1 >= args.Length)
+                            {
+                                PrintErrorMessage($"The value of the \"-tt:{chapterNumber}\" option or \"--title\" option is not specified.");
+                                return defaultReturnValue;
+                            }
+
+                            ++index;
+                            var chapterName = args[index];
+                            if (titles.ContainsKey(chapterNumber))
+                            {
+                                PrintErrorMessage($"The \"-tt:{chapterNumber}\" option or \"--title:{chapterNumber}\" option is specified more than once.");
+                                return defaultReturnValue;
+                            }
+
+                            titles.Add(chapterNumber, chapterName);
                         }
+                        else
+                        {
+                            PrintErrorMessage($"Incorrect option specified. : \"{args[index]}\"");
+                            return defaultReturnValue;
+                        }
+
+                        actionMode = ActionMode.Convert;
+                        break;
+                    }
                 }
             }
+
             if (actionMode == ActionMode.NotSpecified)
             {
                 PrintErrorMessage("No arguments specified.");
@@ -774,16 +867,18 @@ namespace ChapterConverter
                 PrintErrorMessage($"Input file format is not specified. Please specify the \"--input_format\" option.");
                 return defaultReturnValue;
             }
+
             if (outputFormat == ChapterFormat.NotSpecified)
             {
                 PrintErrorMessage($"Output file format is not specified. Please specify the \"--output_format\" option.");
                 return defaultReturnValue;
             }
-            if (inputFormat == ChapterFormat.Immediate)
+
+            if (inputFormat is ChapterFormat.Immediate or ChapterFormat.Movie)
             {
                 if (inputFilePath is null)
                 {
-                    PrintErrorMessage($"Neither the \"-i\" option nor the \"--input\" option is specified even though \"immediate\" is specified for the input format. Specify a list of chapter start times with the \"-i\" or \"--input\" option.");
+                    PrintErrorMessage($"Neither the \"-i\" option nor the \"--input\" option is specified even though \"{inputFormat switch { ChapterFormat.Immediate => _fileFormatImmediate, ChapterFormat.Movie => _fileFormatMovie, _ => "???", }}\" is specified for the input format. Specify a list of chapter start times with the \"-i\" or \"--input\" option.");
                     return defaultReturnValue;
                 }
             }
@@ -795,30 +890,34 @@ namespace ChapterConverter
                     return defaultReturnValue;
                 }
             }
+
             if (outputFilePath is not null && !(force ?? false) && File.Exists(outputFilePath))
             {
                 PrintErrorMessage($"Output file already exists. Specify the \"-f\" option or \"--force\" option to allow overwriting of the output file.: \"{outputFilePath}\"");
                 return defaultReturnValue;
             }
+
             if (to is not null && t is not null)
             {
                 PrintErrorMessage("\"-to\" option and \"-t\" option cannot be specified at once.");
                 return defaultReturnValue;
             }
 
-            var actualMaximumDuration = maximumDuration ?? ChapterInfo.DefaultMaximumDuration;
+            var actualMaximumDuration = maximumDuration ?? SimpleChapterElement.DefaultMaximumDuration;
             var actualFrom = from ?? TimeSpan.Zero;
             if (actualFrom >= actualMaximumDuration)
             {
                 PrintErrorMessage("The value of the \"-ss\" option is too large. Consider changing the value of the \"--maximum_duration\" option or \"-ss\" option.");
                 return defaultReturnValue;
             }
+
             var actualTo = t is not null ? (actualFrom + t.Value) : (to ?? actualMaximumDuration);
             if (actualTo <= actualFrom)
             {
                 PrintErrorMessage("The value of the \"-to\" option is smaller than the value of the \"-ss\" option. Consider changing the value of the \"-to\" option or \"-ss\" option.");
                 return defaultReturnValue;
             }
+
             if (actualTo > actualMaximumDuration)
                 actualTo = actualMaximumDuration;
             return
@@ -834,7 +933,7 @@ namespace ChapterConverter
                     From = actualFrom,
                     To = actualTo,
                     Titles = titles,
-                    MinimumDuration = minimumDuration ?? ChapterInfo.DefaultMinimumDuration,
+                    MinimumDuration = minimumDuration ?? SimpleChapterElement.DefaultMinimumDuration,
                     KeepEmptyChapter = keepEmptyChapter ?? false,
                 };
         }

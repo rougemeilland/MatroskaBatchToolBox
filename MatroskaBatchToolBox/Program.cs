@@ -1,11 +1,12 @@
-﻿using MatroskaBatchToolBox.Properties;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using MatroskaBatchToolBox.Properties;
+using Utility;
 
 namespace MatroskaBatchToolBox
 {
@@ -49,17 +50,19 @@ namespace MatroskaBatchToolBox
                 var actionMode = ActionMode.None;
                 foreach (var arg in args)
                 {
-                    if (string.Equals(arg, _optionStringNormalizeAudio, StringComparison.Ordinal))
+                    if (arg == _optionStringNormalizeAudio)
                     {
                         actionMode = ActionMode.NormalizeAudio;
                         break;
                     }
-                    if (string.Equals(arg, _optionStringResizeResolution, StringComparison.Ordinal))
+
+                    if (arg == _optionStringResizeResolution)
                     {
                         actionMode = ActionMode.ConvertVideo;
                         break;
                     }
                 }
+
                 if (actionMode == ActionMode.None)
                     actionMode = ActionMode.NormalizeAudio;
 
@@ -80,7 +83,7 @@ namespace MatroskaBatchToolBox
                     });
                 Console.WriteLine();
 
-                Task.Run(() =>
+                _ = Task.Run(() =>
                 {
                     while (true)
                     {
@@ -103,6 +106,7 @@ namespace MatroskaBatchToolBox
                                     Console.ForegroundColor = color;
                                 }
                             }
+
                             break;
                         }
                     }
@@ -143,7 +147,7 @@ namespace MatroskaBatchToolBox
                 Console.WriteLine();
                 Console.Beep();
                 Console.WriteLine(Resource.ProcessCompletedMessageText);
-                Console.ReadLine();
+                _ = Console.ReadLine();
 
                 void worker()
                 {
@@ -197,7 +201,7 @@ namespace MatroskaBatchToolBox
                 Console.WriteLine();
                 Console.Beep();
                 Console.WriteLine("Press ENTER key to exit.");
-                Console.ReadLine();
+                _ = Console.ReadLine();
             }
             catch (Exception ex)
             {
@@ -211,7 +215,7 @@ namespace MatroskaBatchToolBox
                 Console.WriteLine();
                 Console.Beep();
                 Console.WriteLine("Press ENTER key to exit.");
-                Console.ReadLine();
+                _ = Console.ReadLine();
             }
         }
 
@@ -228,7 +232,7 @@ namespace MatroskaBatchToolBox
             // 進捗の母数はソースファイルのサイズの合計で、単純変換は非常に高速に終了するため、その後のサイズ変換の進捗や終了予定時刻に非現実的な値が表示されやすい問題がある。
             // そのため、"--convert-video" モードでは「サイズ変更対象になりそうなソースファイル」と「単純変換対象になりそうなファイル」がそれぞれ大量に連続して処理されにくいように
             // 適当に処理順序を変えた sourceFileList を再作成する。
-            
+
             var sourceQueueWithSimpleConversion = new Queue<FileInfo>();
             var sourceQueueWithComplexConversion = new Queue<FileInfo>();
             foreach (var sourceFile in sourceFileList)
@@ -239,16 +243,18 @@ namespace MatroskaBatchToolBox
                 else
                     sourceQueueWithComplexConversion.Enqueue(sourceFile);
             }
+
             var totalCountOfSourceFilesWithSimpleConversion = sourceQueueWithSimpleConversion.Count;
             var totalCountOfSourceFilesWithComplexConversion = sourceQueueWithComplexConversion.Count;
             var modifiedSourceFileList = new List<FileInfo>();
             while (sourceQueueWithSimpleConversion.Count > 0 && sourceQueueWithComplexConversion.Count > 0)
             {
-                if (sourceQueueWithSimpleConversion.Count *  totalCountOfSourceFilesWithComplexConversion > sourceQueueWithComplexConversion.Count * totalCountOfSourceFilesWithSimpleConversion)
+                if (sourceQueueWithSimpleConversion.Count * totalCountOfSourceFilesWithComplexConversion > sourceQueueWithComplexConversion.Count * totalCountOfSourceFilesWithSimpleConversion)
                     modifiedSourceFileList.Add(sourceQueueWithSimpleConversion.Dequeue());
                 else
                     modifiedSourceFileList.Add(sourceQueueWithComplexConversion.Dequeue());
             }
+
             while (sourceQueueWithSimpleConversion.Count > 0)
                 modifiedSourceFileList.Add(sourceQueueWithSimpleConversion.Dequeue());
             while (sourceQueueWithComplexConversion.Count > 0)
@@ -288,6 +294,7 @@ namespace MatroskaBatchToolBox
                 {
                     file = null;
                 }
+
                 if (file is not null)
                     yield return file;
 
@@ -302,6 +309,7 @@ namespace MatroskaBatchToolBox
                 {
                     directoryInfo = null;
                 }
+
                 if (directoryInfo is not null)
                 {
                     foreach (var childFile in directoryInfo.EnumerateFiles("*.*", SearchOption.AllDirectories))
@@ -319,16 +327,8 @@ namespace MatroskaBatchToolBox
         }
 
         private static bool IsSourceFile(string sourceFilePath)
-        {
-            if ((Path.GetFileName(sourceFilePath) ?? ".").StartsWith(".", StringComparison.Ordinal))
-                return false;
-            var extension = Path.GetExtension(sourceFilePath).ToUpperInvariant();
-            return
-                string.Equals(extension, ".MKV", StringComparison.Ordinal) ||
-                string.Equals(extension, ".MP4", StringComparison.Ordinal) ||
-                string.Equals(extension, ".WMV", StringComparison.Ordinal) ||
-                string.Equals(extension, ".AVI", StringComparison.Ordinal);
-        }
+            => !(Path.GetFileName(sourceFilePath) ?? ".").StartsWith(".", StringComparison.Ordinal) &&
+                Path.GetExtension(sourceFilePath).ToUpperInvariant().IsAnyOf(".MKV", ".MP4", ".WMV", ".AVI");
 
         private static bool IsRequestedCancellation()
         {
@@ -352,13 +352,13 @@ namespace MatroskaBatchToolBox
                     return;
                 }
 
-                if (!string.Equals(progressText, _previousProgressText, StringComparison.InvariantCulture))
+                if (progressText != _previousProgressText)
                 {
                     Console.CursorVisible = false;
                     var (leftPos0, topPos0) = Console.GetCursorPosition();
                     Console.Write($"  {progressText}");
                     var (leftPos1, topPos1) = Console.GetCursorPosition();
-                    var currentProgressTextLength = (leftPos1 - leftPos0) + (topPos1 - topPos0) * Console.WindowWidth;
+                    var currentProgressTextLength = leftPos1 - leftPos0 + (topPos1 - topPos0) * Console.WindowWidth;
                     if (_previousProgressTextLengthOnConsole > currentProgressTextLength)
                         Console.Write(new string(' ', _previousProgressTextLengthOnConsole - currentProgressTextLength));
                     Console.SetCursorPosition(leftPos0, topPos0);

@@ -1,15 +1,13 @@
 ﻿using Utility.Models.Json;
 
-namespace Utility
+namespace Utility.Movie
 {
     public class SubtitleStreamInfo
         : StreamInfo
     {
         internal SubtitleStreamInfo(MovieStreamInfoContainer stream, int indexWithinSubtitleStream)
             : base(stream)
-        {
-            IndexWithinSubtitleStream = indexWithinSubtitleStream;
-        }
+            => IndexWithinSubtitleStream = indexWithinSubtitleStream;
 
         public int IndexWithinSubtitleStream { get; }
     }

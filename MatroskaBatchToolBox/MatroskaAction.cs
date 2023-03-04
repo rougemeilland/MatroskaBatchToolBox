@@ -1,9 +1,9 @@
 ﻿using System;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Utility;
+using Utility.Movie;
 
 namespace MatroskaBatchToolBox
 {
@@ -69,9 +69,8 @@ namespace MatroskaBatchToolBox
                         destinationFileEncodedByVorbis,
                     new Progress<double>(progress => progressReporter.Report((progress + 1) / 2)));
             }
-            if (audioCodecIsNotSupported)
-                return ActionResult.Failed;
-            return actionResult;
+
+            return !audioCodecIsNotSupported ? actionResult : ActionResult.Failed;
 
             static FileInfo MakeDestinationFilePath(FileInfo sourceFile, AudioEncoderType audioEncoder)
             {
@@ -99,17 +98,20 @@ namespace MatroskaBatchToolBox
                     // ファイル名に正規化されたマーク文字列があるので、何もせずに復帰する。
                     return (actionResult = ActionResult.Skipped, false);
                 }
+
                 if (destinationFile.Exists)
                 {
                     // 出力先ファイルが既に存在しているので、何もせず復帰する。
                     return (actionResult = ActionResult.Skipped, false);
                 }
+
                 if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
                 {
                     // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return (actionResult = ActionResult.Failed, false);
                 }
+
                 switch (ExternalCommand.NormalizeAudioFile(logFile, sourceFile, audioEncoder, workingFile, progressReporter))
                 {
                     case CommandResult.NotSupported:
@@ -120,6 +122,7 @@ namespace MatroskaBatchToolBox
                     default:
                         break;
                 }
+
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\".", });
                 return (actionResult = ActionResult.Success, false);
@@ -131,6 +134,7 @@ namespace MatroskaBatchToolBox
                     DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
+
                 ExternalCommand.ReportAggregateException(logFile, ex);
                 return (actionResult = ActionResult.Failed, false);
             }
@@ -141,6 +145,7 @@ namespace MatroskaBatchToolBox
                     DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
                 }
+
                 ExternalCommand.ReportException(logFile, ex);
                 return (actionResult = ActionResult.Failed, false);
             }
@@ -151,6 +156,7 @@ namespace MatroskaBatchToolBox
                     DeleteFileSafety(workingFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
                 }
+
                 switch (actionResult)
                 {
                     case ActionResult.Success:
@@ -226,16 +232,18 @@ namespace MatroskaBatchToolBox
             FileInfo? actualDestinationFilePath = null;
             try
             {
-                if (string.Equals(sourceFile.Name, destinationFile.Name, StringComparison.InvariantCultureIgnoreCase))
+                if (sourceFile.Name == destinationFile.Name)
                 {
                     // 出力ファイル名が入力ファイル名と同じなので、既に変換済みとみなして、何もせず復帰する。
                     return actionResult = ActionResult.Skipped;
                 }
+
                 if (destinationFile.Exists)
                 {
                     // 出力先ファイルが既に存在しているので、何もせず復帰する。
                     return actionResult = ActionResult.Skipped;
                 }
+
                 if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
                 {
                     // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
@@ -245,8 +253,9 @@ namespace MatroskaBatchToolBox
 
                 var (commandResult, movieInfo) =
                     Command.GetMovieInformation(
-                        localSettings.FFprobeCommandFile,
+                        localSettings.FfprobeCommandFile,
                         sourceFile,
+                        MovieInformationType.Streams | MovieInformationType.Chapters,
                         (level, message) =>
                             ExternalCommand.Log(
                                 logFile,
@@ -264,9 +273,7 @@ namespace MatroskaBatchToolBox
                 {
                     var invalidStreams =
                         movieInfo.VideoStreams
-                        .Where(stream =>
-                            !stream.IsImageVideoStream &&
-                            !string.Equals(stream.Resolution, resolutionSpec, StringComparison.Ordinal))
+                        .Where(stream => !stream.IsImageVideoStream && stream.Resolution != resolutionSpec)
                         .ToList();
                     if (invalidStreams.Any())
                     {
@@ -342,6 +349,7 @@ namespace MatroskaBatchToolBox
                     if (conversionResult == CommandResult.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                 }
+
                 actualDestinationFilePath = MoveToDestinationFile(workingFile1, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
                 return actionResult = ActionResult.Success;
@@ -353,6 +361,7 @@ namespace MatroskaBatchToolBox
                     DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
+
                 ExternalCommand.ReportAggregateException(logFile, ex);
                 return actionResult = ActionResult.Failed;
             }
@@ -363,6 +372,7 @@ namespace MatroskaBatchToolBox
                     DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
+
                 ExternalCommand.ReportException(logFile, ex);
                 return actionResult = ActionResult.Failed;
             }
@@ -373,11 +383,13 @@ namespace MatroskaBatchToolBox
                     DeleteFileSafety(workingFile1);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile1.FullName}\"", });
                 }
+
                 if (workingFile2.Exists)
                 {
                     DeleteFileSafety(workingFile2);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile2.FullName}\"", });
                 }
+
                 switch (actionResult)
                 {
                     case ActionResult.Success:
@@ -402,8 +414,8 @@ namespace MatroskaBatchToolBox
 
         private static ActionResult ChangeResolutionOfMovieFile(Settings localSettings, FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
-            var videoEncoder = localSettings.FFmpegVideoEncoder;
-            var calculateVMAFScore = localSettings.CalculateVMAFScore;
+            var videoEncoder = localSettings.FfmpegVideoEncoder;
+            var calculateVmafScore = localSettings.CalculateVmafScore;
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
             var (isParsedSuccessfully, resolutionSpec, aspectRatioSpec, aspectRatioSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
@@ -434,16 +446,19 @@ namespace MatroskaBatchToolBox
                     // ファイル名に既にエンコードされているマーク文字列があるので、何もせずに復帰する。
                     return actionResult = ActionResult.Skipped;
                 }
+
                 if (string.Equals(destinationFileName, sourceFile.Name, StringComparison.InvariantCultureIgnoreCase))
                 {
                     // 入力ファイルと出力ファイルのファイル名が一致しているので、何もせず復帰する。
                     return actionResult = ActionResult.Skipped;
                 }
+
                 if (destinationFile.Exists)
                 {
                     // 出力先ファイルが既に存在しているので、何もせず復帰する。
                     return actionResult = ActionResult.Skipped;
                 }
+
                 if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
                 {
                     // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
@@ -453,8 +468,9 @@ namespace MatroskaBatchToolBox
 
                 var (commandResult, movieInfo) =
                     Command.GetMovieInformation(
-                        localSettings.FFprobeCommandFile,
+                        localSettings.FfprobeCommandFile,
                         sourceFile,
+                        MovieInformationType.Streams | MovieInformationType.Chapters,
                         (level, message) =>
                             ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }));
                 if (commandResult == CommandResult.Cancelled)
@@ -468,7 +484,7 @@ namespace MatroskaBatchToolBox
 
                 if (CheckingForNeedToDoMultiStepConversion(localSettings, movieInfo))
                 {
-                    if (calculateVMAFScore)
+                    if (calculateVmafScore)
                     {
                         var stepWeight1 = 1.0;
                         var stepWeight2 = 0.1;
@@ -517,7 +533,7 @@ namespace MatroskaBatchToolBox
 
                         // 第3段階: VMAFスコアの計算 (progress の重みづけ: 1)
                         var commandResult3 =
-                            ExternalCommand.CalculateVMAFScoreFromMovieFile(
+                            ExternalCommand.CalculateVmafScoreFromMovieFile(
                                 logFile,
                                 sourceFile,
                                 workingFile1,
@@ -583,7 +599,7 @@ namespace MatroskaBatchToolBox
                     //   b) メタデータを削除する指定がされていない、または
                     //   c) チャプタータイトルを保持しない指定がされている、または
                     //   d) チャプタータイトルが元々全く存在しない。
-                    if (calculateVMAFScore)
+                    if (calculateVmafScore)
                     {
                         var stepWeight1 = 1.0;
                         var stepWeight2 = 1.0;
@@ -611,7 +627,7 @@ namespace MatroskaBatchToolBox
 
                         // 第2段階: VMAFスコアの計算 (progress の重みづけ: 1)
                         var commandResult2 =
-                            ExternalCommand.CalculateVMAFScoreFromMovieFile(
+                            ExternalCommand.CalculateVmafScoreFromMovieFile(
                                 logFile,
                                 sourceFile,
                                 workingFile1,
@@ -644,6 +660,7 @@ namespace MatroskaBatchToolBox
                             return actionResult = ActionResult.Cancelled;
                     }
                 }
+
                 actualDestinationFilePath = MoveToDestinationFile(workingFile1, destinationFile);
                 ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
                 return actionResult = ActionResult.Success;
@@ -655,6 +672,7 @@ namespace MatroskaBatchToolBox
                     DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
+
                 ExternalCommand.ReportAggregateException(logFile, ex);
                 return actionResult = ActionResult.Failed;
             }
@@ -665,6 +683,7 @@ namespace MatroskaBatchToolBox
                     DeleteFileSafety(destinationFile);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
                 }
+
                 ExternalCommand.ReportException(logFile, ex);
                 return actionResult = ActionResult.Failed;
             }
@@ -675,11 +694,13 @@ namespace MatroskaBatchToolBox
                     DeleteFileSafety(workingFile1);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile1.FullName}\"", });
                 }
+
                 if (workingFile2.Exists)
                 {
                     DeleteFileSafety(workingFile2);
                     ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile2.FullName}\"", });
                 }
+
                 switch (actionResult)
                 {
                     case ActionResult.Success:
@@ -725,8 +746,8 @@ namespace MatroskaBatchToolBox
 
             // 解像度指定がある場合
 
-            var resolutionWidth = int.Parse(resolutionSpecMatch.Groups["resolutionWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-            var resolutionHeight = int.Parse(resolutionSpecMatch.Groups["resolutionHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+            var resolutionWidth = resolutionSpecMatch.Groups["resolutionWidth"].Value.ParseAsInt32();
+            var resolutionHeight = resolutionSpecMatch.Groups["resolutionHeight"].Value.ParseAsInt32();
             conversionSpec = conversionSpec[resolutionSpecMatch.Length..];
             if (conversionSpec.Length <= 0 || _startsWithCommentPattern.IsMatch(conversionSpec))
             {
@@ -772,8 +793,8 @@ namespace MatroskaBatchToolBox
             {
                 // アスペクト比が整数比で表現されている場合
 
-                var aspectRatioWidth = int.Parse(matchAspectRatioSpecMatch.Groups["aspectRatioWidth"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-                var aspectRatioHeight = int.Parse(matchAspectRatioSpecMatch.Groups["aspectRatioHeight"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                var aspectRatioWidth = matchAspectRatioSpecMatch.Groups["aspectRatioWidth"].Value.ParseAsInt32();
+                var aspectRatioHeight = matchAspectRatioSpecMatch.Groups["aspectRatioHeight"].Value.ParseAsInt32();
 
                 return (true, $"{resolutionWidth}x{resolutionHeight}", $"{aspectRatioWidth}:{aspectRatioHeight}", $"{aspectRatioWidth}{matchAspectRatioSpecMatch.Groups["aspectRatioSeparater"].Value}{aspectRatioHeight}");
             }
@@ -781,10 +802,7 @@ namespace MatroskaBatchToolBox
             {
                 // アスペクト比が実数値で表現されている場合
 
-
-                var aspectRatioValueText = matchAspectRatioSpecMatch.Groups["aspectRatioValue"].Value;
-                if (!double.TryParse(aspectRatioValueText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture.NumberFormat, out double aspectRatioValue) ||
-                    aspectRatioValue <= 0)
+                if (!matchAspectRatioSpecMatch.Groups["aspectRatioValue"].Value.TryParse(out double aspectRatioValue) || aspectRatioValue <= 0)
                 {
                     // 数値の書式が正しくないかまたは正ではない場合(構文ミス)
                     // アスペクト比として0を指定した場合のみここに到達する
@@ -792,7 +810,7 @@ namespace MatroskaBatchToolBox
                     return (false, null, null, null);
                 }
 
-                return (true, $"{resolutionWidth}x{resolutionHeight}", aspectRatioValueText, aspectRatioValueText);
+                return (true, $"{resolutionWidth}x{resolutionHeight}", (string?)matchAspectRatioSpecMatch.Groups["aspectRatioValue"].Value, (string?)matchAspectRatioSpecMatch.Groups["aspectRatioValue"].Value);
             }
             else
             {
@@ -814,6 +832,7 @@ namespace MatroskaBatchToolBox
                     ? $"{Path.GetFileNameWithoutExtension(sourceFileName)}.mkv"
                     : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription}].mkv";
             }
+
             var matches = _resolutionAndAspectRatioSpecInFileNamePattern.Matches(sourceFileName);
             if (matches.Count == 1)
             {
@@ -838,7 +857,7 @@ namespace MatroskaBatchToolBox
             else if (matches.Count > 1)
             {
                 // 入力元ファイルの名前に解像度指定が複数ある場合
-                if (matches.Any(match => string.Equals(match.Groups["resolutionAndAspectRatioSpec"].Value, resolutionAndAspectRatioSpec, StringComparison.Ordinal)))
+                if (matches.Any(match => match.Groups["resolutionAndAspectRatioSpec"].Value == resolutionAndAspectRatioSpec))
                 {
                     // 入力ファイル名の解像度指定の中に、変換先の解像度指定に一致するものが一つでもある場合
 
@@ -873,7 +892,6 @@ namespace MatroskaBatchToolBox
         }
 
         private static bool CheckingForNeedToDoMultiStepConversion(Settings localSettings, MovieInformation movieInfo)
-        {
             // ffmpeg の仕様?により、メタデータファイルと "-map_chapters 1" が指定されていているにもかかわらず、"-map_metadata -1" を指定するとチャプターのタイトルが設定されない。
             // そのため、上記の条件に該当する場合は、メタデータの削除とチャプターの設定を2段階に分けて別々に行う。
             // 具体的な条件は以下の通り。
@@ -881,12 +899,10 @@ namespace MatroskaBatchToolBox
             //   b) メタデータの削除指定がされており、かつ
             //   c) チャプタータイトルを保持する指定がされており、かつ
             //   d) 削除するには惜しいタイトルを持つチャプターが1つ以上存在する場合。
-            return
-                !localSettings.DeleteChapters &&
+            => !localSettings.DeleteChapters &&
                 localSettings.DeleteMetadata &&
                 localSettings.KeepChapterTitles &&
                 movieInfo.Chapters.Any(chapter => chapter.HasUniqueChapterTitle);
-        }
 
         private static FileInfo MoveToDestinationFile(FileInfo sourceFile, FileInfo destinationFile)
         {
@@ -917,6 +933,7 @@ namespace MatroskaBatchToolBox
                 catch (IOException)
                 {
                 }
+
                 ++count;
             }
         }
@@ -947,24 +964,17 @@ namespace MatroskaBatchToolBox
         }
 
         private static void DeleteFileSafety(FileInfo targetFile)
-        {
             // targetFile.Delete() を使用しない理由:
             //   targetFile.Delete() を発行すると、targetFile オブジェクトに「もうこのファイルは存在しない」というフラグが立ってしまうらしく、
             //   その後 targetFile.FullName のパス名のファイルを作成しても、targetFile.Exists は false を返し続けるから。
-            DeleteFileSafety(targetFile.FullName);
-        }
+            => DeleteFileSafety(targetFile.FullName);
 
         private static void FinalizeLogFile(FileInfo logFile, string result)
-        {
-            File.Move(logFile.FullName, ConstructLogFilePath(logFile, result), true);
-        }
+            => File.Move(logFile.FullName, ConstructLogFilePath(logFile, result), true);
 
         private static string ConstructLogFilePath(FileInfo logFile, string result)
-        {
-            return
-                Path.Combine(
-                    logFile.DirectoryName ?? ".",
-                    $"{Path.GetFileNameWithoutExtension(logFile.Name)}.{result}{logFile.Extension}");
-        }
+            => Path.Combine(
+                logFile.DirectoryName ?? ".",
+                $"{Path.GetFileNameWithoutExtension(logFile.Name)}.{result}{logFile.Extension}");
     }
 }

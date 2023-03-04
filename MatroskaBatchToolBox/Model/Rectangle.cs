@@ -1,12 +1,12 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Text.RegularExpressions;
+using Utility;
 
 namespace MatroskaBatchToolBox.Model
 {
     internal class Rectangle
     {
-        private static Regex _rectanglePattern;
+        private static readonly Regex _rectanglePattern;
 
         static Rectangle()
         {
@@ -41,10 +41,10 @@ namespace MatroskaBatchToolBox.Model
             {
                 rectangle =
                     new Rectangle(
-                        int.Parse(match.Groups["left"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat),
-                        int.Parse(match.Groups["top"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat),
-                        int.Parse(match.Groups["width"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat),
-                        int.Parse(match.Groups["height"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat));
+                        match.Groups["left"].Value.ParseAsInt32(),
+                        match.Groups["top"].Value.ParseAsInt32(),
+                        match.Groups["width"].Value.ParseAsInt32(),
+                        match.Groups["height"].Value.ParseAsInt32());
                 return true;
             }
         }

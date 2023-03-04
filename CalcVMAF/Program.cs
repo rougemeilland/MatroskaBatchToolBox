@@ -2,12 +2,11 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace CalcVMAF
+namespace CalcVmaf
 {
 
     public static class Program
@@ -21,12 +20,13 @@ namespace CalcVMAF
         {
             var vmafScorePattern = new Regex(@" VMAF score: (?<vmafScore>\d+\.\d+)[\r\n]", RegexOptions.Compiled);
             var baseDirectoryPath = Path.GetDirectoryName(typeof(Program).Assembly.Location) ?? ".";
-            var ffmpegExecutablePath = FindFFmpegExecutablePath(baseDirectoryPath);
+            var ffmpegExecutablePath = FindFfmpegExecutablePath(baseDirectoryPath);
             if (string.IsNullOrEmpty(ffmpegExecutablePath))
             {
                 Console.Error.WriteLine("'ffmpeg' executable not found.");
                 return 1;
             }
+
             var (originalMovieFile, encodedMovieFile, option) = ParseArguments(args);
             if (originalMovieFile is null || encodedMovieFile is null || option is null)
                 return 1;
@@ -67,6 +67,7 @@ namespace CalcVMAF
                     logWriter.WriteLine(new string('=', 40));
                     logWriter.WriteLine("");
                 }
+
                 var vmafScore = "";
                 var process = Process.Start(processStartInfo);
                 if (process is null)
@@ -74,6 +75,7 @@ namespace CalcVMAF
                     Console.Error.WriteLine("'Failed to start ffmpeg.");
                     return 1;
                 }
+
                 try
                 {
                     _ = Task.Run(() =>
@@ -118,6 +120,7 @@ namespace CalcVMAF
                                 if (!(option.Log ?? false))
                                     Console.WriteLine(vmafScore);
                             }
+
                             var indexOfLastNewLine = cache.LastIndexOfAny(new[] { '\r', '\n' });
                             if (indexOfLastNewLine >= 0)
                                 cache = cache[(indexOfLastNewLine + 1)..];
@@ -141,6 +144,7 @@ namespace CalcVMAF
                         logWriter = null;
                         File.Move(logFilePath, $"{encodedMovieFile.FullName}.vmaf-{vmafScore}.log", true);
                     }
+
                     return process.ExitCode;
                 }
                 finally
@@ -154,18 +158,18 @@ namespace CalcVMAF
             }
         }
 
-        private static string? FindFFmpegExecutablePath(string baseDirectoryPath)
+        private static string? FindFfmpegExecutablePath(string baseDirectoryPath)
         {
             var ffmpegExecutablePath1 = Path.Combine(baseDirectoryPath, "ffmpeg");
             var ffmpegExecutablePath2 = Path.Combine(baseDirectoryPath, "ffmpeg.exe");
             try
             {
-                if (File.Exists(ffmpegExecutablePath1))
-                    return ffmpegExecutablePath1;
-                else if (File.Exists(ffmpegExecutablePath2))
-                    return ffmpegExecutablePath1;
-                else
-                    return null;
+                return
+                    File.Exists(ffmpegExecutablePath1)
+                    ? ffmpegExecutablePath1
+                    : File.Exists(ffmpegExecutablePath2)
+                    ? ffmpegExecutablePath1
+                    : null;
             }
             catch (Exception)
             {
@@ -181,13 +185,14 @@ namespace CalcVMAF
 
             for (var index = 0; index < args.Length; ++index)
             {
-                if (string.Equals(args[index], "--log", StringComparison.Ordinal))
+                if (args[index] == "--log")
                 {
                     if (option.Log is not null)
                     {
                         Console.Error.WriteLine("Duplicate '--log' option specified.");
                         return (null, null, null);
                     }
+
                     option.Log = true;
                 }
                 else if (args[index].StartsWith("-", StringComparison.Ordinal) ||
@@ -213,6 +218,7 @@ namespace CalcVMAF
                         Console.Error.WriteLine($"Original movie file does not exist.: \"{args[index]}\"");
                         return (null, null, null);
                     }
+
                     originalMovieFile = file;
                 }
                 else if (encodedMovieFile is null)
@@ -232,24 +238,28 @@ namespace CalcVMAF
                         Console.Error.WriteLine($"Encoded movie file does not exist.: \"{args[index]}\"");
                         return (null, null, null);
                     }
+
                     encodedMovieFile = file;
                 }
                 else
                 {
-                    Console.Error.WriteLine($"There is an error in the command line arguments.: {nameof(CalcVMAF)} {string.Join(" ", args)}");
+                    Console.Error.WriteLine($"There is an error in the command line arguments.: {nameof(CalcVmaf)} {string.Join(" ", args)}");
                     return (null, null, null);
                 }
             }
+
             if (originalMovieFile is null)
             {
-                Console.Error.WriteLine($"Original movie file is not specified.: {nameof(CalcVMAF)} {string.Join(" ", args)}");
+                Console.Error.WriteLine($"Original movie file is not specified.: {nameof(CalcVmaf)} {string.Join(" ", args)}");
                 return (null, null, null);
             }
+
             if (encodedMovieFile is null)
             {
-                Console.Error.WriteLine($"Encoded movie file is not specified.: {nameof(CalcVMAF)} {string.Join(" ", args)}");
+                Console.Error.WriteLine($"Encoded movie file is not specified.: {nameof(CalcVmaf)} {string.Join(" ", args)}");
                 return (null, null, null);
             }
+
             return (originalMovieFile, encodedMovieFile, option);
         }
     }

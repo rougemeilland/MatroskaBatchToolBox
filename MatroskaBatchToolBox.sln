@@ -9,11 +9,16 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Experiment", "Experiment\Ex
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EncoderBenchmarkTest", "EncoderBenchmarkTest\EncoderBenchmarkTest.csproj", "{83940C16-51B2-46E4-BA0E-ECC1AB87D9CA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CalcVMAF", "CalcVMAF\CalcVMAF.csproj", "{361666FF-66E1-4A32-B63A-8512C49EDB35}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CalcVmaf", "CalcVMAF\CalcVmaf.csproj", "{361666FF-66E1-4A32-B63A-8512C49EDB35}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ChapterConverter", "ChapterConverter\ChapterConverter.csproj", "{FE5EE9EB-7E51-4C4A-9840-3ED049F51F6C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utility", "Utility\Utility.csproj", "{72B2D0EA-4D02-4434-8AD8-F4A013943C95}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Utility", "Utility\Utility.csproj", "{72B2D0EA-4D02-4434-8AD8-F4A013943C95}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{FC68CED9-4DD0-4157-B655-9B600B05A0AE}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

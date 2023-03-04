@@ -1,86 +1,54 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Utility;
+using Utility.Serialization;
 
 namespace ChapterConverter
 {
-    internal class CSVChapterFormatter
-        : IChapterFormatter
+    internal class CsvChapterFormatter
+        : ChapterFormatter
     {
-        private static readonly Regex _rawPattern;
-        private readonly ChapterFormatterParameter _parameter;
-
-        static CSVChapterFormatter()
+        public CsvChapterFormatter(ChapterFormatterParameter parameter)
+            : base(parameter)
         {
-            _rawPattern = new Regex(@"^(?<time>[\d\.:]+)\t(?<name>[^\t]*)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         }
 
-        public CSVChapterFormatter(ChapterFormatterParameter parameter)
+        protected override IEnumerable<InternalChapterElement> Parse(string rawText)
         {
-            _parameter = parameter;
-        }
-
-        IEnumerable<ChapterInfo> IChapterFormatter.Parse(string rawText)
-        {
-            var chapterSummaries =
-                rawText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(lineText =>
-                {
-                    var match = _rawPattern.Match(lineText);
-                    if (!match.Success)
-                        throw new Exception($"Invalid row format in input data.: {lineText}");
-
-                    var time =
-                        Time.ParseTime(match.Groups["time"].Value, false)
-                        ?? throw new Exception($"Invalid row format in input data.: {lineText}");
-                    if (time >= _parameter.MaximumDuration)
-                        throw new Exception($"The chapter start time is too large in the input data. Check the chapter start time or change the maximum chapter duration with the \"--maximum_duration\" option.: {lineText}");
-
-                    var name = match.Groups["name"].Value.Trim();
-
-                    return new { time, name, lineText };
-                })
+            var chapters =
+                CsvSerializer.Deserialize(rawText, new CsvSerializerOption { ColumnDelimiterChar = '\t' })
+                .Select(row => row.ToArray())
+                .Select((row, index) =>
+                    row.Length.IsInRange(1, 2)
+                    ? (new
+                    {
+                        startTime = row[0].TryParse(false, out TimeSpan time) ? time : throw new Exception($"Invalid row format in input data.: {row[0]}"),
+                        title = row.Length >= 2 ? row[1] : "",
+                    })
+                    : throw new Exception("The format of the input CSV data is invalid. (not enough columns in row)"))
                 .ToArray();
 
-            if (chapterSummaries[0].time != TimeSpan.Zero)
-                _parameter.ReportWarningMessage($"The time of the first chapter in the input data is not zero.");
-
-            for (var index = 0; index < chapterSummaries.Length - 1; ++index)
+            for (var index = 0; index < chapters.Length; ++index)
             {
-                var currentChapter = chapterSummaries[index];
-                var nextChapter = chapterSummaries[index + 1];
-                if (currentChapter.time > nextChapter.time)
-                    throw new Exception($"The chapters in the input data are not arranged in ascending chronological order.: \"{currentChapter.lineText}\", \"{nextChapter.lineText}\"");
-            }
-
-            for (var index = 0; index < chapterSummaries.Length; ++index)
-            {
-                var summary = chapterSummaries[index];
-                var endTime = index + 1 < chapterSummaries.Length ? chapterSummaries[index + 1].time : _parameter.MaximumDuration;
-                yield return new ChapterInfo(summary.time, endTime, summary.name);
+                var startTime = chapters[index].startTime;
+                var endTime = index + 1 < chapters.Length ? chapters[index + 1].startTime : SimpleChapterElement.DefaultMaximumDuration;
+                var title = chapters[index].title;
+                yield return new InternalChapterElement($"#{index}", startTime, endTime, title);
             }
         }
 
-        string IChapterFormatter.Render(IEnumerable<ChapterInfo> chapters)
-        {
-            return
-                string.Join(
-                    "\r\n",
-                    chapters
-                    .Select(chapter => FormatRaw(chapter.StartTime, chapter.Title))
-                    .Append(""));
-        }
-
-        private string FormatRaw(TimeSpan time, string name)
-        {
-            var timeText = Time.FormatTime(time, 6);
-            var modifiedName = name.Replace('\t', ' ');
-            if (name.Contains('\t'))
-                _parameter.ReportWarningMessage($"In the output data, the TAB code is included in the chapter name, so replace the TAB code with white space.: time={timeText} ({time.TotalSeconds:F6}), name=\"{modifiedName}\"");
-
-            return $"{timeText}\t{modifiedName}";
-        }
+        protected override string Render(IEnumerable<InternalChapterElement> chapters)
+            => CsvSerializer.Serialize(
+                chapters
+                .Select((chapter, index) =>
+                {
+                    var row = new[] { chapter.StartTime.FormatTime(6), }.AsEnumerable();
+                    if (!string.IsNullOrEmpty(chapter.Title))
+                        row = row.Append(chapter.Title);
+                    return row;
+                }),
+                new CsvSerializerOption { ColumnDelimiterChar = '\t' });
     }
 }

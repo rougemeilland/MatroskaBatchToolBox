@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Utility;
@@ -8,22 +7,19 @@ using Utility;
 namespace ChapterConverter
 {
     internal class ChapterListChapterFormatter
-        : IChapterFormatter
+        : ChapterFormatter
     {
         private static readonly Regex _chapterPattern;
-        private readonly ChapterFormatterParameter _parameter;
 
         static ChapterListChapterFormatter()
-        {
-            _chapterPattern = new Regex(@"^(CHAPTER(?<timeIndex>\d+)=(?<time>[\d\.:]+))|(CHAPTER(?<nameIndex>\d+)NAME=(?<name>.*))$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-        }
+            => _chapterPattern = new Regex(@"^(CHAPTER(?<timeIndex>\d+)=(?<time>[\d\.:]+))|(CHAPTER(?<nameIndex>\d+)NAME=(?<name>.*))$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         public ChapterListChapterFormatter(ChapterFormatterParameter parameter)
+            : base(parameter)
         {
-            _parameter = parameter;
         }
 
-        IEnumerable<ChapterInfo> IChapterFormatter.Parse(string rawText)
+        protected override IEnumerable<InternalChapterElement> Parse(string rawText)
         {
             var times = new Dictionary<int, (TimeSpan time, string lineText)>();
             var names = new Dictionary<int, (string name, string lineText)>();
@@ -34,42 +30,18 @@ namespace ChapterConverter
                     throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
                 if (match.Groups["timeIndex"].Success)
                 {
-                    var indexText = match.Groups["timeIndex"].Value;
-                    if (!int.TryParse(indexText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int index) || index < 0)
-                        throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
+                    var index = match.Groups["timeIndex"].Value.ParseAsInt32();
                     if (times.TryGetValue(index, out (TimeSpan time, string lineText) value))
                         throw new Exception($"There are duplicate rows in the input data.: \"{currentLineText}\", \"{value.lineText}\"");
 
-                    var timeText = match.Groups["time"].Value;
-                    var currentTime =
-                        Time.ParseTime(timeText, true)
-                        ?? throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
-                    if (currentTime >= _parameter.MaximumDuration)
-                        throw new Exception($"The chapter start time is too large in the input data. Check the chapter start time or change the maximum chapter duration with the \"--maximum_duration\" option.: {currentLineText}");
-
-                    var misorderedLineText1 =
-                        times
-                        .Where(timeItem => timeItem.Key < index && timeItem.Value.time > currentTime)
-                        .Select(item => item.Value.lineText)
-                        .FirstOrDefault();
-                    if (misorderedLineText1 is not null)
-                        throw new Exception($"The chapters in the input data are not arranged in ascending chronological order.: \"{currentLineText}\", \"{misorderedLineText1}\"");
-
-                    var misorderedLineText2 =
-                        times
-                        .Where(timeItem => timeItem.Key > index && timeItem.Value.time < currentTime)
-                        .Select(item => item.Value.lineText)
-                        .FirstOrDefault();
-                    if (misorderedLineText2 is not null)
-                        throw new Exception($"The chapters in the input data are not arranged in ascending chronological order.: \"{currentLineText}\", \"{misorderedLineText2}\"");
+                    if (!match.Groups["time"].Value.TryParse(true, out TimeSpan currentTime))
+                        throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
 
                     times.Add(index, (currentTime, currentLineText));
                 }
                 else if (match.Groups["nameIndex"].Success)
                 {
-                    var indexText = match.Groups["nameIndex"].Value;
-                    if (!int.TryParse(indexText, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat, out int index) || index < 0)
-                        throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
+                    var index = match.Groups["nameIndex"].Value.ParseAsInt32();
                     if (names.TryGetValue(index, out (string name, string lineText) value))
                         throw new Exception($"There are duplicate rows in the input data.: \"{currentLineText}\", \"{value.lineText}\"");
 
@@ -78,7 +50,9 @@ namespace ChapterConverter
                     names.Add(index, (name, currentLineText));
                 }
                 else
+                {
                     throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
+                }
             }
 
             var indexFormat = $"D{(times.Any() ? times.Keys.Max() : 0).ToString().Length}";
@@ -101,25 +75,23 @@ namespace ChapterConverter
                 })
                 .ToArray();
 
-            if (chapters[0].startTime != TimeSpan.Zero)
-                _parameter.ReportWarningMessage($"The time of the first chapter in the input data is not zero.");
-
+            var chapterIndexFormat = $"D{chapters.Select(chapter => chapter.index).Append(0).Max().ToString().Length}";
             for (var index = 0; index < chapters.Length; ++index)
             {
                 var currentChapter = chapters[index];
-                var nextStartTime = index + 1 < chapters.Length ? chapters[index + 1].startTime : _parameter.MaximumDuration;
-                yield return new ChapterInfo(currentChapter.startTime, nextStartTime, currentChapter.name);
+                var nextStartTime = index + 1 < chapters.Length ? chapters[index + 1].startTime : Parameter.MaximumDuration;
+                yield return new InternalChapterElement($"CHAPTER{currentChapter.index.ToString(chapterIndexFormat)}", currentChapter.startTime, nextStartTime, currentChapter.name);
             }
         }
 
-        string IChapterFormatter.Render(IEnumerable<ChapterInfo> chapters)
+        protected override string Render(IEnumerable<InternalChapterElement> chapters)
         {
             var chapterSummaries =
                 chapters
                 .Select((chapter, index) => new { index, startTime = chapter.StartTime, name = chapter.Title })
                 .ToList();
 
-            var indexFormat = $"D{chapterSummaries.Count.ToString().Length}";
+            var indexFormat = $"D{(chapterSummaries.Count - 1).ToString().Length}";
 
             var textLines =
                 chapterSummaries
@@ -129,7 +101,7 @@ namespace ChapterConverter
                     return
                         new[]
                         {
-                            $"CHAPTER{indexText}={Time.FormatTime(summary.startTime, 3)}",
+                            $"CHAPTER{indexText}={summary.startTime.FormatTime(3)}",
                             $"CHAPTER{indexText}NAME={summary.name}",
                         };
                 });
