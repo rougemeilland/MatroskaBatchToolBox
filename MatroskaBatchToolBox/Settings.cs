@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using MatroskaBatchToolBox.Model;
 using MatroskaBatchToolBox.Model.Json;
 
@@ -21,33 +20,6 @@ namespace MatroskaBatchToolBox
             var settings =
                 JsonSerializer.Deserialize<GlobalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas = true })
                 ?? throw new Exception("Failed to parse 'settings.json'.");
-            var ffmpegCommandFile = (FileInfo?)null;
-            foreach (var executableFile in new DirectoryInfo(Path.GetDirectoryName(typeof(Settings).Assembly.Location) ?? ".").EnumerateFiles())
-            {
-                if (Regex.IsMatch(executableFile.Name, @"^ffmpeg(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-                    ffmpegCommandFile = executableFile;
-            }
-
-            if (ffmpegCommandFile is null)
-            {
-                var message = $"'ffmpeg' is not installed.";
-                PrintFatalMessage(message);
-                throw new Exception(); // can't reach here
-            }
-
-            FileInfo? ffprobeCommandFile = null;
-            foreach (var executableFile in new DirectoryInfo(Path.GetDirectoryName(typeof(Settings).Assembly.Location) ?? ".").EnumerateFiles())
-            {
-                if (Regex.IsMatch(executableFile.Name, @"^ffprobe(\.exe)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-                    ffprobeCommandFile = executableFile;
-            }
-
-            if (ffprobeCommandFile is null)
-            {
-                var message = $"'ffprobe' is not installed.";
-                PrintFatalMessage(message);
-                throw new Exception(); // can't reach here
-            }
 
             FileInfo? ffmpegNormalizeCommandFile;
             if (string.IsNullOrEmpty(settings.FfmpegNormalizeCommandFilePath))
@@ -109,8 +81,6 @@ namespace MatroskaBatchToolBox
             GlobalSettings =
                 new Settings(
                     ffmpegNormalizeCommandFile,
-                    ffprobeCommandFile,
-                    ffmpegCommandFile,
                     videoEncoderOnComplexConversion.Value,
                     ffmpegLibx264EncoderOption,
                     ffmpegLibx265EncoderOption,
@@ -150,8 +120,6 @@ namespace MatroskaBatchToolBox
 
         private Settings(
             FileInfo ffmpegNormalizeCommandFile,
-            FileInfo ffprobeCommandFile,
-            FileInfo ffmpegCommandFile,
             VideoEncoderType ffmpegVideoEncoder,
             string ffmpegLibx264EncoderOption,
             string ffmpegLibx265EncoderOption,
@@ -175,8 +143,6 @@ namespace MatroskaBatchToolBox
             int degreeOfParallelism)
         {
             FfmpegNormalizeCommandFile = ffmpegNormalizeCommandFile;
-            FfprobeCommandFile = ffprobeCommandFile;
-            FfmpegCommandFile = ffmpegCommandFile;
             FfmpegVideoEncoder = ffmpegVideoEncoder;
             FfmpegLibx264EncoderOption = ffmpegLibx264EncoderOption;
             FfmpegLibx265EncoderOption = ffmpegLibx265EncoderOption;
@@ -201,8 +167,6 @@ namespace MatroskaBatchToolBox
         }
 
         public FileInfo FfmpegNormalizeCommandFile { get; }
-        public FileInfo FfprobeCommandFile { get; }
-        public FileInfo FfmpegCommandFile { get; }
         public VideoEncoderType FfmpegVideoEncoder { get; }
         public string FfmpegLibx264EncoderOption { get; }
         public string FfmpegLibx265EncoderOption { get; }
@@ -237,14 +201,9 @@ namespace MatroskaBatchToolBox
                 var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText, new JsonSerializerOptions { AllowTrailingCommas = true });
                 if (localSettings is null)
                     return this;
-#if DEBUG && true
-                System.Diagnostics.Debug.WriteLine($"read settings: \"{localSettingFilePath}\"");
-#endif
                 return
                     new Settings(
                         FfmpegNormalizeCommandFile,
-                        FfprobeCommandFile,
-                        FfmpegCommandFile,
                         localSettings.FfmpegVideoEncoder.TryParseAsVideoEncoderType() ?? FfmpegVideoEncoder,
                         localSettings.FfmpegLibx264EncoderOption ?? FfmpegLibx264EncoderOption,
                         localSettings.FfmpegLibx265EncoderOption ?? FfmpegLibx265EncoderOption,

@@ -44,7 +44,7 @@ namespace CalcVmaf
 #if false // -an をつけると、実行中の time と speed が正常に表示されなくなる。
             commandParameter.Append(" -an -sn");
 #endif
-                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                if (OperatingSystem.IsWindows())
                     commandParameter.Append(" -f NULL -");
                 else
                     commandParameter.Append(" -f null /dev/null");

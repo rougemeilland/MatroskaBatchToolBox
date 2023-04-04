@@ -2,8 +2,10 @@
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using Utility;
-using Utility.Movie;
+using MatroskaBatchToolBox.Utility;
+using MatroskaBatchToolBox.Utility.Interprocess;
+using MatroskaBatchToolBox.Utility.Movie;
+using Palmtree;
 
 namespace MatroskaBatchToolBox
 {
@@ -114,11 +116,11 @@ namespace MatroskaBatchToolBox
 
                 switch (ExternalCommand.NormalizeAudioFile(logFile, sourceFile, audioEncoder, workingFile, progressReporter))
                 {
-                    case CommandResult.NotSupported:
+                    case CommandResultCode.NotSupported:
                         return (actionResult = ActionResult.Failed, true);
-                    case CommandResult.Cancelled:
+                    case CommandResultCode.Cancelled:
                         return (actionResult = ActionResult.Cancelled, false);
-                    case CommandResult.Completed:
+                    case CommandResultCode.Completed:
                     default:
                         break;
                 }
@@ -251,23 +253,15 @@ namespace MatroskaBatchToolBox
                     return actionResult = ActionResult.Failed;
                 }
 
-                var (commandResult, movieInfo) =
+                var movieInfo =
                     Command.GetMovieInformation(
-                        localSettings.FfprobeCommandFile,
+                        null,
                         sourceFile,
                         MovieInformationType.Streams | MovieInformationType.Chapters,
                         (level, message) =>
                             ExternalCommand.Log(
                                 logFile,
                                 new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }));
-                if (commandResult == CommandResult.Cancelled)
-                    return actionResult = ActionResult.Cancelled;
-                if (movieInfo is null)
-                {
-                    // このルートには到達しないはず
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Stream information could not be obtained from the movie file.: \"{sourceFile.FullName}\"", });
-                    return actionResult = ActionResult.Failed;
-                }
 
                 if (!string.IsNullOrEmpty(resolutionSpec))
                 {
@@ -305,7 +299,7 @@ namespace MatroskaBatchToolBox
                             false,
                             workingFile2,
                             new Progress<double>(progress => progressReporter.Report((0.0 + progress * stepWeight1) / totalWeight)));
-                    if (conversionResult1 == CommandResult.Cancelled)
+                    if (conversionResult1 == CommandResultCode.Cancelled)
                         return actionResult = ActionResult.Cancelled;
 
                     // 第2段階: 最低限のメタデータ(チャプタータイトルを含む)の付加 (progress の重みづけ: 1)
@@ -325,7 +319,7 @@ namespace MatroskaBatchToolBox
                             true,
                             workingFile1,
                             new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress * stepWeight2) / totalWeight)));
-                    if (commandResult2 == CommandResult.Cancelled)
+                    if (commandResult2 == CommandResultCode.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                 }
                 else
@@ -346,7 +340,7 @@ namespace MatroskaBatchToolBox
                             false,
                             workingFile1,
                             progressReporter);
-                    if (conversionResult == CommandResult.Cancelled)
+                    if (conversionResult == CommandResultCode.Cancelled)
                         return actionResult = ActionResult.Cancelled;
                 }
 
@@ -415,9 +409,15 @@ namespace MatroskaBatchToolBox
         private static ActionResult ChangeResolutionOfMovieFile(Settings localSettings, FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
             var videoEncoder = localSettings.FfmpegVideoEncoder;
-            var calculateVmafScore = localSettings.CalculateVmafScore;
             var logFile = new FileInfo(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
+            var calculateVmafScore = localSettings.CalculateVmafScore;
+            if (calculateVmafScore && (localSettings.Cropping is not null || localSettings.Trimming is not null))
+            {
+                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: WARNING: The \"calculate_vmaf_score\" property is set to true, but the \"cropping\" or \"trimming\" option is specified, so the VMAF score is not calculated." });
+                calculateVmafScore = false;
+            }
+
             var (isParsedSuccessfully, resolutionSpec, aspectRatioSpec, aspectRatioSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
             if (!isParsedSuccessfully || resolutionSpec is null || aspectRatioSpec is null)
             {
@@ -466,21 +466,13 @@ namespace MatroskaBatchToolBox
                     return actionResult = ActionResult.Failed;
                 }
 
-                var (commandResult, movieInfo) =
+                var movieInfo =
                     Command.GetMovieInformation(
-                        localSettings.FfprobeCommandFile,
+                        null,
                         sourceFile,
                         MovieInformationType.Streams | MovieInformationType.Chapters,
                         (level, message) =>
                             ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }));
-                if (commandResult == CommandResult.Cancelled)
-                    return actionResult = ActionResult.Cancelled;
-                if (movieInfo is null)
-                {
-                    // このルートには到達しないはず
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Stream information could not be obtained from the movie file.: \"{sourceFile.FullName}\"", });
-                    return actionResult = ActionResult.Failed;
-                }
 
                 if (CheckingForNeedToDoMultiStepConversion(localSettings, movieInfo))
                 {
@@ -508,7 +500,7 @@ namespace MatroskaBatchToolBox
                                 false,
                                 workingFile2,
                                 new Progress<double>(progress => progressReporter.Report((0.0 + progress * stepWeight1) / totalWeight)));
-                        if (commandResult1 == CommandResult.Cancelled)
+                        if (commandResult1 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
 
                         // 第2段階: ストリームの単純コピーと最低限のメタデータ(チャプタータイトル含む)の付加 (progress の重みづけ: 0.1)
@@ -528,7 +520,7 @@ namespace MatroskaBatchToolBox
                                 true,
                                 workingFile1,
                                 new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress * stepWeight2) / totalWeight)));
-                        if (commandResult2 == CommandResult.Cancelled)
+                        if (commandResult2 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
 
                         // 第3段階: VMAFスコアの計算 (progress の重みづけ: 1)
@@ -540,7 +532,7 @@ namespace MatroskaBatchToolBox
                                 resolutionSpec,
                                 out double vmafScore,
                                 new Progress<double>(progress => progressReporter.Report((stepWeight1 + stepWeight2 + progress * stepWeight3) / totalWeight)));
-                        if (commandResult3 == CommandResult.Cancelled)
+                        if (commandResult3 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
 
                         ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: VMAF Score: {vmafScore:F6}" });
@@ -568,7 +560,7 @@ namespace MatroskaBatchToolBox
                                 false,
                                 workingFile2,
                                 new Progress<double>(progress => progressReporter.Report((0.0 + progress * stepWeight1) / totalWeight)));
-                        if (commandResult1 == CommandResult.Cancelled)
+                        if (commandResult1 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
 
                         // 第2段階: ストリームの単純コピーと最低限のメタデータ(チャプタータイトル含む)の付加 (progress の重みづけ: 0.1)
@@ -588,7 +580,7 @@ namespace MatroskaBatchToolBox
                                 true,
                                 workingFile1,
                                 new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress * stepWeight2) / totalWeight)));
-                        if (commandResult2 == CommandResult.Cancelled)
+                        if (commandResult2 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
                     }
                 }
@@ -622,7 +614,7 @@ namespace MatroskaBatchToolBox
                                 false,
                                 workingFile1,
                                 new Progress<double>(progress => progressReporter.Report((0.0 + progress) / totalWeight)));
-                        if (commandResult1 == CommandResult.Cancelled)
+                        if (commandResult1 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
 
                         // 第2段階: VMAFスコアの計算 (progress の重みづけ: 1)
@@ -634,7 +626,7 @@ namespace MatroskaBatchToolBox
                                 resolutionSpec,
                                 out double vmafScore,
                                 new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress) / totalWeight)));
-                        if (commandResult2 == CommandResult.Cancelled)
+                        if (commandResult2 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
                         ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: VMAF Score: {vmafScore:F6}" });
                     }
@@ -656,7 +648,7 @@ namespace MatroskaBatchToolBox
                                 false,
                                 workingFile1,
                                 progressReporter);
-                        if (commandResult1 == CommandResult.Cancelled)
+                        if (commandResult1 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
                     }
                 }
@@ -814,9 +806,7 @@ namespace MatroskaBatchToolBox
             }
             else
             {
-                // _startsWithAspectRatioSpecPattern.Match(conversionSpec).Success == true なので、このルートには到達しないはず
-
-                throw new Exception("internal error");
+                throw Validation.GetFailErrorException("_startsWithAspectRatioSpecPattern.Match(conversionSpec).Success == true なので、このルートには到達しないはず");
             }
         }
 

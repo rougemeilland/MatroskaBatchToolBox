@@ -6,6 +6,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>chapconv</AssemblyName>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net7.0|AnyCPU'">
@@ -29,7 +30,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Utility\Utility.csproj" />
+    <ProjectReference Include="..\MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj" />
   </ItemGroup>
 
   <ItemGroup>

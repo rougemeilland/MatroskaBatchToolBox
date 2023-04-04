@@ -3,9 +3,9 @@ using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
-using Utility;
-using Utility.Models.Json;
-using Utility.Movie;
+using MatroskaBatchToolBox.Utility;
+using MatroskaBatchToolBox.Utility.Models.Json;
+using MatroskaBatchToolBox.Utility.Movie;
 
 namespace ChapterConverter
 {

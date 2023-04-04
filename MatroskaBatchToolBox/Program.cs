@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using MatroskaBatchToolBox.Properties;
-using Utility;
+using Palmtree;
 
 namespace MatroskaBatchToolBox
 {
@@ -79,7 +79,7 @@ namespace MatroskaBatchToolBox
                     {
                         ActionMode.NormalizeAudio => Resource.AudioNormalizationProcessStartMessageText,
                         ActionMode.ConvertVideo => Resource.VideoConversionStartMessageText,
-                        _ => throw new Exception("internal error"),
+                        _ => throw Validation.GetFailErrorException($"Unexpected {nameof(ActionMode)} value: {actionMode}"),
                     });
                 Console.WriteLine();
 
@@ -133,8 +133,6 @@ namespace MatroskaBatchToolBox
                         progressState.WriteProgressText(PrintProgress);
                 }
 
-                if (!IsRequestedCancellation())
-                    progressState.CheckCompletion();
                 progressState.WriteProgressText(PrintProgress);
 
                 lock (_lockConsoleObject)
@@ -180,7 +178,7 @@ namespace MatroskaBatchToolBox
                         catch (Exception ex)
                         {
                             // ここに到達することはないはず
-                            throw new Exception("internal error", ex);
+                            throw Validation.GetFailErrorException("Unreachable code", ex);
 
                         }
                         finally
@@ -259,19 +257,6 @@ namespace MatroskaBatchToolBox
                 modifiedSourceFileList.Add(sourceQueueWithSimpleConversion.Dequeue());
             while (sourceQueueWithComplexConversion.Count > 0)
                 modifiedSourceFileList.Add(sourceQueueWithComplexConversion.Dequeue());
-#if DEBUG && false
-            System.Diagnostics.Debug.WriteLine("-----");
-            System.Diagnostics.Debug.WriteLine("modifiedSourceFileList:");
-            System.Diagnostics.Debug.Indent();
-            foreach (var sourceFile in modifiedSourceFileList)
-            {
-                System.Diagnostics.Debug.WriteLine($"\"{sourceFile.FullName}\"");
-            }
-            System.Diagnostics.Debug.Unindent();
-            System.Diagnostics.Debug.WriteLine("-----");
-            if (modifiedSourceFileList.Count != sourceFileList.Count)
-                throw new Exception();
-#endif
             return modifiedSourceFileList;
         }
 

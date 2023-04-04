@@ -1,6 +1,6 @@
 ﻿namespace MatroskaBatchToolBox
 {
-    public enum ActionResult
+    internal enum ActionResult
     {
         Success,
         Skipped,

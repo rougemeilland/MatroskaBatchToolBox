@@ -5,7 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Utility;
+using MatroskaBatchToolBox.Utility;
+using Palmtree;
 
 namespace EncoderBenchmarkTest
 {
@@ -151,7 +152,7 @@ namespace EncoderBenchmarkTest
             _ = commandParameter.Append($" -i \"{encodedFile.FullName}\"");
             _ = commandParameter.Append($" -filter_complex \"scale={resolutionWidth}x{resolutionHeight},[1]libvmaf\"");
             _ = commandParameter.Append(" -an -sn");
-            _ = Environment.OSVersion.Platform == PlatformID.Win32NT
+            _ = OperatingSystem.IsWindows()
                 ? commandParameter.Append(" -f NULL -")
                 : commandParameter.Append(" -f null /dev/null");
             double? vmafScore = null;
@@ -159,9 +160,9 @@ namespace EncoderBenchmarkTest
                ExecuteFfmpegCommand(
                    ffmpegCommandPath,
                    commandParameter.ToString(),
-                   textLine =>
+                   lineText =>
                    {
-                       var match = _vmafScorePattern.Match(textLine);
+                       var match = _vmafScorePattern.Match(lineText);
                        if (match.Success && match.Groups["vmafScore"].Value.TryParse(out double vmafScoreValue))
                            vmafScore = vmafScoreValue;
                    });
@@ -171,7 +172,7 @@ namespace EncoderBenchmarkTest
                 : throw new Exception("VMAF score was not reported.");
         }
 
-        private static TimeSpan ExecuteFfmpegCommand(string ffmpegCommandPath, string commandParameter, Action<string>? textLineHander = null)
+        private static TimeSpan ExecuteFfmpegCommand(string ffmpegCommandPath, string commandParameter, Action<string>? lineTextHander = null)
         {
             var processStartInfo = new ProcessStartInfo()
             {
@@ -203,11 +204,11 @@ namespace EncoderBenchmarkTest
                                 break;
                             }
 
-                            if (textLineHander is not null)
+                            if (lineTextHander is not null)
                             {
                                 try
                                 {
-                                    textLineHander(lineText);
+                                    lineTextHander(lineText);
                                 }
                                 catch (Exception)
                                 {

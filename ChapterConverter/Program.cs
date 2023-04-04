@@ -4,12 +4,13 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using Utility;
-using Utility.Movie;
+using MatroskaBatchToolBox.Utility;
+using MatroskaBatchToolBox.Utility.Movie;
+using Palmtree;
 
 namespace ChapterConverter
 {
-    class Program
+    public class Program
     {
         private enum ActionMode
         {
@@ -81,7 +82,7 @@ namespace ChapterConverter
         {
             _consoleLockObject = new object();
             _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
-            _titleOptionPattern = new Regex(@"^(-tt|--title):(?<chapterNumber>\d+)$");
+            _titleOptionPattern = new Regex(@"^(-tt|--set_title):(?<chapterNumber>\d+)$");
         }
 
         public static int Main(string[] args)
@@ -165,7 +166,7 @@ namespace ChapterConverter
                 $"      The end time can be specified in hour-minute-second format (hh:mm.sss.sss) or second format (sssss.sss).",
                 $"      This option cannot be specified with the \"-to\" option.",
                 $"",
-                $"    -tt:<chapter number> <chapter title>  or  --title:<chapter number> <chapter title>",
+                $"    -tt:<chapter number> <chapter title>  or  --set_title:<chapter number> <chapter title>",
                 $"      (Optional) Change the title of the specified chapter.",
                 $"      Chapter numbers are integers starting from 0.",
                 $"      * Note that if trimming is done, the chapter number of the trimming result will be applied.",
@@ -178,7 +179,8 @@ namespace ChapterConverter
                 $"    --maximum_duration <duratuon time>",
                 $"      (Optional) Specifies the time to apply instead of the end time of the last chapter if it is unknown.",
                 $"      The value for this option can be specified in hour-minute-second format (hh:mm.ss.sss) or second format (sssss.sss).",
-                $"      The default value for this option is 168:00:00.000 (7 days). Normally you do not need to change the value of this option.",
+                $"      The default value for this option is 168:00:00.000 (7 days).",
+                $"      Normally you do not need to change the value of this option.",
                 $"",
                 $"      * commentary",
                 $"        Some chapter file formats only describe the chapter start time, not the end time.",
@@ -193,7 +195,7 @@ namespace ChapterConverter
                 $"",
                 $"      * Commentary",
                 $"        In general, chapters that are too short to be visible are meaningless.",
-                $"        So chapconv will automatically combine chapters that are too short with the chapters before and after it.",
+                $"        So {_thisProgramName} will automatically merge chapters shorter than the value specified in this option with the chapter before or after it.",
                 $"",
                 $"        More specifically, if the first chapter is too short, merge it with the second chapter.",
                 $"        Also, if the second and subsequent chapters are too short, they are combined with the previous chapter.",
@@ -256,7 +258,7 @@ namespace ChapterConverter
                 $"      This is the format for specifying the chapter start time directly with a command parameter.",
                 $"      This format can only be specified as an input format.",
                 $"      When specifying this format, the \"-i\" or \"--input\" option must specify a comma-separated list of chapter start times instead of input file pathnames.",
-                $"      Each chapter start time is specified in hour, minute, second format (hh:mm:ss.sss) or second format (ssss.sss).",
+                $"      Each chapter start time is specified in hour, minute, second format (eg 00:12:34.567) or second format (eg 1234.567).",
                 $"      Also, if a chapter start time is prefixed with a plus (+) sign, it represents the time added to the previous chapter start time.",
                 $"        Examples: Here are some example specifications. Any specification is completely equivalent.",
                 $"",
@@ -265,7 +267,7 @@ namespace ChapterConverter
                 $"          -if immediate -i 0,+101.835,+109.309,+104.971",
                 $"          -if immediate -i 0,+0:01:41.835,+0:01:49.309,+0:01:44.971",
                 $"",
-                $"      * Chapter titles cannot be specified in the \"immediate\" format. To specify the chapter title, add the \"-tt\" option or \"--title\" option.",
+                $"      * Chapter titles cannot be specified in the \"immediate\" format. To specify the chapter title, add the \"-tt\" option or \"--set_title\" option.",
                 $"",
                 $"    {_fileFormatFfprobeCsv}:",
                 $"      This format is equivalent to the data obtained by specifying the \"-print_format csv\" option to the \"ffprobe\" command.",
@@ -375,12 +377,10 @@ namespace ChapterConverter
         {
             try
             {
-                if (inputFormat is ChapterFormat.Immediate or ChapterFormat.Movie)
+                if (inputFormat.IsAnyOf(ChapterFormat.Immediate, ChapterFormat.Movie))
                 {
-                    return
-                        inputFilePath is not null
-                        ? inputFilePath
-                        : throw new Exception("internal error ((inputFormat == ChapterFormat.Immediate || inputFormat == ChapterFormat.Movie) && inputFilePath is null)");
+                    Validation.Assert(inputFilePath is not null, "inputFilePath is not null");
+                    return inputFilePath;
                 }
                 else
                 {
@@ -660,7 +660,7 @@ namespace ChapterConverter
                         {
                             if (!args[index].TryParse(false, out TimeSpan maximumDurationValue))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--maximum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
+                                PrintErrorMessage($"The format of the value of the \"--maximum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -692,7 +692,7 @@ namespace ChapterConverter
                         {
                             if (!args[index].TryParse(false, out TimeSpan time))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--ss\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
+                                PrintErrorMessage($"The format of the value of the \"--ss\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -724,7 +724,7 @@ namespace ChapterConverter
                         {
                             if (!args[index].TryParse(false, out TimeSpan time))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
+                                PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -756,7 +756,7 @@ namespace ChapterConverter
                         {
                             if (!args[index].TryParse(false, out TimeSpan time))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
+                                PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -788,7 +788,7 @@ namespace ChapterConverter
                         {
                             if (!args[index].TryParse(false, out TimeSpan minimumDurationValue))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--minimum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg hh:mm:ss.sss or mm:ss.sss) or seconds format (ss.sss).: \"{args[index]}\"");
+                                PrintErrorMessage($"The format of the value of the \"--minimum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -827,7 +827,7 @@ namespace ChapterConverter
                             var chapterNumber = match.Groups["chapterNumber"].Value.ParseAsInt32();
                             if (index + 1 >= args.Length)
                             {
-                                PrintErrorMessage($"The value of the \"-tt:{chapterNumber}\" option or \"--title\" option is not specified.");
+                                PrintErrorMessage($"The value of the \"-tt:{chapterNumber}\" option or \"--set_title\" option is not specified.");
                                 return defaultReturnValue;
                             }
 
@@ -835,7 +835,7 @@ namespace ChapterConverter
                             var chapterName = args[index];
                             if (titles.ContainsKey(chapterNumber))
                             {
-                                PrintErrorMessage($"The \"-tt:{chapterNumber}\" option or \"--title:{chapterNumber}\" option is specified more than once.");
+                                PrintErrorMessage($"The \"-tt:{chapterNumber}\" option or \"--set_title:{chapterNumber}\" option is specified more than once.");
                                 return defaultReturnValue;
                             }
 
@@ -897,45 +897,67 @@ namespace ChapterConverter
                 return defaultReturnValue;
             }
 
+            var actualMaximumDuration = maximumDuration ?? SimpleChapterElement.DefaultMaximumDuration;
+
             if (to is not null && t is not null)
             {
                 PrintErrorMessage("\"-to\" option and \"-t\" option cannot be specified at once.");
                 return defaultReturnValue;
             }
 
-            var actualMaximumDuration = maximumDuration ?? SimpleChapterElement.DefaultMaximumDuration;
-            var actualFrom = from ?? TimeSpan.Zero;
-            if (actualFrom >= actualMaximumDuration)
+            try
             {
-                PrintErrorMessage("The value of the \"-ss\" option is too large. Consider changing the value of the \"--maximum_duration\" option or \"-ss\" option.");
-                return defaultReturnValue;
-            }
-
-            var actualTo = t is not null ? (actualFrom + t.Value) : (to ?? actualMaximumDuration);
-            if (actualTo <= actualFrom)
-            {
-                PrintErrorMessage("The value of the \"-to\" option is smaller than the value of the \"-ss\" option. Consider changing the value of the \"-to\" option or \"-ss\" option.");
-                return defaultReturnValue;
-            }
-
-            if (actualTo > actualMaximumDuration)
-                actualTo = actualMaximumDuration;
-            return
-                new CommandLineOptions
+                var (actualFrom, actualTo) = GetTrimmingRange(from, to, t);
+                if (actualFrom >= actualMaximumDuration)
                 {
-                    ActionMode = actionMode,
-                    InputFormat = inputFormat,
-                    InputFilePath = inputFilePath,
-                    OutputFormat = outputFormat,
-                    OutputFilePath = outputFilePath,
-                    Force = force ?? false,
-                    MaximumDuration = actualMaximumDuration,
-                    From = actualFrom,
-                    To = actualTo,
-                    Titles = titles,
-                    MinimumDuration = minimumDuration ?? SimpleChapterElement.DefaultMinimumDuration,
-                    KeepEmptyChapter = keepEmptyChapter ?? false,
-                };
+                    PrintErrorMessage("The value of the \"-ss\" option is too large. Consider changing the value of the \"--maximum_duration\" option or \"-ss\" option.");
+                    return defaultReturnValue;
+                }
+
+                return
+                    new CommandLineOptions
+                    {
+                        ActionMode = actionMode,
+                        InputFormat = inputFormat,
+                        InputFilePath = inputFilePath,
+                        OutputFormat = outputFormat,
+                        OutputFilePath = outputFilePath,
+                        Force = force ?? false,
+                        MaximumDuration = actualMaximumDuration,
+                        From = actualFrom,
+                        To = actualTo,
+                        Titles = titles,
+                        MinimumDuration = minimumDuration ?? SimpleChapterElement.DefaultMinimumDuration,
+                        KeepEmptyChapter = keepEmptyChapter ?? false,
+                    };
+            }
+            catch (Exception ex)
+            {
+                PrintErrorMessage(ex.Message);
+                return defaultReturnValue;
+            }
+        }
+
+        private static (TimeSpan from, TimeSpan to) GetTrimmingRange(TimeSpan? ssValue, TimeSpan? toValue, TimeSpan? tValue)
+        {
+            if (toValue is not null && tValue is not null)
+                throw new Exception("\"-to\" option and \"-t\" option cannot be specified at once.");
+
+            Validation.Assert(ssValue is null || ssValue.Value >= TimeSpan.Zero, "ssValue is null || ssValue.Value >= TimeSpan.Zero");
+            Validation.Assert(toValue is null || toValue.Value >= TimeSpan.Zero, "toValue is null || toValue.Value >= TimeSpan.Zero");
+            Validation.Assert(tValue is null || tValue.Value >= TimeSpan.Zero, "tValue is null || tValue.Value >= TimeSpan.Zero");
+
+            var from = ssValue ?? TimeSpan.Zero;
+            var to =
+                tValue is null
+                ? toValue ?? TimeSpan.MaxValue
+                : from > TimeSpan.MaxValue - tValue.Value
+                ? TimeSpan.MaxValue
+                : from + tValue.Value;
+            return
+                to >= from
+                ? (from, to)
+                : throw new Exception("The value of the \"-to\" option is smaller than the value of the \"-ss\" option. Consider changing the value of the \"-to\" option or \"-ss\" option.");
         }
 
         private static void PrintWarningMessage(string message)

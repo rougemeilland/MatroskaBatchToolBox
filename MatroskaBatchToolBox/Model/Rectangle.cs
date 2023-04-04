@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
-using Utility;
+using Palmtree;
 
 namespace MatroskaBatchToolBox.Model
 {
@@ -29,7 +29,7 @@ namespace MatroskaBatchToolBox.Model
         public bool IsValid => Left >= 0 && Top >= 0 && Width >= 0 && Height >= 0;
         public static Rectangle DefaultValue { get; }
 
-        public static bool TryParse(string text, [MaybeNullWhen(false)] out Rectangle rectangle)
+        public static bool TryParse(string text, [NotNullWhen(true)] out Rectangle? rectangle)
         {
             var match = _rectanglePattern.Match(text);
             if (!match.Success)

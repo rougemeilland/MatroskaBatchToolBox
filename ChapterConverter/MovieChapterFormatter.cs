@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Utility;
-using Utility.Movie;
+using MatroskaBatchToolBox.Utility.Interprocess;
+using MatroskaBatchToolBox.Utility.Movie;
 
 namespace ChapterConverter
 {
@@ -18,9 +18,9 @@ namespace ChapterConverter
         protected override IEnumerable<InternalChapterElement> Parse(string inputFilePath)
         {
             var inputFile = new FileInfo(inputFilePath);
-            var (commandResult, movieInfo) =
+            var movieInfo =
                 Command.GetMovieInformation(
-                    GetFfprobeProgramFile(),
+                    null,
                     inputFile,
                     MovieInformationType.Chapters,
                     (level, message) =>
@@ -29,28 +29,11 @@ namespace ChapterConverter
                             Parameter.ReportWarningMessage(message);
                     });
             return
-                commandResult != CommandResult.Completed
-                ? throw new Exception("Failed to execute \"ffprobe\".")
-                : movieInfo is null
-                ? throw new Exception($"The video file information could not be acquired successfully.: \"{inputFile.FullName}\"")
-                : movieInfo.Chapters
+                movieInfo.Chapters
                 .Select((chapter, index) => new InternalChapterElement($"#{index}", chapter.StartTime, chapter.EndTime, chapter.Title));
         }
 
         protected override string Render(IEnumerable<InternalChapterElement> chapters)
             => throw new NotSupportedException($"It is not possible to output in \"movie\" format.");
-
-        private static FileInfo GetFfprobeProgramFile()
-        {
-            var baseDirectoryPath = Path.GetDirectoryName(typeof(MovieChapterFormatter).Assembly.Location) ?? ".";
-            var ffprobeProgramFile = new FileInfo(Path.Combine(baseDirectoryPath, "ffprobe"));
-            if (ffprobeProgramFile.Exists)
-                return ffprobeProgramFile;
-            ffprobeProgramFile = new FileInfo(Path.Combine(baseDirectoryPath, "ffprobe.exe"));
-            return
-                ffprobeProgramFile.Exists
-                ? ffprobeProgramFile
-                : throw new Exception($"Cannot find the executable file of \"ffprobe\" under the directory \"{baseDirectoryPath}\".");
-        }
     }
 }

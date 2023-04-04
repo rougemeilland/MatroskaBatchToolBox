@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Utility;
-using Utility.Serialization;
+using MatroskaBatchToolBox.Utility;
+using Palmtree;
+using Palmtree.Serialization;
 
 namespace ChapterConverter
 {
@@ -26,7 +27,7 @@ namespace ChapterConverter
                     .Where(row => row.Length > 0 && row[0] == _firstColumnValue)
                     .Select((row, rowIndex) =>
                     {
-                        if (row.Length.IsOutOfRange(7, 8))
+                        if (row.Length.IsOutOfClosedInterval(7, 8))
                             throw new Exception("The format of the input CSV data is invalid. (Invalid number of columns in row)");
                         var header = row[0];
                         var id = row[1];

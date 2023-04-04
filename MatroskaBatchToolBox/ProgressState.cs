@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using MatroskaBatchToolBox.Properties;
-using Utility;
+using Palmtree;
 
 namespace MatroskaBatchToolBox
 {
@@ -90,12 +90,9 @@ namespace MatroskaBatchToolBox
             _progressHistory = new LinkedList<ProgressHistoryElement>();
             _firstDateTime = DateTime.UtcNow;
             _progressHistory.AddLast(new LinkedListNode<ProgressHistoryElement>(new ProgressHistoryElement(_firstDateTime, 0.0)));
-#if DEBUG && false
-            System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)} object created. Total length of source files = {_totalLengthOfUnprocessedSourceFiles:N} bytes.");
-#endif
         }
 
-        public bool TryGetNextSourceFile(out int sourceFieId, [MaybeNullWhen(false)] out FileInfo sourceFile)
+        public bool TryGetNextSourceFile(out int sourceFieId, [NotNullWhen(true)] out FileInfo? sourceFile)
         {
             lock (this)
             {
@@ -107,17 +104,6 @@ namespace MatroskaBatchToolBox
                     sourceFieId = item.UniqueId;
                     sourceFile = item.File;
                     _totalLengthOfUnprocessedSourceFiles -= item.FileLength;
-#if DEBUG && false
-                    {
-                        var totalLength1 = _unprocessedSourceFiles.Sum(item => item.FileLength);
-                        var totalLength2 = _totalLengthOfUnprocessedSourceFiles;
-                        if (totalLength1 != totalLength2)
-                            throw new Exception();
-                    }
-#endif
-#if DEBUG && false
-                    System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)}.{nameof(TryGetNextSourceFile)}() => sourceFieId={sourceFieId}, sourceFile=\"{item.File.FullName}\"({item.FileLength:N} bytes)");
-#endif
                     return true;
                 }
                 else
@@ -131,7 +117,7 @@ namespace MatroskaBatchToolBox
 
         public void UpdateProgress(int sourceFieId, double progress)
         {
-            if (!progress.IsInRange(0, 1))
+            if (!progress.IsInClosedInterval(0, 1))
                 throw new Exception($"Invalid {nameof(progress)} value: {nameof(progress)} = {progress}");
 
             lock (this)
@@ -157,10 +143,6 @@ namespace MatroskaBatchToolBox
                     while (_progressHistory.First is not null && _progressHistory.First.Value.DateTime < historyItemLowerLimit)
                         _progressHistory.RemoveFirst();
                 }
-
-#if DEBUG && false
-                System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)}.{nameof(UpdateProgress)}({nameof(sourceFieId)}={sourceFieId}, {nameof(progress)}={progress:F6})");
-#endif
             }
         }
 
@@ -168,10 +150,9 @@ namespace MatroskaBatchToolBox
         {
             lock (this)
             {
-                if (!_processingSourceFiles.TryGetValue(sourceFieId, out SourceFileInfo? item))
-                    throw new Exception($"internal error (invalid {nameof(sourceFieId)})");
+                Validation.Assert(_processingSourceFiles.TryGetValue(sourceFieId, out SourceFileInfo? item), "_processingSourceFiles.TryGetValue(sourceFieId, out SourceFileInfo? item)");
                 _processedSourceFiles[actionResult].Add(item);
-                _processingSourceFiles.Remove(sourceFieId);
+                _ = _processingSourceFiles.Remove(sourceFieId);
                 switch (actionResult)
                 {
                     case ActionResult.Success:
@@ -184,18 +165,6 @@ namespace MatroskaBatchToolBox
                         // NOP
                         break;
                 }
-#if DEBUG && false
-                {
-                    var totalLength1 = _processedSourceFiles[ActionResult.Success].Sum(item => item.FileLength);
-                    var totalLength2 = _processedSourceFiles[ActionResult.Failed].Sum(item => item.FileLength);
-                    var totalLength3 = _totalLengthOfProcessedSourceFiles;
-                    if (totalLength1 + totalLength2 != totalLength3)
-                        throw new Exception();
-                }
-#endif
-#if DEBUG && false
-                System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)}.{nameof(CompleteSourceFile)}({nameof(sourceFieId)}={sourceFieId}, {nameof(actionResult)}={actionResult}");
-#endif
             }
         }
 
@@ -209,18 +178,13 @@ namespace MatroskaBatchToolBox
             var now = DateTime.UtcNow;
             lock (this)
             {
-                if (_progressHistory.First is null)
-                    throw new Exception("internal error");
+                Validation.Assert(_progressHistory.First is not null, "_progressHistory.First is not null");
                 oldDateTime = _progressHistory.First.Value.DateTime;
                 oldPercentage = _progressHistory.First.Value.Percentage;
-                if (_progressHistory.Last is null)
-                    throw new Exception("internal error");
+                Validation.Assert(_progressHistory.Last is not null, "_progressHistory.Last is not null");
                 latestDateTime = _progressHistory.Last.Value.DateTime;
                 latestPercentage = _progressHistory.Last.Value.Percentage;
                 progressValue = GetProgressValue();
-#if DEBUG && false
-                System.Diagnostics.Debug.WriteLine($"WriteProgressText: Histories={_progressHistory.Count}, maxElapsedTime={(latestDateTime - _firstDateTime).TotalSeconds:F3}s");
-#endif
             }
 
             var elapsedTime = latestDateTime - _firstDateTime;
@@ -247,28 +211,6 @@ namespace MatroskaBatchToolBox
                         FormatTimeSpanFriendly(remainTime),
                         FormatDateTimeFriendly(untilDateTime.ToLocalTime(), now.ToLocalTime())));
             }
-        }
-
-        // 将来のデバッグ用のメソッドであるため、警告を抑止する属性を付加
-        [SuppressMessage("Performance", "CA1822:メンバーを static に設定します", Justification = "<保留中>")]
-        public void CheckCompletion()
-        {
-
-#if DEBUG && false
-            {
-                if (_unprocessedSourceFiles.Any())
-                    throw new Exception("internal error");
-                if (_processingSourceFiles.Any())
-                    throw new Exception("internal error");
-            }
-            {
-                var totalLength1 = _processedSourceFiles[ActionResult.Success].Sum(item => item.FileLength);
-                var totalLength2 = _processedSourceFiles[ActionResult.Failed].Sum(item => item.FileLength);
-                var totalLength3 = _totalLengthOfProcessedSourceFiles;
-                if (totalLength1 + totalLength2 != totalLength3)
-                    throw new Exception();
-            }
-#endif
         }
 
         private static IEnumerable<SourceFileInfo> EnumerateSourceFileInfo(IEnumerable<FileInfo> sourceFiles)
@@ -318,15 +260,7 @@ namespace MatroskaBatchToolBox
                 _processingSourceFiles.Values.Sum(sourceFile => sourceFile.FileLength * sourceFile.Progress) +
                 _totalLengthOfProcessedSourceFiles;
 
-#if DEBUG && false
-            if (totalOfProcessedSourceFileLength > totalOfSourceFileLength)
-                throw new Exception($"{nameof(totalOfProcessedSourceFileLength)} > {nameof(totalOfSourceFileLength)}: {nameof(totalOfProcessedSourceFileLength)} = {totalOfProcessedSourceFileLength}, {nameof(totalOfSourceFileLength)} = {totalOfSourceFileLength}");
-#endif
-
             var progress = totalOfProcessedSourceFileLength / totalOfSourceFileLength;
-#if DEBUG && false
-            System.Diagnostics.Debug.WriteLine($"{nameof(MatroskaBatchToolBox)}:INFO: {nameof(ProgressState)}.{nameof(GetProgressValue)}() => {progress:F6}");
-#endif
             return progress;
         }
 

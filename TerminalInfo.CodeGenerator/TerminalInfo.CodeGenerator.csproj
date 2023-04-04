@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <NoWarn>1701;1702;SYSLIB1045;SYSLIB1054</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <NoWarn>1701;1702;SYSLIB1045;SYSLIB1054</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="termInfo_capability_symbols.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="terminfo_variables.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

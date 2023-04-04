@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using Utility;
+using MatroskaBatchToolBox.Utility;
+using Palmtree;
 
 namespace ChapterConverter
 {
@@ -93,7 +94,7 @@ namespace ChapterConverter
 
             var indexFormat = $"D{(chapterSummaries.Count - 1).ToString().Length}";
 
-            var textLines =
+            var lineText =
                 chapterSummaries
                 .SelectMany(summary =>
                 {
@@ -106,7 +107,7 @@ namespace ChapterConverter
                         };
                 });
 
-            return string.Join("\r\n", textLines.Append(""));
+            return string.Join("\r\n", lineText.Append(""));
         }
     }
 }

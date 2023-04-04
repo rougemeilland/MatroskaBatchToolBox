@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net7.0;net60</TargetFrameworks>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Palmtree</RootNamespace>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net7.0|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <NoWarn>1701;1702;SYSLIB1045;SYSLIB1054</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net7.0|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <NoWarn>1701;1702;SYSLIB1045;SYSLIB1054</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net60|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <NoWarn>1701;1702;SYSLIB1045;SYSLIB1054</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net60|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <NoWarn>1701;1702;SYSLIB1045;SYSLIB1054</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Palmtree.Core\Palmtree.Core.csproj" />
+    <ProjectReference Include="..\Palmtree.TerminalInfo\Palmtree.TerminalInfo.csproj" />
+  </ItemGroup>
+
+</Project>

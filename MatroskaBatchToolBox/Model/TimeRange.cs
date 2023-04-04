@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
-using Utility;
+using MatroskaBatchToolBox.Utility;
 
 namespace MatroskaBatchToolBox.Model
 {
@@ -24,7 +24,7 @@ namespace MatroskaBatchToolBox.Model
         public bool IsValid => StartTime is not null && EndTime is not null;
         public static TimeRange DefaultValue { get; }
 
-        public static bool TryParse(string text, [MaybeNullWhen(false)] out TimeRange timeRange)
+        public static bool TryParse(string text, [NotNullWhen(true)] out TimeRange? timeRange)
         {
             var timeSpecs = text.Split('-');
             if (timeSpecs.Length != 2)

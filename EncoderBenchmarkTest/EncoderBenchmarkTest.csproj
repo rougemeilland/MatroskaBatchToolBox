@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -18,7 +19,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Utility\Utility.csproj" />
+    <ProjectReference Include="..\MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj" />
+    <ProjectReference Include="..\Palmtree.Core\Palmtree.Core.csproj" />
   </ItemGroup>
 
 </Project>
