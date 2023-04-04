@@ -358,3 +358,4 @@ MigrationBackup/
 /ChapterConverter/Properties/launchSettings.json
 /CalcVMAF/Properties/launchSettings.json
 *.exe
+/Experiment/Properties/launchSettings.json
