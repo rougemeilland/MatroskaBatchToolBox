@@ -177,7 +177,7 @@ namespace MovieChapterEditor
                                     string.Join(" ", ffmpegCommandParameters),
                                     Command.GetTextInputRedirector(inMetadataReader.ReadLine),
                                     standardOutputRedirector,
-                                    Console.Error.WriteLine,
+                                    TinyConsole.Error.WriteLine,
                                     (level, message) =>
                                     {
                                         switch (level)
@@ -237,7 +237,7 @@ namespace MovieChapterEditor
             }
             finally
             {
-                Console.ResetColor();
+                TinyConsole.ResetColor();
             }
         }
 
@@ -266,7 +266,7 @@ namespace MovieChapterEditor
                 var temporaryInputFile = new FileInfo(Path.GetTempFileName());
                 try
                 {
-                    using var inputStream = Console.OpenStandardInput();
+                    using var inputStream = TinyConsole.OpenStandardInput();
                     using var outputStream = new FileStream(temporaryInputFile.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
                     {
                         var buffer = new byte[10240];
@@ -352,7 +352,7 @@ namespace MovieChapterEditor
         {
             if (outputFille is null)
             {
-                var standardOutputStream = Console.OpenStandardOutput();
+                var standardOutputStream = TinyConsole.OpenStandardOutput();
                 return ("-", standardOutputStream, Command.GetBinaryOutputRedirector(data => standardOutputStream.Write(data.Span)));
             }
             else
@@ -394,7 +394,7 @@ namespace MovieChapterEditor
                         .Prepend($"  * {optionDefinition.GetHelpSyntaxText()}")
                         .Append("")));
             foreach (var lineText in textLines)
-                Console.WriteLine(lineText);
+                TinyConsole.Out.WriteLine(lineText);
         }
 
         private static void PrintExceptionMessage(Exception ex)
@@ -408,10 +408,10 @@ namespace MovieChapterEditor
 
         private static void PrintWarningMessage(string programName, string message)
         {
-            var color = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"{programName}:WARNING: {message}");
-            Console.ForegroundColor = color;
+            var color = TinyConsole.ForegroundColor;
+            TinyConsole.ForegroundColor = ConsoleColor.Yellow;
+            TinyConsole.Error.WriteLine($"{programName}:WARNING: {message}");
+            TinyConsole.ForegroundColor = color;
         }
 
         private static void PrintErrorMessage(string message)
@@ -419,10 +419,10 @@ namespace MovieChapterEditor
 
         private static void PrintErrorMessage(string programName, string message)
         {
-            var color = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.Error.WriteLine($"{programName}:ERROR: {message}");
-            Console.ForegroundColor = color;
+            var color = TinyConsole.ForegroundColor;
+            TinyConsole.ForegroundColor = ConsoleColor.Red;
+            TinyConsole.Error.WriteLine($"{programName}:ERROR: {message}");
+            TinyConsole.ForegroundColor = color;
         }
     }
 }

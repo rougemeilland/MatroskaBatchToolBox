@@ -26,7 +26,6 @@ namespace MatroskaBatchToolBox
         private static readonly object _lockConsoleObject;
         private static readonly TimeSpan _maximumTimeForProgressUpdate;
         private static string _previousProgressText;
-        private static int _previousProgressTextLengthOnConsole;
         private static bool _cancelRequested;
         private static bool _completed;
 
@@ -36,14 +35,13 @@ namespace MatroskaBatchToolBox
             _lockConsoleObject = new object();
             _maximumTimeForProgressUpdate = TimeSpan.FromMinutes(1);
             _previousProgressText = "";
-            _previousProgressTextLengthOnConsole = 0;
             _cancelRequested = false;
             _completed = false;
         }
 
         public static void Main(string[] args)
         {
-            Console.Title = nameof(MatroskaBatchToolBox);
+            TinyConsole.Title = nameof(MatroskaBatchToolBox);
 
             try
             {
@@ -69,25 +67,26 @@ namespace MatroskaBatchToolBox
                 var applicationLock = new Mutex(false, _applicationUniqueId);
                 if (!applicationLock.WaitOne(0, false))
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine(string.Format(Resource.AlreadyRunnningMessasgeText, nameof(MatroskaBatchToolBox)));
+                    TinyConsole.ForegroundColor = ConsoleColor.Red;
+                    TinyConsole.WriteLine(string.Format(Resource.AlreadyRunnningMessasgeText, nameof(MatroskaBatchToolBox)));
+                    TinyConsole.ResetColor();
                     return;
                 }
 
-                Console.WriteLine(
+                TinyConsole.WriteLine(
                     actionMode switch
                     {
                         ActionMode.NormalizeAudio => Resource.AudioNormalizationProcessStartMessageText,
                         ActionMode.ConvertVideo => Resource.VideoConversionStartMessageText,
                         _ => throw Validation.GetFailErrorException($"Unexpected {nameof(ActionMode)} value: {actionMode}"),
                     });
-                Console.WriteLine();
+                TinyConsole.WriteLine();
 
                 _ = Task.Run(() =>
                 {
                     while (true)
                     {
-                        var keyInfo = Console.ReadKey(true);
+                        var keyInfo = TinyConsole.ReadKey(true);
                         if (keyInfo.Key == ConsoleKey.Q)
                         {
                             ExternalCommand.AbortExternalCommands();
@@ -96,14 +95,14 @@ namespace MatroskaBatchToolBox
                                 if (!_completed)
                                 {
                                     _cancelRequested = true;
-                                    Console.CursorVisible = true;
-                                    Console.WriteLine();
-                                    Console.WriteLine();
-                                    var color = Console.ForegroundColor;
-                                    Console.ForegroundColor = ConsoleColor.Yellow;
-                                    Console.WriteLine(Resource.Q_KeyPressedMessasgeText);
-                                    Console.WriteLine();
-                                    Console.ForegroundColor = color;
+                                    TinyConsole.CursorVisible = ConsoleCursorVisiblity.NormalMode;
+                                    TinyConsole.WriteLine();
+                                    TinyConsole.WriteLine();
+                                    var color = TinyConsole.ForegroundColor;
+                                    TinyConsole.ForegroundColor = ConsoleColor.Yellow;
+                                    TinyConsole.WriteLine(Resource.Q_KeyPressedMessasgeText);
+                                    TinyConsole.WriteLine();
+                                    TinyConsole.ForegroundColor = color;
                                 }
                             }
 
@@ -140,12 +139,12 @@ namespace MatroskaBatchToolBox
                     _completed = true;
                 }
 
-                Console.CursorVisible = true;
-                Console.WriteLine();
-                Console.WriteLine();
-                Console.Beep();
-                Console.WriteLine(Resource.ProcessCompletedMessageText);
-                _ = Console.ReadLine();
+                TinyConsole.CursorVisible = ConsoleCursorVisiblity.NormalMode;
+                TinyConsole.WriteLine();
+                TinyConsole.WriteLine();
+                TinyConsole.Beep();
+                TinyConsole.WriteLine(Resource.ProcessCompletedMessageText);
+                _ = TinyConsole.ReadLine();
 
                 void worker()
                 {
@@ -189,31 +188,31 @@ namespace MatroskaBatchToolBox
             }
             catch (AggregateException ex)
             {
-                Console.CursorVisible = true;
-                Console.WriteLine();
-                Console.WriteLine();
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Fatal error occured.");
-                Console.ForegroundColor = ConsoleColor.White;
+                TinyConsole.CursorVisible = ConsoleCursorVisiblity.NormalMode;
+                TinyConsole.WriteLine();
+                TinyConsole.WriteLine();
+                TinyConsole.ForegroundColor = ConsoleColor.Red;
+                TinyConsole.WriteLine($"Fatal error occured.");
+                TinyConsole.ForegroundColor = ConsoleColor.White;
                 ExternalCommand.ReportAggregateException(ex);
-                Console.WriteLine();
-                Console.Beep();
-                Console.WriteLine("Press ENTER key to exit.");
-                _ = Console.ReadLine();
+                TinyConsole.WriteLine();
+                TinyConsole.Beep();
+                TinyConsole.WriteLine("Press ENTER key to exit.");
+                _ = TinyConsole.ReadLine();
             }
             catch (Exception ex)
             {
-                Console.CursorVisible = true;
-                Console.WriteLine();
-                Console.WriteLine();
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Fatal error occured.");
-                Console.ForegroundColor = ConsoleColor.White;
+                TinyConsole.CursorVisible = ConsoleCursorVisiblity.NormalMode;
+                TinyConsole.WriteLine();
+                TinyConsole.WriteLine();
+                TinyConsole.ForegroundColor = ConsoleColor.Red;
+                TinyConsole.WriteLine($"Fatal error occured.");
+                TinyConsole.ForegroundColor = ConsoleColor.White;
                 ExternalCommand.ReportException(ex);
-                Console.WriteLine();
-                Console.Beep();
-                Console.WriteLine("Press ENTER key to exit.");
-                _ = Console.ReadLine();
+                TinyConsole.WriteLine();
+                TinyConsole.Beep();
+                TinyConsole.WriteLine("Press ENTER key to exit.");
+                _ = TinyConsole.ReadLine();
             }
         }
 
@@ -332,23 +331,17 @@ namespace MatroskaBatchToolBox
 
                 if (_cancelRequested)
                 {
-                    Console.CursorVisible = false;
-                    Console.Write(".");
+                    TinyConsole.CursorVisible = ConsoleCursorVisiblity.Invisible;
+                    TinyConsole.Write(".");
                     return;
                 }
 
                 if (progressText != _previousProgressText)
                 {
-                    Console.CursorVisible = false;
-                    var (leftPos0, topPos0) = Console.GetCursorPosition();
-                    Console.Write($"  {progressText}");
-                    var (leftPos1, topPos1) = Console.GetCursorPosition();
-                    var currentProgressTextLength = leftPos1 - leftPos0 + (topPos1 - topPos0) * Console.WindowWidth;
-                    if (_previousProgressTextLengthOnConsole > currentProgressTextLength)
-                        Console.Write(new string(' ', _previousProgressTextLengthOnConsole - currentProgressTextLength));
-                    Console.SetCursorPosition(leftPos0, topPos0);
+                    TinyConsole.CursorVisible = ConsoleCursorVisiblity.Invisible;
+                    TinyConsole.Write($"  {progressText}");
+                    TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
                     _previousProgressText = progressText;
-                    _previousProgressTextLengthOnConsole = currentProgressTextLength;
                 }
             }
         }

@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj" />
+    <ProjectReference Include="..\Palmtree.Console\Palmtree.Console.csproj" />
   </ItemGroup>
 
   <ItemGroup>

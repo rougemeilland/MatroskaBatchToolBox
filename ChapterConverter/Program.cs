@@ -288,7 +288,7 @@ namespace ChapterConverter
                 $"",
             };
             foreach (var message in helpMessageTextLines)
-                Console.WriteLine(message);
+                TinyConsole.Out.WriteLine(message);
         }
 
         private static bool ConvertAction(CommandLineOptions options)
@@ -386,7 +386,7 @@ namespace ChapterConverter
                 {
                     using var reader =
                         inputFilePath is null
-                        ? new StreamReader(Console.OpenStandardInput(), Encoding.UTF8)
+                        ? new StreamReader(TinyConsole.OpenStandardInput(), Encoding.UTF8)
                         : new StreamReader(inputFilePath, Encoding.UTF8);
                     return reader.ReadToEnd();
                 }
@@ -405,7 +405,7 @@ namespace ChapterConverter
                 var utf8EncodingWithoutBOM = new UTF8Encoding(false);
                 using var writer =
                     outputFilePath is null
-                    ? new StreamWriter(Console.OpenStandardOutput(), utf8EncodingWithoutBOM)
+                    ? new StreamWriter(TinyConsole.OpenStandardOutput(), utf8EncodingWithoutBOM)
                     : new StreamWriter(new FileStream(outputFilePath, force ? FileMode.Create : FileMode.CreateNew, FileAccess.Write, FileShare.None), utf8EncodingWithoutBOM);
                 writer.Write(outputRawText);
                 return true;
@@ -964,10 +964,10 @@ namespace ChapterConverter
         {
             lock (_consoleLockObject)
             {
-                var color = Console.ForegroundColor;
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Error.WriteLine($"{_thisProgramName}: WARNING: {message}");
-                Console.ForegroundColor = color;
+                var color = TinyConsole.ForegroundColor;
+                TinyConsole.ForegroundColor = ConsoleColor.Yellow;
+                TinyConsole.Error.WriteLine($"{_thisProgramName}: WARNING: {message}");
+                TinyConsole.ForegroundColor = color;
             }
         }
 
@@ -975,10 +975,10 @@ namespace ChapterConverter
         {
             lock (_consoleLockObject)
             {
-                var color = Console.ForegroundColor;
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.Error.WriteLine($"{_thisProgramName}: ERROR: {message}");
-                Console.ForegroundColor = color;
+                var color = TinyConsole.ForegroundColor;
+                TinyConsole.ForegroundColor = ConsoleColor.Red;
+                TinyConsole.Error.WriteLine($"{_thisProgramName}: ERROR: {message}");
+                TinyConsole.ForegroundColor = color;
             }
         }
     }

@@ -19,6 +19,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Palmtree.Console\Palmtree.Console.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="ffmpeg.exe">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

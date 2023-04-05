@@ -96,13 +96,13 @@ namespace EncoderBenchmarkTest
                                 try
                                 {
                                     var (elapsedTime, fileSize, commandLine) = ConvertMovieFile(ffmpegCommandPath, sourceFile, encodedFile, resolutionWidth, resolutionHeight, aspectRatioWidth, aspectRatioHeight, item.encoder, item.parameter);
-                                    Console.WriteLine(new string('-', 40));
+                                    TinyConsole.WriteLine(new string('-', 40));
                                     var vmafScore = CalculateVmaf(ffmpegCommandPath, sourceFile, encodedFile, resolutionWidth, resolutionHeight);
                                     var resultItems = new[] { Path.GetFileName(sourceFilePath) ?? "???", sourceFileLength.ToString("N0"), item.friendlyEncoderName, encodedFile.Length.ToString("N0"), elapsedTime.TotalSeconds.ToString("F2"), vmafScore.ToString("F6"), ((double)encodedFile.Length / sourceFileLength).ToString("F6"), commandLine };
                                     logWriter.WriteLine(string.Join("\t", resultItems));
                                     logWriter.Flush();
-                                    Console.WriteLine(string.Join(", ", resultItems));
-                                    Console.WriteLine(new string('=', 40));
+                                    TinyConsole.WriteLine(string.Join(", ", resultItems));
+                                    TinyConsole.WriteLine(new string('=', 40));
                                 }
                                 catch (Exception)
                                 {
@@ -117,9 +117,9 @@ namespace EncoderBenchmarkTest
                 }
             }
 
-            Console.WriteLine("Complete");
-            Console.Beep();
-            _ = Console.ReadLine();
+            TinyConsole.WriteLine("Complete");
+            TinyConsole.Beep();
+            _ = TinyConsole.ReadLine();
         }
 
         private static (TimeSpan cpuTime, long encodedFileLength, string commandLine) ConvertMovieFile(string ffmpegCommandPath, FileInfo sourceFile, FileInfo encodedFile, int resolutionWidth, int resolutionHeight, int aspectRatioWidth, int aspectRatioHeight, string encoder, string encoderDependentParameters)
@@ -138,7 +138,7 @@ namespace EncoderBenchmarkTest
             _ = commandParameter.Append($" -sn");
             _ = commandParameter.Append($" \"{encodedFile.FullName}\"");
             var summaryOfCommandLine = $"{Path.GetFileName(ffmpegCommandPath)} {commandParameter.ToString().Replace(sourceFile.FullName, sourceFile.Name).Replace(encodedFile.FullName, encodedFile.Name)}";
-            Console.WriteLine($"commandLine: {summaryOfCommandLine}");
+            TinyConsole.WriteLine($"commandLine: {summaryOfCommandLine}");
             var totalProcessorTime = ExecuteFfmpegCommand(ffmpegCommandPath, commandParameter.ToString());
             var encodedFileLength = encodedFile.Length;
             return (totalProcessorTime, encodedFileLength, summaryOfCommandLine);
@@ -216,9 +216,9 @@ namespace EncoderBenchmarkTest
                             }
 
                             if (lineText.StartsWith("frame=", StringComparison.Ordinal))
-                                Console.Write(lineText + "\r");
+                                TinyConsole.Write(lineText + "\r");
                             else
-                                Console.WriteLine(lineText);
+                                TinyConsole.WriteLine(lineText);
                         }
                     });
                 standardErrorProcessingTask.Wait();

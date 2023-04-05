@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Palmtree;
 
 namespace CalcVmaf
 {
@@ -23,7 +24,7 @@ namespace CalcVmaf
             var ffmpegExecutablePath = FindFfmpegExecutablePath(baseDirectoryPath);
             if (string.IsNullOrEmpty(ffmpegExecutablePath))
             {
-                Console.Error.WriteLine("'ffmpeg' executable not found.");
+                TinyConsole.Error.WriteLine("'ffmpeg' executable not found.");
                 return 1;
             }
 
@@ -72,7 +73,7 @@ namespace CalcVmaf
                 var process = Process.Start(processStartInfo);
                 if (process is null)
                 {
-                    Console.Error.WriteLine("'Failed to start ffmpeg.");
+                    TinyConsole.Error.WriteLine("'Failed to start ffmpeg.");
                     return 1;
                 }
 
@@ -82,7 +83,7 @@ namespace CalcVmaf
                     {
                         while (true)
                         {
-                            var c = Console.Read();
+                            var c = TinyConsole.Read();
                             if (c < 0)
                                 break;
                             process.StandardInput.Write(char.ConvertFromUtf32(c));
@@ -97,7 +98,7 @@ namespace CalcVmaf
                             if (length <= 0)
                                 break;
                             var blockText = new string(buffer, 0, length);
-                            Console.Write(blockText);
+                            TinyConsole.Write(blockText);
                             logWriter?.Write(blockText);
                         }
                     });
@@ -111,14 +112,14 @@ namespace CalcVmaf
                             if (length <= 0)
                                 break;
                             var blockText = new string(buffer, 0, length);
-                            Console.Error.Write(blockText);
+                            TinyConsole.Error.Write(blockText);
                             logWriter?.Write(blockText);
                             cache += blockText;
                             foreach (var match in vmafScorePattern.Matches(cache).Cast<Match>())
                             {
                                 vmafScore = match.Groups["vmafScore"].Value;
                                 if (!(option.Log ?? false))
-                                    Console.WriteLine(vmafScore);
+                                    TinyConsole.Out.WriteLine(vmafScore);
                             }
 
                             var indexOfLastNewLine = cache.LastIndexOfAny(new[] { '\r', '\n' });
@@ -189,7 +190,7 @@ namespace CalcVmaf
                 {
                     if (option.Log is not null)
                     {
-                        Console.Error.WriteLine("Duplicate '--log' option specified.");
+                        TinyConsole.Error.WriteLine("Duplicate '--log' option specified.");
                         return (null, null, null);
                     }
 
@@ -198,7 +199,7 @@ namespace CalcVmaf
                 else if (args[index].StartsWith("-", StringComparison.Ordinal) ||
                          args[index].StartsWith("--", StringComparison.Ordinal))
                 {
-                    Console.Error.WriteLine($"An unsupported option was specified.: \"{args[index]}\"");
+                    TinyConsole.Error.WriteLine($"An unsupported option was specified.: \"{args[index]}\"");
                     return (null, null, null);
                 }
                 else if (originalMovieFile is null)
@@ -209,13 +210,13 @@ namespace CalcVmaf
                         file = new FileInfo(args[index]);
                         if (!file.Exists)
                         {
-                            Console.Error.WriteLine($"Original movie file does not exist.: \"{args[index]}\"");
+                            TinyConsole.Error.WriteLine($"Original movie file does not exist.: \"{args[index]}\"");
                             return (null, null, null);
                         }
                     }
                     catch (Exception)
                     {
-                        Console.Error.WriteLine($"Original movie file does not exist.: \"{args[index]}\"");
+                        TinyConsole.Error.WriteLine($"Original movie file does not exist.: \"{args[index]}\"");
                         return (null, null, null);
                     }
 
@@ -229,13 +230,13 @@ namespace CalcVmaf
                         file = new FileInfo(args[index]);
                         if (!file.Exists)
                         {
-                            Console.Error.WriteLine($"Encoded movie file does not exist.: \"{args[index]}\"");
+                            TinyConsole.Error.WriteLine($"Encoded movie file does not exist.: \"{args[index]}\"");
                             return (null, null, null);
                         }
                     }
                     catch (Exception)
                     {
-                        Console.Error.WriteLine($"Encoded movie file does not exist.: \"{args[index]}\"");
+                        TinyConsole.Error.WriteLine($"Encoded movie file does not exist.: \"{args[index]}\"");
                         return (null, null, null);
                     }
 
@@ -243,20 +244,20 @@ namespace CalcVmaf
                 }
                 else
                 {
-                    Console.Error.WriteLine($"There is an error in the command line arguments.: {nameof(CalcVmaf)} {string.Join(" ", args)}");
+                    TinyConsole.Error.WriteLine($"There is an error in the command line arguments.: {nameof(CalcVmaf)} {string.Join(" ", args)}");
                     return (null, null, null);
                 }
             }
 
             if (originalMovieFile is null)
             {
-                Console.Error.WriteLine($"Original movie file is not specified.: {nameof(CalcVmaf)} {string.Join(" ", args)}");
+                TinyConsole.Error.WriteLine($"Original movie file is not specified.: {nameof(CalcVmaf)} {string.Join(" ", args)}");
                 return (null, null, null);
             }
 
             if (encodedMovieFile is null)
             {
-                Console.Error.WriteLine($"Encoded movie file is not specified.: {nameof(CalcVmaf)} {string.Join(" ", args)}");
+                TinyConsole.Error.WriteLine($"Encoded movie file is not specified.: {nameof(CalcVmaf)} {string.Join(" ", args)}");
                 return (null, null, null);
             }
 

@@ -478,18 +478,18 @@ namespace MatroskaBatchToolBox
 
         public static void ReportException(Exception ex)
         {
-            Console.CursorVisible = true;
-            Console.WriteLine("----------");
-            Console.WriteLine(ex.Message);
-            Console.WriteLine(ex.StackTrace ?? "");
+            TinyConsole.CursorVisible = ConsoleCursorVisiblity.NormalMode;
+            TinyConsole.WriteLine("----------");
+            TinyConsole.WriteLine(ex.Message);
+            TinyConsole.WriteLine(ex.StackTrace ?? "");
             for (var innerEx = ex.InnerException; innerEx is not null; innerEx = innerEx.InnerException)
             {
-                Console.WriteLine("----------");
-                Console.WriteLine(innerEx.Message);
-                Console.WriteLine(innerEx.StackTrace ?? "");
+                TinyConsole.WriteLine("----------");
+                TinyConsole.WriteLine(innerEx.Message);
+                TinyConsole.WriteLine(innerEx.StackTrace ?? "");
             }
 
-            Console.WriteLine("----------");
+            TinyConsole.WriteLine("----------");
         }
 
         public static void ReportException(FileInfo logFile, Exception ex)

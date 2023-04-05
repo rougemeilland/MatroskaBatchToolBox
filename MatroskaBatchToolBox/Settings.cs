@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using MatroskaBatchToolBox.Model;
 using MatroskaBatchToolBox.Model.Json;
+using Palmtree;
 
 namespace MatroskaBatchToolBox
 {
@@ -106,15 +107,15 @@ namespace MatroskaBatchToolBox
 
         private static void PrintFatalMessage(string message)
         {
-            var previousColor = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine();
-            Console.WriteLine();
-            Console.WriteLine(message);
-            Console.ForegroundColor = previousColor;
-            Console.Beep();
-            Console.WriteLine("Press ENTER key to exit.");
-            _ = Console.ReadLine();
+            var previousColor = TinyConsole.ForegroundColor;
+            TinyConsole.ForegroundColor = ConsoleColor.Red;
+            TinyConsole.WriteLine();
+            TinyConsole.WriteLine();
+            TinyConsole.WriteLine(message);
+            TinyConsole.ForegroundColor = previousColor;
+            TinyConsole.Beep();
+            TinyConsole.WriteLine("Press ENTER key to exit.");
+            _ = TinyConsole.ReadLine();
             Environment.Exit(1);
         }
 

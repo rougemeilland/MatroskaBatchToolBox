@@ -4856,7 +4856,7 @@ namespace Palmtree.Terminal
                 // However, in that case, #000000-#000007 means SGR color code (Black, Red, Green, Yellow, Blue, Magenta, Cyan, White) instead of RGB. (Oh my God!)
                 // So if the specified color code is #000000-#000007, secretly change it to another similar color.
                 var (r, g, b) = color.ToRgb();
-                colorCode = (int) TrueColor.FromRgb((byte)(r + 1), (byte)(g + 1), (byte)(b + 1));
+                colorCode = (int)TrueColor.FromRgb((byte)(r + 1), (byte)(g + 1), (byte)(b + 1));
             }
 
             return _database.GetStringCapabilityValue(TermInfoStringCapabilities.SetAForeground, colorCode);
@@ -5605,5 +5605,10 @@ namespace Palmtree.Terminal
         /// ターミナル名およびターミナルの別名の配列です。
         /// </summary>
         public IReadOnlyArray<string> TerminalNames => _database.TerminalNames;
+
+        /// <summary>
+        /// terminfo データベースのパス名です。
+        /// </summary>
+        public string TermInfoFilePath => _database.TermInfoFilePath;
     }
 }
