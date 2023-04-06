@@ -8,34 +8,6 @@ namespace Palmtree
     partial class TinyConsole
     {
         /// <summary>
-        /// コンソールウィンドウ領域の左端の位置を、コンソールバッファに対する相対位置として取得します。
-        /// </summary>
-        /// <exception cref="InvalidOperationException">
-        /// <list type="bullet">
-        /// <item>標準出力と標準エラー出力がともにリダイレクトされています。</item>
-        /// </list>
-        /// </exception>
-        public static int WindowLeft
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => Console.WindowLeft;
-        }
-
-        /// <summary>
-        /// コンソールウィンドウ領域の上端の位置を、コンソールバッファに対する相対位置として取得します。
-        /// </summary>
-        /// <exception cref="InvalidOperationException">
-        /// <list type="bullet">
-        /// <item>標準出力と標準エラー出力がともにリダイレクトされています。</item>
-        /// </list>
-        /// </exception>
-        public static int WindowTop
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => Console.WindowTop;
-        }
-
-        /// <summary>
         /// 標準入力ストリームを取得します。
         /// </summary>
         public static TextReader In

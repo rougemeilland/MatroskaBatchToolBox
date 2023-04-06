@@ -35,15 +35,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Palmtree.Console.InterOp.Unix\Palmtree.Console.InterOp.Unix.vcxproj" />
     <ProjectReference Include="..\Palmtree.Console\Palmtree.Console.csproj" />
     <ProjectReference Include="..\Palmtree.Core\Palmtree.Core.csproj" />
     <ProjectReference Include="..\Palmtree.TerminalInfo\Palmtree.TerminalInfo.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="terminfo.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="xterm">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

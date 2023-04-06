@@ -23,7 +23,7 @@ namespace Palmtree
             int readBytesPos = 0;
             Span<byte> buffer = stackalloc byte[256];
 
-            UnixNativeInterOp.InitializeConsoleBeforeRead(minChars: (byte)(_everReceivedCursorPositionResponse ? 1 : 0), decisecondsTimeout: (byte)(_firstCursorPositionRequest ? 100 : 10));
+            InterOpUnix.InitializeConsoleBeforeRead(minChars: (byte)(_everReceivedCursorPositionResponse ? 1 : 0), decisecondsTimeout: (byte)(_firstCursorPositionRequest ? 100 : 10));
             try
             {
                 // CPR リクエストの送信
@@ -152,7 +152,7 @@ namespace Palmtree
             }
             finally
             {
-                UnixNativeInterOp.UninitializeConsoleAfterRead();
+                InterOpUnix.UninitializeConsoleAfterRead();
                 _firstCursorPositionRequest = false;
             }
 

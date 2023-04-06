@@ -30,6 +30,7 @@ namespace Palmtree
         private const char _alternativeCharacterSetMapMaximumKey = '\u007e';
         private static readonly bool _isWindows = OperatingSystem.IsWindows();
         private static readonly IntPtr _consoleOutputHandle;
+        private static readonly int _consoleOutputFileNo;
         private static readonly TextWriter _consoleTextWriter;
         private static readonly TextWriter? _escapeCodeWriter;
         private static readonly ConsoleColor _defaultBackgrouongColor = Console.BackgroundColor;
@@ -52,21 +53,24 @@ namespace Palmtree
         {
             if (!Console.IsOutputRedirected)
             {
-                _consoleOutputHandle = _isWindows ? WindowsNativeInterOp.GetStdHandle(WindowsNativeInterOp.STD_OUTPUT_HANDLE) : WindowsNativeInterOp.INVALID_HANDLE_VALUE;
+                _consoleOutputHandle = _isWindows ? InterOpWindows.GetStdHandle(InterOpWindows.STD_OUTPUT_HANDLE) : InterOpWindows.INVALID_HANDLE_VALUE;
+                _consoleOutputFileNo = !_isWindows ? InterOpUnix.GetStandardFileNo(InterOpUnix.STANDARD_FILE_OUT) : -1;
                 _consoleTextWriter =
                     new StreamWriter(Console.OpenStandardOutput(), Console.OutputEncoding.RemovePreamble(), 256, true) { AutoFlush = true };
                 _escapeCodeWriter = _consoleTextWriter;
             }
             else if (!Console.IsErrorRedirected)
             {
-                _consoleOutputHandle = _isWindows ? WindowsNativeInterOp.GetStdHandle(WindowsNativeInterOp.STD_ERROR_HANDLE) : WindowsNativeInterOp.INVALID_HANDLE_VALUE;
+                _consoleOutputHandle = _isWindows ? InterOpWindows.GetStdHandle(InterOpWindows.STD_ERROR_HANDLE) : InterOpWindows.INVALID_HANDLE_VALUE;
+                _consoleOutputFileNo = !_isWindows ? InterOpUnix.GetStandardFileNo(InterOpUnix.STANDARD_FILE_ERR) : -1;
                 _consoleTextWriter =
                     new StreamWriter(Console.OpenStandardError(), Console.OutputEncoding.RemovePreamble(), 256, true) { AutoFlush = true };
                 _escapeCodeWriter = _consoleTextWriter;
             }
             else
             {
-                _consoleOutputHandle = WindowsNativeInterOp.INVALID_HANDLE_VALUE;
+                _consoleOutputHandle = InterOpWindows.INVALID_HANDLE_VALUE;
+                _consoleOutputFileNo = -1;
                 _consoleTextWriter =
                         new StreamWriter(Console.OpenStandardError(), Console.OutputEncoding.RemovePreamble(), 256, true) { AutoFlush = true };
                 _escapeCodeWriter = null;
@@ -87,20 +91,20 @@ namespace Palmtree
                 }
             }
 
-            if (_isWindows && _consoleOutputHandle != WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+            if (_isWindows && _consoleOutputHandle != InterOpWindows.INVALID_HANDLE_VALUE)
             {
                 // Windows プラットフォームであり、かつ
                 // コンソール出力ハンドルが有効である (つまり標準出力と標準エラー出力のどちらかがリダイレクトされていない) 場合
 
                 // コンソールモードに ENABLE_VIRTUAL_TERMINAL_PROCESSING フラグを立てる (エスケープコードを解釈可能にする)
 
-                if (!WindowsNativeInterOp.GetConsoleMode(_consoleOutputHandle, out var mode))
+                if (!InterOpWindows.GetConsoleMode(_consoleOutputHandle, out var mode))
                     throw new Exception("Failed to get console mode.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
-                if ((mode & WindowsNativeInterOp.ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0)
+                if ((mode & InterOpWindows.ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0)
                 {
-                    mode |= WindowsNativeInterOp.ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-                    if (!WindowsNativeInterOp.SetConsoleMode(_consoleOutputHandle, mode))
+                    mode |= InterOpWindows.ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+                    if (!InterOpWindows.SetConsoleMode(_consoleOutputHandle, mode))
                         throw new Exception("Failed to set console mode.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
                 }
             }
@@ -127,7 +131,7 @@ namespace Palmtree
                         {
                             fixed (byte* keypadXmitBytesPointer = keypadXmitBytes)
                             {
-                                UnixNativeInterOp.SetKeypadXmit(keypadXmitBytesPointer);
+                                InterOpUnix.SetKeypadXmit(keypadXmitBytesPointer);
                             }
                         }
                     }
@@ -159,13 +163,13 @@ namespace Palmtree
             {
                 if (ImplementWithWin32Api)
                 {
-                    if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                    if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                         throw new InvalidOperationException("Since both standard output and standard error output are redirected, it is not possible to get console attributes.");
 
-                    if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                    if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                         throw new InvalidOperationException("Failed to get console screen buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
-                    (_currentBackgrouongColor, _) = WindowsNativeInterOp.FromConsoleAttributeToConsoleColors(consoleInfo.wAttributes);
+                    (_currentBackgrouongColor, _) = InterOpWindows.FromConsoleAttributeToConsoleColors(consoleInfo.wAttributes);
                     return _currentBackgrouongColor;
                 }
                 else
@@ -195,13 +199,13 @@ namespace Palmtree
             {
                 if (ImplementWithWin32Api)
                 {
-                    if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                    if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                         throw new InvalidOperationException("Since both standard output and standard error output are redirected, it is not possible to get console attributes.");
 
-                    if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                    if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                         throw new InvalidOperationException("Failed to get console screen buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
-                    (_, _currentForegrouongColor) = WindowsNativeInterOp.FromConsoleAttributeToConsoleColors(consoleInfo.wAttributes);
+                    (_, _currentForegrouongColor) = InterOpWindows.FromConsoleAttributeToConsoleColors(consoleInfo.wAttributes);
                     return _currentBackgrouongColor;
                 }
                 else
@@ -229,11 +233,11 @@ namespace Palmtree
         {
             if (ImplementWithWin32Api)
             {
-                if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                     throw new InvalidOperationException("Both standard output and standard error output are redirected, so console attributes cannot be changed.");
 
-                var consoleAtrribute = WindowsNativeInterOp.FromConsoleColorsToConsoleAttribute(_defaultBackgrouongColor, _defaultForegrouongColor);
-                if (!WindowsNativeInterOp.SetConsoleTextAttribute(_consoleOutputHandle, consoleAtrribute))
+                var consoleAtrribute = InterOpWindows.FromConsoleColorsToConsoleAttribute(_defaultBackgrouongColor, _defaultForegrouongColor);
+                if (!InterOpWindows.SetConsoleTextAttribute(_consoleOutputHandle, consoleAtrribute))
                     throw new InvalidOperationException("Failed to set console text attribute.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                 _currentBackgrouongColor = _defaultBackgrouongColor;
@@ -258,138 +262,29 @@ namespace Palmtree
 
         #endregion
 
-        #region BufferWidth
-
-#if false
-        public static int BufferWidth
-        {
-            get
-            {
-                if (OperatingSystem.IsWindows())
-                {
-
-                    if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
-                        throw new InvalidOperationException("Failed to get console buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
-
-                    return consoleInfo.dwSize.X;
-                }
-                else
-                {
-                    // UNIXの実装では native コードで標準出力のみに対してシステムコールが発行されている。
-                    // UNIXのネイティブコードを修正しないと標準出力がリダイレクトされている状況では正常に動作しないと思われるため、ここでは実装しない。
-                    throw new NotSupportedException();
-                }
-            }
-        }
-#endif
-
-        #endregion
-
-        #region BufferHeight
-
-#if false
-        public static int BufferHeight
-        {
-            get
-            {
-                if (OperatingSystem.IsWindows())
-                {
-                    if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
-                        throw new InvalidOperationException("Failed to get console buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
-
-                    return consoleInfo.dwSize.Y;
-                }
-                else
-                {
-                    // UNIXの実装では native コードで標準出力のみに対してシステムコールが発行されている。
-                    // UNIXのネイティブコードを修正しないと標準出力がリダイレクトされている状況では正常に動作しないと思われるため、ここでは実装しない。
-                    throw new NotSupportedException();
-                }
-            }
-        }
-#endif
-
-        #endregion
-
         #region WindowWidth
 
-#if false
+        /// <summary>
+        /// コンソールウィンドウの桁数を取得または設定します。
+        /// </summary>
         public static int WindowWidth
         {
-            get
-            {
-                if (OperatingSystem.IsWindows())
-                {
-                    if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
-                        throw new InvalidOperationException("Failed to get console buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
-
-                    return consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1;
-                }
-                else
-                {
-                    // UNIXの実装では native コードで標準出力のみに対してシステムコールが発行されている。
-                    // UNIXのネイティブコードを修正しないと標準出力がリダイレクトされている状況では正常に動作しないと思われるため、ここでは実装しない。
-                    throw new NotSupportedException();
-                }
-            }
-
-            set
-            {
-                if (OperatingSystem.IsWindows())
-                {
-                    // UNIXで実装しないため、Windowsでも実装しない。
-                    throw new NotSupportedException();
-                }
-                else
-                {
-                    // UNIXの実装では native コードで標準出力のみに対してシステムコールが発行されている。
-                    // UNIXのネイティブコードを修正しないと標準出力がリダイレクトされている状況では正常に動作しないと思われるため、ここでは実装しない。
-                    throw new NotSupportedException();
-                }
-            }
+            get => GetWindowSizeCore().windowWidth;
+            // set => SetWindowSizeCore(value, GetWindowSizeCore().windowHeight); // プラットフォーム依存の機能であるためサポートしないこととする
         }
 
-#endif
         #endregion
 
         #region WindowHeight
 
-#if false
+        /// <summary>
+        /// コンソールウィンドウの行数を取得または設定します。
+        /// </summary>
         public static int WindowHeight
         {
-            get
-            {
-                if (OperatingSystem.IsWindows())
-                {
-                    if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
-                        throw new InvalidOperationException("Failed to get console buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
-
-                    return consoleInfo.srWindow.Bottom - consoleInfo.srWindow.Top + 1;
-                }
-                else
-                {
-                    // UNIXの実装では native コードで標準出力のみに対してシステムコールが発行されている。
-                    // UNIXのネイティブコードを修正しないと標準出力がリダイレクトされている状況では正常に動作しないと思われるため、ここでは実装しない。
-                    throw new NotSupportedException();
-                }
-            }
-
-            set
-            {
-                if (OperatingSystem.IsWindows())
-                {
-                    // UNIXで実装しないため、Windowsでも実装しない。
-                    throw new NotSupportedException();
-                }
-                else
-                {
-                    // UNIXの実装では native コードで標準出力のみに対してシステムコールが発行されている。
-                    // UNIXのネイティブコードを修正しないと標準出力がリダイレクトされている状況では正常に動作しないと思われるため、ここでは実装しない。
-                    throw new NotSupportedException();
-                }
-            }
+            get => GetWindowSizeCore().windowHeight;
+            // set => SetWindowSizeCore(GetWindowSizeCore().windowWidth, value); // プラットフォーム依存の機能であるためサポートしないこととする
         }
-#endif
 
         #endregion
 
@@ -443,7 +338,6 @@ namespace Palmtree
             }
             else
             {
-
                 WriteAnsiEscapeCodeToConsole(
                     ThisTerminalInfo.Bell ?? throw new InvalidOperationException("This terminal does not define the \"bell\" capability."),
                     () => throw new InvalidOperationException("Since both standard output and standard error output are redirected, it cannot beep."));
@@ -468,13 +362,13 @@ namespace Palmtree
         {
             if (ImplementWithWin32Api)
             {
-                if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                     throw new InvalidOperationException("Since both standard output and standard error output are redirected, the console screen cannot be cleared.");
 
-                if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                     throw new InvalidOperationException("Failed to get console screen buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
-                if (!WindowsNativeInterOp.SetConsoleCursorPosition(_consoleOutputHandle, new WindowsNativeInterOp.COORD { X = 0, Y = 0 }))
+                if (!InterOpWindows.SetConsoleCursorPosition(_consoleOutputHandle, new InterOpWindows.COORD { X = 0, Y = 0 }))
                     throw new InvalidOperationException("Failed to set cursor position.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                 ClearScreenCore(0, 0, consoleInfo.dwSize.X * consoleInfo.dwSize.Y, consoleInfo.wAttributes);
@@ -521,10 +415,10 @@ namespace Palmtree
         {
             if (ImplementWithWin32Api)
             {
-                if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                     throw new InvalidOperationException("Since both standard output and standard error output are redirected, it is not possible to delete console characters.");
 
-                if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                     throw new InvalidOperationException("Failed to get console buffer info.", Marshal.GetExceptionForHR(Marshal.GetLastWin32Error()));
 
                 var screenWidth = consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1;
@@ -551,7 +445,7 @@ namespace Palmtree
                     case ConsoleEraseMode.EntireScreen:
                     {
                         // カーソルをホームポジションに設定
-                        if (!WindowsNativeInterOp.SetConsoleCursorPosition(_consoleOutputHandle, new WindowsNativeInterOp.COORD { X = consoleInfo.srWindow.Left, Y = consoleInfo.srWindow.Top }))
+                        if (!InterOpWindows.SetConsoleCursorPosition(_consoleOutputHandle, new InterOpWindows.COORD { X = consoleInfo.srWindow.Left, Y = consoleInfo.srWindow.Top }))
                             throw new InvalidOperationException("Failed to set cursor position.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                         for (var row = consoleInfo.srWindow.Top; row <= consoleInfo.srWindow.Bottom; row++)
@@ -568,7 +462,7 @@ namespace Palmtree
                             case ConsoleEraseMode.EntireConsoleBuffer:
                             {
                                 // カーソルをホームポジションに設定
-                                if (!WindowsNativeInterOp.SetConsoleCursorPosition(_consoleOutputHandle, new WindowsNativeInterOp.COORD { X = 0, Y = 0 }))
+                                if (!InterOpWindows.SetConsoleCursorPosition(_consoleOutputHandle, new InterOpWindows.COORD { X = 0, Y = 0 }))
                                     throw new InvalidOperationException("Failed to set cursor position.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                                 startX = 0;
@@ -649,10 +543,10 @@ namespace Palmtree
 
                 if (ImplementWithWin32Api)
                 {
-                    if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                    if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                         throw new InvalidOperationException("Since both standard output and standard error are redirected, it is not possible to change the visibility of the cursor.");
 
-                    if (!WindowsNativeInterOp.GetConsoleCursorInfo(_consoleOutputHandle, out var cursorInfo))
+                    if (!InterOpWindows.GetConsoleCursorInfo(_consoleOutputHandle, out var cursorInfo))
                         throw new InvalidOperationException("Failed to get console cursor info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                     (cursorInfo.bVisible, cursorInfo.dwSize) =
@@ -663,7 +557,7 @@ namespace Palmtree
                             ConsoleCursorVisiblity.HighVisibilityMode => (true, 100U),
                             _ => throw Validation.GetFailErrorException($"Unexpected value \"{value}\""),
                         };
-                    if (!WindowsNativeInterOp.SetConsoleCursorInfo(_consoleOutputHandle, ref cursorInfo))
+                    if (!InterOpWindows.SetConsoleCursorInfo(_consoleOutputHandle, ref cursorInfo))
                         throw new InvalidOperationException("Failed to set console cursor info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
                 }
                 else
@@ -934,17 +828,17 @@ namespace Palmtree
         {
             if (ImplementWithWin32Api)
             {
-                if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                     throw new InvalidOperationException("Both standard output and standard error output are redirected, so console attributes cannot be changed.");
 
-                if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                     throw new InvalidOperationException("Failed to get console screen buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                 var consoleAtrribute =
-                    WindowsNativeInterOp.FromConsoleColorsToConsoleAttribute(
+                    InterOpWindows.FromConsoleColorsToConsoleAttribute(
                         value,
-                        WindowsNativeInterOp.FromConsoleAttributeToConsoleColors(consoleInfo.wAttributes).foregroundColor);
-                if (!WindowsNativeInterOp.SetConsoleTextAttribute(_consoleOutputHandle, consoleAtrribute))
+                        InterOpWindows.FromConsoleAttributeToConsoleColors(consoleInfo.wAttributes).foregroundColor);
+                if (!InterOpWindows.SetConsoleTextAttribute(_consoleOutputHandle, consoleAtrribute))
                     throw new InvalidOperationException("Failed to set console text attribute.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
             }
             else
@@ -966,17 +860,17 @@ namespace Palmtree
         {
             if (ImplementWithWin32Api)
             {
-                if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                     throw new InvalidOperationException("Both standard output and standard error output are redirected, so console attributes cannot be changed.");
 
-                if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                     throw new InvalidOperationException("Failed to get console screen buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                 var consoleAtrribute =
-                    WindowsNativeInterOp.FromConsoleColorsToConsoleAttribute(
-                        WindowsNativeInterOp.FromConsoleAttributeToConsoleColors(consoleInfo.wAttributes).backgroundColor,
+                    InterOpWindows.FromConsoleColorsToConsoleAttribute(
+                        InterOpWindows.FromConsoleAttributeToConsoleColors(consoleInfo.wAttributes).backgroundColor,
                         value);
-                if (!WindowsNativeInterOp.SetConsoleTextAttribute(_consoleOutputHandle, consoleAtrribute))
+                if (!InterOpWindows.SetConsoleTextAttribute(_consoleOutputHandle, consoleAtrribute))
                     throw new InvalidOperationException("Failed to set console text attribute.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
             }
@@ -993,14 +887,167 @@ namespace Palmtree
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static (int windowWidth, int windowHeight) GetWindowSizeCore()
+        {
+            if (_isWindows)
+            {
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
+                    throw new InvalidOperationException("Since both standard output and standard error output are redirected, it is not possible to get window size.");
+
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                    throw new InvalidOperationException("Failed to get console screen buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
+
+                return (consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1, consoleInfo.srWindow.Bottom - consoleInfo.srWindow.Top + 1);
+            }
+            else
+            {
+                if (_consoleOutputFileNo < 0)
+                    throw new InvalidOperationException("Since both standard output and standard error output are redirected, it is not possible to get window size.");
+
+                if (InterOpUnix.GetWindowSize(_consoleOutputFileNo, out var windowSize, out _) == 0)
+                    return (windowSize.Col, windowSize.Row);
+
+                return (ThisTerminalInfo.Columns ?? throw new InvalidOperationException("The terminal does not have the capability \"columns\" defined."), ThisTerminalInfo.Lines ?? throw new InvalidOperationException("The terminal does not have the capability \"lines\" defined."));
+            }
+        }
+
+#if false // プラットフォーム依存の機能であるためサポートしないこととする
+        private static void SetWindowSizeCore(int windowWidth, int windowHeight)
+        {
+            if (_isWindows)
+            {
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
+                    throw new InvalidOperationException("Since both standard output and standard error output are redirected, it is not possible to set window size.");
+
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                    throw new InvalidOperationException("Failed to get console screen buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
+
+                var largestConsoleBufferSize = InterOpWindows.GetLargestConsoleWindowSize(_consoleOutputHandle);
+                if (largestConsoleBufferSize.X == 0 && largestConsoleBufferSize.Y == 0)
+                    throw new InvalidOperationException("Failed to get largest console buffer size.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
+
+                // 新たなコンソールウィンドウのサイズを初期化する。
+                var newConsoleBufferSize = new InterOpWindows.COORD { X = consoleInfo.dwSize.X, Y = consoleInfo.dwSize.Y };
+
+                // 新たなコンソールウィンドウの桁数をチェックする
+                try
+                {
+                    if (windowWidth < 0)
+                        throw new ArgumentOutOfRangeException(nameof(windowWidth));
+                    if (checked(consoleInfo.srWindow.Left + windowWidth) > consoleInfo.dwSize.X)
+                    {
+                        // 新たなコンソールウィンドウの桁が現在のコンソールバッファからはみ出している場合
+
+                        // 新たなコンソールバッファの桁数を求める
+                        newConsoleBufferSize.X = checked((short)(consoleInfo.srWindow.Left + windowWidth));
+                        if (newConsoleBufferSize.X > largestConsoleBufferSize.X)
+                            throw new ArgumentOutOfRangeException(nameof(windowWidth));
+                    }
+                }
+                catch (OverflowException)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(windowWidth));
+                }
+
+                // 新たなコンソールウィンドウの行数をチェックする
+                try
+                {
+                    if (windowHeight < 0)
+                        throw new ArgumentOutOfRangeException(nameof(windowHeight));
+                    if (checked(consoleInfo.srWindow.Top + windowHeight) > consoleInfo.dwSize.Y)
+                    {
+                        // 新たなコンソールウィンドウの行が現在のコンソールバッファからはみ出している場合
+
+                        // 新たなコンソールバッファの行数を求める
+                        newConsoleBufferSize.Y = checked((short)(consoleInfo.srWindow.Top + windowHeight));
+                        if (newConsoleBufferSize.Y > largestConsoleBufferSize.Y)
+                            throw new ArgumentOutOfRangeException(nameof(windowHeight));
+                    }
+                }
+                catch (OverflowException)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(windowHeight));
+                }
+
+                if (newConsoleBufferSize.X != consoleInfo.dwSize.X || newConsoleBufferSize.Y != consoleInfo.dwSize.Y)
+                {
+                    // コンソールバッファのサイズを変更する必要がある場合
+
+                    // コンソールバッファのサイズを変更する
+                    if (!InterOpWindows.SetConsoleScreenBufferSize(_consoleOutputHandle, newConsoleBufferSize))
+                        throw new InvalidOperationException("Failed to resize console buffer.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
+                }
+
+                var success = false;
+                try
+                {
+                    // コンソールウィンドウのサイズを変更する
+                    var windowRect =
+                        new InterOpWindows.SMALL_RECT
+                        {
+                            Left = consoleInfo.srWindow.Left,
+                            Top = consoleInfo.srWindow.Top,
+                            Right = (short)(consoleInfo.srWindow.Left + windowWidth - 1),
+                            Bottom = (short)(consoleInfo.srWindow.Top + windowHeight - 1),
+                        };
+                    if (!InterOpWindows.SetConsoleWindowInfo(_consoleOutputHandle, true, ref windowRect))
+                        throw new InvalidOperationException("Failed to resize console window.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
+
+                    // 成功フラグをセットする
+                    success = true;
+                }
+                finally
+                {
+                    if (!success && (newConsoleBufferSize.X != consoleInfo.dwSize.X || newConsoleBufferSize.Y != consoleInfo.dwSize.Y))
+                    {
+                        // コンソールウィンドウのサイズの変更に失敗しており、かつコンソールバッファのサイズが変更されている場合
+
+                        // コンソールバッファのサイズを元に戻す。(エラーは無視する)
+                        _ = InterOpWindows.SetConsoleScreenBufferSize(_consoleOutputHandle, consoleInfo.dwSize);
+                    }
+                }
+            }
+            else
+            {
+                if (_consoleOutputFileNo < 0)
+                    throw new InvalidOperationException("Since both standard output and standard error output are redirected, it is not possible to get window size.");
+
+                if (windowWidth is < 0 or > ushort.MaxValue)
+                    throw new ArgumentOutOfRangeException(nameof(windowWidth));
+                if (windowHeight is < 0 or > ushort.MaxValue)
+                    throw new ArgumentOutOfRangeException(nameof(windowHeight));
+
+                var windowSize =
+                    new InterOpUnix.WinSize
+                    {
+                        Col = (ushort)windowWidth,
+                        Row = (ushort)windowHeight,
+                        XPixel = default,
+                        YPixel = default,
+                    };
+
+                var result = InterOpUnix.SetWindowSize(_consoleOutputFileNo, ref windowSize, out var errno);
+                if (result != 0)
+                {
+                    Console.Error.WriteLine($"result={result}, errno={errno}");
+                    if (errno == InterOpUnix.ENOTSUP)
+                        throw new PlatformNotSupportedException("Resizing the console window is not supported.");
+                    else
+                        throw new InvalidOperationException($"Failed to set window size.: errno={errno}");
+                }
+            }
+        }
+#endif
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static (int left, int top) GetCursorPositionCore()
         {
             if (ImplementWithWin32Api)
             {
-                if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                     throw new InvalidOperationException("Since both standard output and standard error output are redirected, it is not possible to get the cursor position.");
 
-                if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                     throw new InvalidOperationException("Failed to get console screen buffer info.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                 return (consoleInfo.dwCursorPosition.X - consoleInfo.srWindow.Left, consoleInfo.dwCursorPosition.Y - consoleInfo.srWindow.Top);
@@ -1020,10 +1067,10 @@ namespace Palmtree
         {
             if (ImplementWithWin32Api)
             {
-                if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                     throw new InvalidOperationException("Cursor position cannot be set because both standard output and standard error output are redirected.");
 
-                if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                     throw new InvalidOperationException("Failed to get console information.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                 if (left.IsOutOfClosedInterval(0, consoleInfo.srWindow.Right - consoleInfo.srWindow.Left))
@@ -1032,9 +1079,9 @@ namespace Palmtree
                 if (left.IsOutOfClosedInterval(0, consoleInfo.srWindow.Bottom - consoleInfo.srWindow.Top))
                     throw new ArgumentOutOfRangeException(nameof(top), top, $"Invalid value for \"{nameof(top)}\" parameter.: {nameof(top)}={top}");
 
-                if (!WindowsNativeInterOp.SetConsoleCursorPosition(
+                if (!InterOpWindows.SetConsoleCursorPosition(
                     _consoleOutputHandle,
-                    new WindowsNativeInterOp.COORD
+                    new InterOpWindows.COORD
                     {
                         X = checked((short)(left + consoleInfo.srWindow.Left)),
                         Y = checked((short)(top + consoleInfo.srWindow.Top)),
@@ -1057,15 +1104,15 @@ namespace Palmtree
         {
             if (ImplementWithWin32Api)
             {
-                if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                     throw new InvalidOperationException("Both standard output and standard error output are redirected, so the cursor position cannot be moved.");
 
-                if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                     throw new InvalidOperationException("Failed to get console buffer info.", Marshal.GetExceptionForHR(Marshal.GetLastWin32Error()));
 
-                if (!WindowsNativeInterOp.SetConsoleCursorPosition(
+                if (!InterOpWindows.SetConsoleCursorPosition(
                     _consoleOutputHandle,
-                    new WindowsNativeInterOp.COORD
+                    new InterOpWindows.COORD
                     {
                         X = consoleInfo.dwCursorPosition.X,
                         Y = checked((short)(consoleInfo.dwCursorPosition.Y + n).Maximum(consoleInfo.srWindow.Top).Minimum(consoleInfo.srWindow.Bottom)),
@@ -1096,15 +1143,15 @@ namespace Palmtree
         {
             if (ImplementWithWin32Api)
             {
-                if (_consoleOutputHandle == WindowsNativeInterOp.INVALID_HANDLE_VALUE)
+                if (_consoleOutputHandle == InterOpWindows.INVALID_HANDLE_VALUE)
                     throw new InvalidOperationException("Both standard output and standard error output are redirected, so the cursor position cannot be moved.");
 
-                if (!WindowsNativeInterOp.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
+                if (!InterOpWindows.GetConsoleScreenBufferInfo(_consoleOutputHandle, out var consoleInfo))
                     throw new InvalidOperationException("Failed to get console buffer info.", Marshal.GetExceptionForHR(Marshal.GetLastWin32Error()));
 
-                if (!WindowsNativeInterOp.SetConsoleCursorPosition(
+                if (!InterOpWindows.SetConsoleCursorPosition(
                     _consoleOutputHandle,
-                    new WindowsNativeInterOp.COORD
+                    new InterOpWindows.COORD
                     {
                         X = checked((short)(consoleInfo.dwCursorPosition.X + n).Maximum(consoleInfo.srWindow.Left).Minimum(consoleInfo.srWindow.Right)),
                         Y = consoleInfo.dwCursorPosition.Y
@@ -1148,15 +1195,15 @@ namespace Palmtree
         private static void ClearScreenCore(int startX, int startY, int length, ushort attribute)
         {
             var startPosition =
-                new WindowsNativeInterOp.COORD
+                new InterOpWindows.COORD
                 {
                     X = checked((short)startX),
                     Y = checked((short)startY),
                 };
-            if (!WindowsNativeInterOp.FillConsoleOutputCharacter(_consoleOutputHandle, (short)' ', (uint)length, startPosition, out _))
+            if (!InterOpWindows.FillConsoleOutputCharacter(_consoleOutputHandle, (short)' ', (uint)length, startPosition, out _))
                 throw new InvalidOperationException("Failed to clear console buffer characters.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
-            if (!WindowsNativeInterOp.FillConsoleOutputAttribute(_consoleOutputHandle, attribute, (uint)length, startPosition, out _))
+            if (!InterOpWindows.FillConsoleOutputAttribute(_consoleOutputHandle, attribute, (uint)length, startPosition, out _))
                 throw new InvalidOperationException("Failed to clear console buffer attributes.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
         }
 
@@ -1164,7 +1211,7 @@ namespace Palmtree
         internal static unsafe byte ReadByteFromConsole()
         {
             byte data;
-            int result = UnixNativeInterOp.ReadStdin(&data, sizeof(byte));
+            int result = InterOpUnix.ReadStdin(&data, sizeof(byte));
             if (result < 0)
                 throw new IOException($"I/O error (errno={Marshal.GetLastPInvokeError()})");
 

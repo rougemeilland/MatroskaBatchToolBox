@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -6,7 +7,7 @@ namespace Palmtree
 {
     partial class TinyConsole
     {
-        private static class WindowsNativeInterOp
+        private static class InterOpWindows
         {
             public static readonly uint STD_INPUT_HANDLE = unchecked((uint)-10);
             public static readonly uint STD_OUTPUT_HANDLE = unchecked((uint)-11);
@@ -90,6 +91,13 @@ namespace Palmtree
             [DllImport("kernel32.dll", SetLastError = true)]
             [return: MarshalAs(UnmanagedType.Bool)]
             public extern static bool SetConsoleWindowInfo(IntPtr hConsoleHandle, bool bAbsolute, ref SMALL_RECT lpConsoleWindow);
+
+            [DllImport("kernel32.dll", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            public extern static bool SetConsoleScreenBufferSize(IntPtr hConsoleHandle, COORD dwSize);
+
+            [DllImport("kernel32.dll", SetLastError = true)]
+            public extern static COORD GetLargestConsoleWindowSize(IntPtr hConsoleHandle);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static ushort FromConsoleColorsToConsoleAttribute(ConsoleColor backgroundColor, ConsoleColor foregroundColor)
