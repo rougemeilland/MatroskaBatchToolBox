@@ -5467,7 +5467,9 @@ namespace Palmtree.Terminal
         /// <summary>
         /// terminfo データベースのすべてのターミナルの情報を JSON 形式で出力します。
         /// </summary>
-        /// <param name="writer"></param>
+        /// <param name="writer">
+        /// 出力先である <see cref="TextWriter"/> オブジェクトです。
+        /// </param>
         /// <param name="indent">
         /// JSON テキストに適用されるインデントの数です。
         /// </param>
