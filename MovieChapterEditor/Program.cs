@@ -30,6 +30,7 @@ namespace MovieChapterEditor
                     options.SingleOrNone(option => option.OptionType == OptionType.ToForTrimming)?.OptionParameter[1] as TimeSpan?,
                     options.SingleOrNone(option => option.OptionType == OptionType.DurationForTrimming)?.OptionParameter[1] as TimeSpan?);
                 KeepEmptyChapter = options.Any(option => option.OptionType == OptionType.KeepEemptyChapter);
+                Verbose = options.Any(option => option.OptionType == OptionType.Verbose);
                 IsHelpMode = options.Any(option => option.OptionType == OptionType.Help);
             }
 
@@ -45,6 +46,7 @@ namespace MovieChapterEditor
             public TimeSpan From { get; }
             public TimeSpan To { get; }
             public bool KeepEmptyChapter { get; }
+            public bool Verbose { get; }
             public bool IsHelpMode { get; }
 
             public static CommandParameter Parse(IEnumerable<CommandOptionDefinition<OptionType>> optionDefinitions, string[] args)
@@ -147,6 +149,8 @@ namespace MovieChapterEditor
                     return 0;
                 }
 
+                if (commandOptions.Verbose)
+                    PrintInformationMessage("Start processing.");
                 try
                 {
                     var (inputFile, temporaryInputFile) = GetInputMovieFile(commandOptions);
@@ -259,16 +263,22 @@ namespace MovieChapterEditor
 
             if (commandParameters.Input is not null)
             {
+                if (commandParameters.Verbose)
+                    PrintInformationMessage($"Input file path: \"{commandParameters.Input}\"");
                 return (new FileInfo(commandParameters.Input), null);
             }
             else
             {
+                if (commandParameters.Verbose)
+                    PrintInformationMessage("Read from standard input.");
                 var temporaryInputFile = new FileInfo(Path.GetTempFileName());
                 try
                 {
                     using var inputStream = TinyConsole.OpenStandardInput();
                     using var outputStream = new FileStream(temporaryInputFile.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
                     {
+                        if (commandParameters.Verbose)
+                            PrintInformationMessage($"Copy from standard input to a temporary file.: {temporaryInputFile.FullName}");
                         var buffer = new byte[10240];
                         while (true)
                         {
@@ -277,6 +287,9 @@ namespace MovieChapterEditor
                                 break;
                             outputStream.Write(buffer, 0, length);
                         }
+
+                        if (commandParameters.Verbose)
+                            PrintInformationMessage("Detecting the end of standard input, end the copy.");
                     }
 
                     return (temporaryInputFile, temporaryInputFile);
@@ -296,8 +309,32 @@ namespace MovieChapterEditor
             }
         }
 
-        private static MovieInformation GetMovieInformation(string? inputFormat, FileInfo inputFile)
+        private static TextReader GetInputMetadataStream(CommandParameter commandParameters, FileInfo inputFile)
         {
+            var filterParameter = new ChapterFilterParameter
+            {
+                From = commandParameters.From,
+                KeepEmptyChapter = commandParameters.KeepEmptyChapter,
+                MinimumDuration = commandParameters.MinimumDuration,
+                Titles = commandParameters.ChapterTitles,
+                To = commandParameters.To,
+                WarningMessageReporter = PrintWarningMessage,
+            };
+            return
+                new StringReader(
+                    (commandParameters.ChapterTimes is not null
+                        ? commandParameters.ChapterTimes
+                            .ToSimpleChapterElements(commandParameters.MaximumDuration, PrintWarningMessage)
+                            .ChapterFilter(filterParameter)
+                        : GetMovieInformation(commandParameters, commandParameters.InputFormat, inputFile).Chapters
+                            .ChapterFilter(filterParameter))
+                    .ToMetadataString());
+        }
+
+        private static MovieInformation GetMovieInformation(CommandParameter commandParameters, string? inputFormat, FileInfo inputFile)
+        {
+            if (commandParameters.Verbose)
+                PrintInformationMessage("Probe movie information.");
             try
             {
                 return
@@ -324,28 +361,6 @@ namespace MovieChapterEditor
             {
                 throw new Exception("Failed to get movie information.", ex);
             }
-        }
-
-        private static TextReader GetInputMetadataStream(CommandParameter commandParameters, FileInfo inputFile)
-        {
-            var filterParameter = new ChapterFilterParameter
-            {
-                From = commandParameters.From,
-                KeepEmptyChapter = commandParameters.KeepEmptyChapter,
-                MinimumDuration = commandParameters.MinimumDuration,
-                Titles = commandParameters.ChapterTitles,
-                To = commandParameters.To,
-                WarningMessageReporter = PrintWarningMessage,
-            };
-            return
-                new StringReader(
-                    (commandParameters.ChapterTimes is not null
-                        ? commandParameters.ChapterTimes
-                            .ToSimpleChapterElements(commandParameters.MaximumDuration, PrintWarningMessage)
-                            .ChapterFilter(filterParameter)
-                        : GetMovieInformation(commandParameters.InputFormat, inputFile).Chapters
-                            .ChapterFilter(filterParameter))
-                    .ToMetadataString());
         }
 
         private static (string outputFileSpec, Stream? standardOutputStream, IChildProcessOutputRedirectable? standardOutputRedirector) GetOutputMovieSpecs(string? outputFille, CommandParameter commandOptions)
@@ -403,15 +418,20 @@ namespace MovieChapterEditor
                 PrintErrorMessage(exception.Message);
         }
 
+        private static void PrintInformationMessage(string message)
+            => PrintInformationMessage(_thisProgramName, message);
+
+        private static void PrintInformationMessage(string programName, string message)
+            => TinyConsole.WriteLine($"{programName}:INFORMATION: {message}");
+
         private static void PrintWarningMessage(string message)
             => PrintWarningMessage(_thisProgramName, message);
 
         private static void PrintWarningMessage(string programName, string message)
         {
-            var color = TinyConsole.ForegroundColor;
             TinyConsole.ForegroundColor = ConsoleColor.Yellow;
-            TinyConsole.Error.WriteLine($"{programName}:WARNING: {message}");
-            TinyConsole.ForegroundColor = color;
+            TinyConsole.WriteLine($"{programName}:WARNING: {message}");
+            TinyConsole.ResetColor();
         }
 
         private static void PrintErrorMessage(string message)
@@ -419,10 +439,9 @@ namespace MovieChapterEditor
 
         private static void PrintErrorMessage(string programName, string message)
         {
-            var color = TinyConsole.ForegroundColor;
             TinyConsole.ForegroundColor = ConsoleColor.Red;
-            TinyConsole.Error.WriteLine($"{programName}:ERROR: {message}");
-            TinyConsole.ForegroundColor = color;
+            TinyConsole.WriteLine($"{programName}:ERROR: {message}");
+            TinyConsole.ResetColor();
         }
     }
 }

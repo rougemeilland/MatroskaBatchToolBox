@@ -451,6 +451,20 @@ namespace MovieChapterEditor
                     }),
 
                 new StraightStringCommandOptionDefinition<OptionType>(
+                    OptionType.Verbose,
+                     // エイリアスも含めたオプション名の配列
+                    new string[]{ "-v", "--verbose" },
+                    // 同一オプションの重複のみ NG
+                    (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
+                    // 常に OK (必須ではない)
+                    (options) => null,
+                    "--verbose  or  -v",
+                    new[]
+                    {
+                        "More information will be displayed.",
+                    }),
+
+                new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.Help,
                      // オプション名
                     "-help",

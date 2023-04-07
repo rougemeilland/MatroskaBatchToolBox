@@ -16,6 +16,7 @@
         ToForTrimming,
         DurationForTrimming,
         KeepEemptyChapter,
+        Verbose,
         Help,
     }
 }
