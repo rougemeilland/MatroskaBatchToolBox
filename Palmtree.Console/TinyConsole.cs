@@ -265,26 +265,18 @@ namespace Palmtree
         #region WindowWidth
 
         /// <summary>
-        /// コンソールウィンドウの桁数を取得または設定します。
+        /// コンソールウィンドウの桁数を取得します。
         /// </summary>
-        public static int WindowWidth
-        {
-            get => GetWindowSizeCore().windowWidth;
-            // set => SetWindowSizeCore(value, GetWindowSizeCore().windowHeight); // プラットフォーム依存の機能であるためサポートしないこととする
-        }
+        public static int WindowWidth => GetWindowSizeCore().windowWidth;
 
         #endregion
 
         #region WindowHeight
 
         /// <summary>
-        /// コンソールウィンドウの行数を取得または設定します。
+        /// コンソールウィンドウの行数を取得します。
         /// </summary>
-        public static int WindowHeight
-        {
-            get => GetWindowSizeCore().windowHeight;
-            // set => SetWindowSizeCore(GetWindowSizeCore().windowWidth, value); // プラットフォーム依存の機能であるためサポートしないこととする
-        }
+        public static int WindowHeight => GetWindowSizeCore().windowHeight;
 
         #endregion
 
