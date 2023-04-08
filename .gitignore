@@ -359,3 +359,4 @@ MigrationBackup/
 /CalcVMAF/Properties/launchSettings.json
 *.exe
 /Experiment/Properties/launchSettings.json
+/Palmtree.Movie.Ffmpeg/Properties/launchSettings.json
