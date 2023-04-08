@@ -28,7 +28,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
             HasUniqueChapterTitle = !string.IsNullOrEmpty(Title) && !_uselessChapterTitlePattern.IsMatch(Title);
         }
 
-        public int Id { get; }
+        public long Id { get; }
         public long TimeBaseNumerator { get; }
         public long TimeBaseDenominator { get; }
         public long Start { get; }

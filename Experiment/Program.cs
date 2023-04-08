@@ -1,43 +1,40 @@
 ﻿using System;
-using System.IO;
 using System.Linq;
-using Palmtree;
-using Palmtree.Terminal;
 
 namespace Experiment
 {
     public static partial class Program
     {
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<保留中>")]
-        public static void Main()
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:不要な抑制を削除します", Justification = "<保留中>")]
+        public static void Main(string[] args)
         {
-#if false
-            var windowWidth = Console.WindowWidth;
-            var windowHeight = Console.WindowHeight;
-            try
+            foreach (var item in args.Select((arg, index) => new { arg, encodedArg = EncodeArgument(arg), index }))
             {
-                Console.WriteLine($"{nameof(Console.WindowWidth)}={Console.WindowWidth}");
-                Console.WriteLine($"{nameof(Console.WindowHeight)}={Console.WindowHeight}");
-                _ = Console.ReadLine();
-                Console.WindowWidth = 180;
-                Console.WindowHeight = 50;
-                Console.WriteLine($"{nameof(Console.WindowWidth)}={Console.WindowWidth}");
-                Console.WriteLine($"{nameof(Console.WindowHeight)}={Console.WindowHeight}");
-                _ = Console.ReadLine();
-                Console.WindowWidth = windowWidth;
-                Console.WindowHeight = windowHeight;
-                _ = Console.ReadLine();
+                Console.WriteLine($"{item.index}:{item.arg} => {item.encodedArg}");
             }
-            finally
-            {
-                Console.WindowWidth = windowWidth;
-                Console.WindowHeight = windowHeight;
-            }
-#else
-            TinyConsole.WriteLine($"{nameof(TinyConsole.WindowWidth)}={TinyConsole.WindowWidth}");
-            TinyConsole.WriteLine($"{nameof(TinyConsole.WindowHeight)}={TinyConsole.WindowHeight}");
-#endif
+        }
 
+        private static string EncodeArgument(string arg)
+        {
+            return
+                OperatingSystem.IsWindows()
+                ? arg.IndexOfAny(new[] { '\t', ' ', '"' }) >= 0
+                    ? $"\"{EncodeForWindows(arg)}\""
+                    : arg
+                : arg.IndexOfAny(new[] { '\t', ' ' }) >= 0
+                    ? $"\"{EncodeForUnix(arg)}\""
+                    : EncodeForUnix(arg);
+
+            static string EncodeForWindows(string arg)
+            {
+                return string.Concat(arg.Select(c => c == '"' ? "\"\"" : c.ToString()));
+            }
+
+            static string EncodeForUnix(string arg)
+            {
+                return string.Concat(arg.Select(c => c == '\\' ? "\\\\" : c == '"' ? "\\\"" : c.ToString()));
+            }
         }
     }
 }

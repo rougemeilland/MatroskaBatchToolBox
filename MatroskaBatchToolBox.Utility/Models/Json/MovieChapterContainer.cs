@@ -12,7 +12,7 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
         }
 
         [JsonPropertyName("id")]
-        public int Id { get; set; }
+        public long Id { get; set; }
 
         [JsonPropertyName("time_base")]
         public string TimeBase { get; set; } // 1/1000000000 などの文字列

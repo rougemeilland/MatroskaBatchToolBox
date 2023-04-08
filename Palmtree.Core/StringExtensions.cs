@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 
 namespace Palmtree
 {
@@ -65,5 +66,33 @@ namespace Palmtree
                         '\\' => "\\\\",
                         _ => c.ToString(),
                     }));
+
+        /// <summary>
+        /// 指定された文字列をコマンドラインの引数の形式でエンコードします。
+        /// </summary>
+        /// <param name="s">エンコード対象の文字列です。</param>
+        /// <returns>エンコードされた文字列です。</returns>
+        /// <remarks>エンコードの方法は実行環境のプラットフォームによって異なります。</remarks>
+        public static string CommandLineArgumentEncode(this string s)
+        {
+            return
+                OperatingSystem.IsWindows()
+                ? s.IndexOfAny(new[] { '\t', ' ', '"' }) >= 0
+                    ? $"\"{EncodeForWindows(s)}\""
+                    : s
+                : s.IndexOfAny(new[] { '\t', ' ' }) >= 0
+                    ? $"\"{EncodeForUnix(s)}\""
+                    : EncodeForUnix(s);
+
+            static string EncodeForWindows(string arg)
+            {
+                return string.Concat(arg.Select(c => c == '"' ? "\"\"" : c.ToString()));
+            }
+
+            static string EncodeForUnix(string arg)
+            {
+                return string.Concat(arg.Select(c => c == '\\' ? "\\\\" : c == '"' ? "\\\"" : c.ToString()));
+            }
+        }
     }
 }

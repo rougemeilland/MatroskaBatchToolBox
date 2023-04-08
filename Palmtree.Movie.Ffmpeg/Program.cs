@@ -8,26 +8,18 @@ namespace Palmtree.Movie.Ffmpeg
 {
     public static class Program
     {
-        private static readonly string _thisCommandName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
-        private static readonly string _baseDirectory = Path.GetDirectoryName(typeof(Program).Assembly.Location) ?? ".";
+        private static readonly string _thisCommandName = typeof(Program).Assembly.GetName().Name ?? "???";
+        private static readonly string _baseDirectory = AppContext.BaseDirectory;
 
         public static int Main(string[] args)
         {
-            var newArgs = new string[args.Length];
-            Array.Copy(args, newArgs, args.Length);
-
-            var tempFilePath = (string?)null;
+#if false
+            Console.WriteLine(string.Join(" ", args.Prepend(_thisCommandName).Select(arg => EncodeArgument(arg))));
+            return 0;
+#else
+            var newArgs = MakeFfmpegCommandArguments(args, out var tempFilePath);
             try
             {
-                for (var index = 0; index + 1 < args.Length; ++index)
-                {
-                    if (newArgs[index] != "-i" && (newArgs[index + 1] == "-" || newArgs[index + 1] == "pipe:1"))
-                    {
-                        tempFilePath = Path.GetTempFileName();
-                        newArgs[index + 1] = tempFilePath;
-                    }
-                }
-
                 var exitCode = ExecuteFfpegCommand(newArgs);
                 if (exitCode == 0 && tempFilePath is not null)
                 {
@@ -41,7 +33,7 @@ namespace Palmtree.Movie.Ffmpeg
             catch (Exception ex)
             {
                 TinyConsole.ForegroundColor = ConsoleColor.Red;
-                TinyConsole.Write($"{_thisCommandName}:ERROR: {ex.Message}");
+                TinyConsole.Error.Write($"{_thisCommandName}:ERROR: {ex.Message}");
                 TinyConsole.ResetColor();
                 TinyConsole.WriteLine();
                 return 1;
@@ -51,6 +43,24 @@ namespace Palmtree.Movie.Ffmpeg
                 if (tempFilePath is not null)
                     File.Delete(tempFilePath);
             }
+#endif
+        }
+
+        private static string[] MakeFfmpegCommandArguments(string[] args, out string? tempFilePath)
+        {
+            var newArgs = new string[args.Length];
+            tempFilePath = null;
+            Array.Copy(args, newArgs, args.Length);
+            for (var index = 0; index + 1 < args.Length; ++index)
+            {
+                if (newArgs[index] != "-i" && (newArgs[index + 1] == "-" || newArgs[index + 1] == "pipe:1"))
+                {
+                    tempFilePath = Path.GetTempFileName();
+                    newArgs[index + 1] = tempFilePath;
+                }
+            }
+
+            return newArgs;
         }
 
         private static int ExecuteFfpegCommand(IEnumerable<string> args)
@@ -59,7 +69,7 @@ namespace Palmtree.Movie.Ffmpeg
                 args = args.Prepend("-y");
             var startInfo = new ProcessStartInfo
             {
-                Arguments = string.Join(" ", args.Select(arg => arg.Contains(' ', StringComparison.Ordinal) ? $"\"{arg}\"" : arg)),
+                Arguments = string.Join(" ", args.Select(arg => arg.CommandLineArgumentEncode())),
                 CreateNoWindow = false,
                 FileName = GetFfmpegCommandFilePath(),
                 UseShellExecute = false,
