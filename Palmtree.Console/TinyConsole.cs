@@ -96,16 +96,30 @@ namespace Palmtree
                 // Windows プラットフォームであり、かつ
                 // コンソール出力ハンドルが有効である (つまり標準出力と標準エラー出力のどちらかがリダイレクトされていない) 場合
 
-                // コンソールモードに ENABLE_VIRTUAL_TERMINAL_PROCESSING フラグを立てる (エスケープコードを解釈可能にする)
+                // コンソールモードに ENABLE_VIRTUAL_TERMINAL_PROCESSING フラグ (エスケープコードを解釈可能かどうか) を調べる
 
                 if (!InterOpWindows.GetConsoleMode(_consoleOutputHandle, out var mode))
                     throw new Exception("Failed to get console mode.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
 
                 if ((mode & InterOpWindows.ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0)
                 {
-                    mode |= InterOpWindows.ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-                    if (!InterOpWindows.SetConsoleMode(_consoleOutputHandle, mode))
+                    // コンソールモードに ENABLE_VIRTUAL_TERMINAL_PROCESSING フラグが立っていない場合
+
+                    // コンソールモードに ENABLE_VIRTUAL_TERMINAL_PROCESSING フラグをセットする
+                    if (!InterOpWindows.SetConsoleMode(_consoleOutputHandle, mode | InterOpWindows.ENABLE_VIRTUAL_TERMINAL_PROCESSING))
                         throw new Exception("Failed to set console mode.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
+
+                    // 再度、コンソールモードの ENABLE_VIRTUAL_TERMINAL_PROCESSING フラグを調べる
+                    if (!InterOpWindows.GetConsoleMode(_consoleOutputHandle, out mode))
+                        throw new Exception("Failed to get console mode.", Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
+
+                    if ((mode & InterOpWindows.ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0)
+                    {
+                        // 一度コンソールモードに ENABLE_VIRTUAL_TERMINAL_PROCESSING フラグをセットしたにもかかわらず、ENABLE_VIRTUAL_TERMINAL_PROCESSING フラグがセットされていない場合
+
+                        // ターミナルがエスケープコードをサポートしていないとみなす
+                        _escapeCodeWriter = null;
+                    }
                 }
             }
 
