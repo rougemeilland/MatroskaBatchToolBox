@@ -13,14 +13,10 @@ namespace Palmtree.Movie.Ffmpeg
 
         public static int Main(string[] args)
         {
-#if false
-            Console.WriteLine(string.Join(" ", args.Prepend(_thisCommandName).Select(arg => EncodeArgument(arg))));
-            return 0;
-#else
             var newArgs = MakeFfmpegCommandArguments(args, out var tempFilePath);
             try
             {
-                var exitCode = ExecuteFfpegCommand(newArgs);
+                var exitCode = ExecuteFfpegCommand(newArgs, tempFilePath is not null);
                 if (exitCode == 0 && tempFilePath is not null)
                 {
                     using var inStream = new FileStream(tempFilePath, FileMode.Open, FileAccess.Read, FileShare.None);
@@ -43,7 +39,6 @@ namespace Palmtree.Movie.Ffmpeg
                 if (tempFilePath is not null)
                     File.Delete(tempFilePath);
             }
-#endif
         }
 
         private static string[] MakeFfmpegCommandArguments(string[] args, out string? tempFilePath)
@@ -63,13 +58,14 @@ namespace Palmtree.Movie.Ffmpeg
             return newArgs;
         }
 
-        private static int ExecuteFfpegCommand(IEnumerable<string> args)
+        private static int ExecuteFfpegCommand(IEnumerable<string> args, bool force)
         {
-            if (args.None(arg => arg == "-y"))
+            if (force && args.None(arg => arg == "-y"))
                 args = args.Prepend("-y");
+            var arguments = string.Join(" ", args.Select(arg => arg.CommandLineArgumentEncode()));
             var startInfo = new ProcessStartInfo
             {
-                Arguments = string.Join(" ", args.Select(arg => arg.CommandLineArgumentEncode())),
+                Arguments = arguments,
                 CreateNoWindow = false,
                 FileName = GetFfmpegCommandFilePath(),
                 UseShellExecute = false,

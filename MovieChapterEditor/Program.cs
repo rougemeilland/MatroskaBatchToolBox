@@ -154,70 +154,65 @@ namespace MovieChapterEditor
                 try
                 {
                     var (inputFile, temporaryInputFile) = GetInputMovieFile(commandOptions);
+                    var (outputFile, temporaryOutputFile) = GetOutputMovieFile(commandOptions);
                     try
                     {
-                        var outputFille = commandOptions.Output;
-                        var (outputFileSpec, standardOutputStream, standardOutputRedirector) = GetOutputMovieSpecs(outputFille, commandOptions);
-                        try
-                        {
-                            var ffmpegCommandParameters = new List<string>
-                        {
-                            "-hide_banner"
-                        };
-                            if (commandOptions.IsForceMode)
-                                ffmpegCommandParameters.Add("-y");
-                            if (commandOptions.InputFormat is not null)
-                                ffmpegCommandParameters.Add($"-f {commandOptions.InputFormat}");
-                            ffmpegCommandParameters.Add($"-i \"{inputFile.FullName}\"");
-                            ffmpegCommandParameters.Add("-f ffmetadata -i -");
-                            ffmpegCommandParameters.Add("-c copy -map 0");
-                            ffmpegCommandParameters.Add("-map_chapters 1");
-                            if (commandOptions.OutputFormat is not null)
-                                ffmpegCommandParameters.Add($"-f {commandOptions.OutputFormat}");
-                            ffmpegCommandParameters.Add(outputFileSpec);
-                            using var inMetadataReader = GetInputMetadataStream(commandOptions, inputFile);
-                            var exitCode =
-                                Command.ExecuteFfmpeg(
-                                    string.Join(" ", ffmpegCommandParameters),
-                                    Command.GetTextInputRedirector(inMetadataReader.ReadLine),
-                                    standardOutputRedirector,
-                                    TinyConsole.Error.WriteLine,
-                                    (level, message) =>
-                                    {
-                                        switch (level)
-                                        {
-                                            case "WARNING":
-                                                PrintWarningMessage(message);
-                                                break;
-                                            case "ERROR":
-                                                PrintErrorMessage(message);
-                                                break;
-                                            default:
-                                                // NOP
-                                                break;
-                                        }
-                                    },
-                                    new Progress<double>(_ => { }));
-                            return
-                                exitCode == 0
-                                ? 0
-                                : throw new Exception($"An error occurred in the \"ffmpeg\" command. : exit-code={exitCode}");
-                        }
-                        finally
-                        {
-                            if (standardOutputStream is not null)
+                        var ffmpegCommandParameters =
+                            new List<string>
                             {
-                                try
+                                "-hide_banner"
+                            };
+                        if (commandOptions.IsForceMode || temporaryOutputFile is not null)
+                            ffmpegCommandParameters.Add("-y");
+                        if (commandOptions.InputFormat is not null)
+                            ffmpegCommandParameters.Add($"-f {commandOptions.InputFormat}");
+                        ffmpegCommandParameters.Add($"-i \"{inputFile.FullName}\"");
+                        ffmpegCommandParameters.Add("-f ffmetadata -i -");
+                        ffmpegCommandParameters.Add("-c copy -map 0");
+                        ffmpegCommandParameters.Add("-map_chapters 1");
+                        if (commandOptions.OutputFormat is not null)
+                            ffmpegCommandParameters.Add($"-f {commandOptions.OutputFormat}");
+                        ffmpegCommandParameters.Add($"\"{outputFile.FullName}\"");
+                        using var inMetadataReader = GetInputMetadataStream(commandOptions, inputFile);
+                        var exitCode =
+                            Command.ExecuteFfmpeg(
+                                string.Join(" ", ffmpegCommandParameters),
+                                Command.GetTextInputRedirector(inMetadataReader.ReadLine),
+                                null,
+                                TinyConsole.Error.WriteLine,
+                                (level, message) =>
                                 {
-                                    standardOutputStream.Flush();
-                                }
-                                catch (Exception)
-                                {
-                                }
+                                    switch (level)
+                                    {
+                                        case "WARNING":
+                                            PrintWarningMessage(message);
+                                            break;
+                                        case "ERROR":
+                                            PrintErrorMessage(message);
+                                            break;
+                                        default:
+                                            // NOP
+                                            break;
+                                    }
+                                },
+                                new Progress<double>(_ => { }));
+                        if (temporaryOutputFile is not null)
+                        {
+                            using var inStream = new FileStream(temporaryOutputFile.FullName, FileMode.Open, FileAccess.Read, FileShare.None);
+                            using var outStream = Console.OpenStandardOutput();
+                            if (commandOptions.Verbose)
+                                PrintInformationMessage($"Copy from temporary file to standard output.: {temporaryOutputFile.FullName}");
 
-                                standardOutputStream.Dispose();
-                            }
+                            CopyStream(inStream, outStream);
+
+                            if (commandOptions.Verbose)
+                                PrintInformationMessage("Detecting the end of temporary file, end the copy.");
                         }
+
+                        return
+                            exitCode == 0
+                            ? 0
+                            : throw new Exception($"An error occurred in the \"ffmpeg\" command. : exit-code={exitCode}");
                     }
                     finally
                     {
@@ -226,6 +221,17 @@ namespace MovieChapterEditor
                             try
                             {
                                 File.Delete(temporaryInputFile.FullName);
+                            }
+                            catch (Exception)
+                            {
+                            }
+                        }
+
+                        if (temporaryOutputFile is not null)
+                        {
+                            try
+                            {
+                                File.Delete(temporaryOutputFile.FullName);
                             }
                             catch (Exception)
                             {
@@ -279,14 +285,8 @@ namespace MovieChapterEditor
                     {
                         if (commandParameters.Verbose)
                             PrintInformationMessage($"Copy from standard input to a temporary file.: {temporaryInputFile.FullName}");
-                        var buffer = new byte[10240];
-                        while (true)
-                        {
-                            var length = inputStream.Read(buffer);
-                            if (length <= 0)
-                                break;
-                            outputStream.Write(buffer, 0, length);
-                        }
+
+                        CopyStream(inputStream, outputStream);
 
                         if (commandParameters.Verbose)
                             PrintInformationMessage("Detecting the end of standard input, end the copy.");
@@ -306,6 +306,24 @@ namespace MovieChapterEditor
 
                     throw new Exception("An error occurred while preparing the input file.", ex);
                 }
+            }
+        }
+
+        private static (FileInfo outputFilePath, FileInfo? outputTemporaryFilePath) GetOutputMovieFile(CommandParameter commandParameters)
+        {
+
+            if (commandParameters.Output is not null)
+            {
+                if (commandParameters.Verbose)
+                    PrintInformationMessage($"Output file path: \"{commandParameters.Output}\"");
+                return (new FileInfo(commandParameters.Output), null);
+            }
+            else
+            {
+                if (commandParameters.Verbose)
+                    PrintInformationMessage("Write to standard output.");
+                var temporaryOutputFile = new FileInfo(Path.GetTempFileName());
+                return (temporaryOutputFile, temporaryOutputFile);
             }
         }
 
@@ -363,16 +381,15 @@ namespace MovieChapterEditor
             }
         }
 
-        private static (string outputFileSpec, Stream? standardOutputStream, IChildProcessOutputRedirectable? standardOutputRedirector) GetOutputMovieSpecs(string? outputFille, CommandParameter commandOptions)
+        private static void CopyStream(Stream inputStream, Stream outputStream)
         {
-            if (outputFille is null)
+            var buffer = new byte[10240];
+            while (true)
             {
-                var standardOutputStream = TinyConsole.OpenStandardOutput();
-                return ("-", standardOutputStream, Command.GetBinaryOutputRedirector(data => standardOutputStream.Write(data.Span)));
-            }
-            else
-            {
-                return ($"\"{commandOptions.Output}\"", null, null);
+                var length = inputStream.Read(buffer);
+                if (length <= 0)
+                    break;
+                outputStream.Write(buffer, 0, length);
             }
         }
 
