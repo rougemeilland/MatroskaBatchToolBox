@@ -4,36 +4,37 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Palmtree;
+using System.Threading.Tasks;
 
-namespace Experiment
+namespace Palmtree
 {
-    public static partial class Program
+    /// <summary>
+    /// プロセス / 外部コマンドのヘルパークラスです。
+    /// </summary>
+    public class ProcessUtility
     {
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<保留中>")]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:不要な抑制を削除します", Justification = "<保留中>")]
-        public static int Main(string[] args)
-        {
-            var thisCommandName = typeof(Program).Assembly.GetName().Name;
-            try
-            {
-                var location = ExecuteWhichCommand(args[0]);
-                TinyConsole.WriteLine(location ?? "(null)");
-                return 0;
-            }
-            catch (Exception ex)
-            {
-                TinyConsole.ForegroundColor = ConsoleColor.Red;
-                TinyConsole.Error.WriteLine($"{thisCommandName}:ERROR: {ex.Message}");
-                return 1;
-            }
-            finally
-            {
-                TinyConsole.ResetColor();
-            }
-        }
-
-        private static string? ExecuteWhichCommand(string targetCommandName)
+        /// <summary>
+        /// ファイルシステムから指定されたコマンドを探します。
+        /// </summary>
+        /// <param name="targetCommandName">
+        /// 探すコマンドの名前である <see cref="string"/> オブジェクトです。
+        /// </param>
+        /// <returns>
+        /// <paramref name="targetCommandName"/> で指定されたコマンドが見つかった場合、そのフルパス名が返ります。
+        /// 見つからなかった場合、null が返ります。
+        /// </returns>
+        /// <exception cref="FileNotFoundException">
+        /// コマンドを探すためのコマンドが見つかりませんでした。
+        /// これは Windows の場合は "where.exe" であり、UNIX の場合は "which" です。
+        /// </exception>
+        /// <remarks>
+        /// このメソッドはファイルシステムの以下の場所からコマンドを探します。
+        /// <list type="bullet">
+        /// <item>カレントディレクトリ</item>
+        /// <item>PATH環境変数に設定されているディレクトリ</item>
+        /// </list>
+        /// </remarks>
+        public static string? WhereIs(string targetCommandName)
         {
             // コマンドのパス名を解決するコマンドの情報を取得する
             //   Windows の場合: where.exe
@@ -62,14 +63,29 @@ namespace Experiment
             };
             using var process = Process.Start(startInfo) ?? throw new Exception($"Could not start \"{whichCommandName}\" command.");
 
-            // 標準出力の最初の1行を読み込む (これが見つかったコマンドのフルパス名のはず)
-            var foundPath = process.StandardOutput.ReadLine();
+            // 標準出力を読み込むタスクの起動
+            var standardOutputProcessingTask =
+                Task.Run(() =>
+                {
+                    // 標準出力の最初の1行を読み込む (これが見つかったコマンドのフルパス名のはず)
+                    var firstLine = process.StandardOutput.ReadLine();
 
-            // 標準出力の2行目以降は読み捨てる
-            _ = process.StandardOutput.ReadToEnd();
+                    // 標準出力の2行目以降は読み捨てる
+                    _ = process.StandardOutput.ReadToEnd();
 
-            // 標準エラー出力を読み込み
-            var errorMessage = process.StandardError.ReadToEnd();
+                    // 最初の1行のみを返す。
+                    return firstLine;
+                });
+
+            // 標準エラー出力を読み込むタスクの起動
+            var standardErrorProcessingTask =
+                Task.Run(() => process.StandardError.ReadToEnd());
+
+            // 標準出力読み込みタスクの結果の取得
+            var foundPath = standardOutputProcessingTask.Result;
+
+            // 標準エラー出力読み込みタスクの結果の取得
+            var errorMessage = standardErrorProcessingTask.Result;
 
             // コマンドのパス名を解決するコマンドの終了を待機する
             process.WaitForExit();

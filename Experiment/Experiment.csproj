@@ -5,7 +5,7 @@
     <TargetFrameworks>net7.0;net60</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>experiment</AssemblyName>
+    <AssemblyName>experiment2</AssemblyName>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
   </PropertyGroup>
