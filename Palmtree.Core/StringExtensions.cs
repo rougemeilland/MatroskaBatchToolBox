@@ -94,5 +94,7 @@ namespace Palmtree
                 return string.Concat(arg.Select(c => c == '\\' ? "\\\\" : c == '"' ? "\\\"" : c.ToString()));
             }
         }
+
+        // TODO: ShellArgumentEncode() の実装 (バッチ / シェルスクリプト内でコマンドを呼び出す場合の引数のエンコード)
     }
 }

@@ -157,6 +157,7 @@ namespace MovieChapterEditor
                     var (outputFile, temporaryOutputFile) = GetOutputMovieFile(commandOptions);
                     try
                     {
+                        var movieInformation = GetMovieInformation(commandOptions, commandOptions.InputFormat, inputFile);
                         var ffmpegCommandParameters =
                             new List<string>
                             {
@@ -169,11 +170,17 @@ namespace MovieChapterEditor
                         ffmpegCommandParameters.Add($"-i \"{inputFile.FullName}\"");
                         ffmpegCommandParameters.Add("-f ffmetadata -i -");
                         ffmpegCommandParameters.Add("-c copy -map 0");
+                        foreach (var stream in movieInformation.VideoStreams)
+                            ffmpegCommandParameters.Add($"-disposition:v:{stream.IndexWithinVideoStream} {(stream.Disposition.Default ? "+" : "-")}default{(stream.Disposition.Forced ? "+" : "-")}forced");
+                        foreach (var stream in movieInformation.AudioStreams)
+                            ffmpegCommandParameters.Add($"-disposition:a:{stream.IndexWithinAudioStream} {(stream.Disposition.Default ? "+" : "-")}default{(stream.Disposition.Forced ? "+" : "-")}forced");
+                        foreach (var stream in movieInformation.SubtitleStreams)
+                            ffmpegCommandParameters.Add($"-disposition:s:{stream.IndexWithinSubtitleStream} {(stream.Disposition.Default ? "+" : "-")}default{(stream.Disposition.Forced ? "+" : "-")}forced");
                         ffmpegCommandParameters.Add("-map_chapters 1");
                         if (commandOptions.OutputFormat is not null)
                             ffmpegCommandParameters.Add($"-f {commandOptions.OutputFormat}");
                         ffmpegCommandParameters.Add($"\"{outputFile.FullName}\"");
-                        using var inMetadataReader = GetInputMetadataStream(commandOptions, inputFile);
+                        using var inMetadataReader = GetInputMetadataStream(commandOptions, movieInformation.Chapters);
                         var exitCode =
                             Command.ExecuteFfmpeg(
                                 string.Join(" ", ffmpegCommandParameters),
@@ -327,7 +334,7 @@ namespace MovieChapterEditor
             }
         }
 
-        private static TextReader GetInputMetadataStream(CommandParameter commandParameters, FileInfo inputFile)
+        private static TextReader GetInputMetadataStream(CommandParameter commandParameters, IEnumerable<ChapterInfo> chapters)
         {
             var filterParameter = new ChapterFilterParameter
             {
@@ -344,7 +351,7 @@ namespace MovieChapterEditor
                         ? commandParameters.ChapterTimes
                             .ToSimpleChapterElements(commandParameters.MaximumDuration, PrintWarningMessage)
                             .ChapterFilter(filterParameter)
-                        : GetMovieInformation(commandParameters, commandParameters.InputFormat, inputFile).Chapters
+                        : chapters
                             .ChapterFilter(filterParameter))
                     .ToMetadataString());
         }

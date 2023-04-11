@@ -36,6 +36,9 @@ namespace Palmtree
         /// </remarks>
         public static string? WhereIs(string targetCommandName)
         {
+            // TODO: コマンド呼び出しなしで実装する。1)このアセンブリがある場所, 2)カレントディレクトリ, 3)PATH環境変数で定義されているディレクトリ
+            // TODO: Windows の場合は exe com bat も含む
+
             // コマンドのパス名を解決するコマンドの情報を取得する
             //   Windows の場合: where.exe
             //   UNIX の場合: which
