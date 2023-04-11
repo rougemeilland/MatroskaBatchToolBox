@@ -366,7 +366,7 @@ namespace MovieChapterEditor
                     Command.GetMovieInformation(
                         inputFormat,
                         inputFile,
-                        MovieInformationType.Chapters,
+                        MovieInformationType.Chapters | MovieInformationType.Streams,
                         (level, message) =>
                         {
                             switch (level)

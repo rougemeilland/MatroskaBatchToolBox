@@ -36,6 +36,7 @@ namespace Palmtree
         /// </remarks>
         public static string? WhereIs(string targetCommandName)
         {
+            // Windows のPATH環境変数 ';' 区切り、パス名に';' が含まれている場合はダブルクォートでくくられる。
             // TODO: コマンド呼び出しなしで実装する。1)このアセンブリがある場所, 2)カレントディレクトリ, 3)PATH環境変数で定義されているディレクトリ
             // TODO: Windows の場合は exe com bat も含む
 
