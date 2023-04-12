@@ -28,26 +28,122 @@ namespace Palmtree
         /// これは Windows の場合は "where.exe" であり、UNIX の場合は "which" です。
         /// </exception>
         /// <remarks>
-        /// このメソッドはファイルシステムの以下の場所からコマンドを探します。
         /// <list type="bullet">
+        /// <item>
+        /// <term>検索対象ファイルについて</term>
+        /// <description>
+        /// <list type="bullet">
+        /// <item><term>Windows の場合</term><description><paramref name="targetCommandName"/> で指定された名前に拡張子 ".exe" が付加されたファイルを検索します。</description></item>
+        /// <item><term>Linux の場合</term><description><paramref name="targetCommandName"/> で指定された名前のファイルを探します。ただし実行可能ではないファイルを除きます。</description></item>
+        /// </list>
+        /// </description>
+        /// </item>
+        /// <item>
+        /// <term>検索場所について</term>
+        /// <description>
+        /// 以下の順で検索します。
+        /// <list type="number">
+        /// <item>アセンブリのあるディレクトリ (Windowsのみ)</item>
         /// <item>カレントディレクトリ</item>
         /// <item>PATH環境変数に設定されているディレクトリ</item>
+        /// </list>
+        /// </description>
+        /// </item>
         /// </list>
         /// </remarks>
         public static string? WhereIs(string targetCommandName)
         {
-            // Windows のPATH環境変数 ';' 区切り、パス名に';' が含まれている場合はダブルクォートでくくられる。
-            // TODO: コマンド呼び出しなしで実装する。1)このアセンブリがある場所, 2)カレントディレクトリ, 3)PATH環境変数で定義されているディレクトリ
-            // TODO: Windows の場合は exe com bat も含む
+            if (OperatingSystem.IsWindows())
+            {
+                // Windows の where コマンドは PATH環境変数値の ';' を含むディレクトリ名を正しく認識できないため、where コマンドは使用しない。
 
-            // コマンドのパス名を解決するコマンドの情報を取得する
-            //   Windows の場合: where.exe
-            //   UNIX の場合: which
-            var (whichCommandDirs, whichCommandName, whichCommandOptions) = GetWhichCommandInfo(targetCommandName);
+                return WhereIsForWindows(targetCommandName);
+            }
+            else
+            {
+                return WhereIsForUnix(targetCommandName);
+            }
+        }
+
+        private static string? WhereIsForWindows(string targetCommandName)
+        {
+            var commandFileName = $"{targetCommandName}.exe";
+            return EnumerateExecutableDirectoriesForWindows()
+                        .Select(dir => Path.Combine(dir, commandFileName))
+                        .FirstOrDefault(path => File.Exists(path));
+        }
+
+        private static IEnumerable<string> EnumerateExecutableDirectoriesForWindows()
+        {
+            yield return AppContext.BaseDirectory;
+            yield return Environment.CurrentDirectory;
+            var pathEnvironment = Environment.GetEnvironmentVariable("PATH");
+            if (pathEnvironment is not null)
+            {
+                var startPos = 0;
+                var pathElement = new StringBuilder();
+                while (true)
+                {
+                    // ';' または '"' を探す
+                    var endPos = pathEnvironment.IndexOfAny(new char[] { ';', '"' }, startPos);
+                    if (endPos < 0)
+                    {
+                        // ';' と '"' のどちらも見つからなかった場合
+
+                        // 終端までを pathElement に追加する
+                        _ = pathElement.Append(pathEnvironment[startPos..]);
+
+                        // pathElement をディレクトリパス名として返し、繰り返しを終える
+                        yield return pathElement.ToString();
+                        yield break;
+                    }
+
+                    if (pathEnvironment[endPos] == '"')
+                    {
+                        // 先に見つかったのが '"' であった場合
+
+                        // '"' の 1 文字前までの部分を pathElement に追加する
+                        _ = pathElement.Append(pathEnvironment[startPos..endPos]);
+                        startPos = endPos + 1;
+
+                        // 閉じの '"' を探す
+                        endPos = pathEnvironment.IndexOf('"', startPos);
+                        if (endPos < 0)
+                        {
+                            // 閉じの '"' が見つからなかった場合
+
+                            // 構文エラーなので、そのまま繰り返しを終える
+                            yield break;
+                        }
+
+                        // 閉じの '"' の1つ前までを pathElement に追加する。
+                        _ = pathElement.Append(pathEnvironment[startPos..(endPos - 1)]);
+                        startPos = endPos + 1;
+                    }
+                    else
+                    {
+                        // 先に見つかったのが ';' であった場合
+                        // ';' までの部分を pathElement に追加する
+                        _ = pathElement.Append(pathEnvironment[startPos..endPos]);
+                        startPos = endPos + 1;
+
+                        // pathElement をディレクトリパス名として返す
+                        yield return pathElement.ToString();
+
+                        // pathElement をクリアする
+                        _ = pathElement.Clear();
+                    }
+                }
+            }
+        }
+
+        private static string? WhereIsForUnix(string targetCommandName)
+        {
+            var whichCommandName = "which";
 
             // コマンドのパス名を解決するコマンドのフルパスを求める
             var whichCommandPath =
-                whichCommandDirs
+                new[] { "/usr/bin", "/bin" }
                 .Select(dir => Path.Combine(dir, whichCommandName))
                 .Where(File.Exists)
                 .FirstOrDefault()
@@ -56,7 +152,7 @@ namespace Palmtree
             // コマンドのパス名を解決するコマンドを起動する
             var startInfo = new ProcessStartInfo
             {
-                Arguments = string.Join(" ", whichCommandOptions.Select(option => option.CommandLineArgumentEncode())),
+                Arguments = string.Join(" ", new[] { "-a", targetCommandName }.Select(option => option.CommandLineArgumentEncode())),
                 CreateNoWindow = false,
                 FileName = whichCommandPath,
                 UseShellExecute = false,
@@ -65,7 +161,7 @@ namespace Palmtree
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8,
             };
-            using var process = Process.Start(startInfo) ?? throw new Exception($"Could not start \"{whichCommandName}\" command.");
+            var process = Process.Start(startInfo) ?? throw new Exception($"Could not start \"{whichCommandName}\" command.");
 
             // 標準出力を読み込むタスクの起動
             var standardOutputProcessingTask =
@@ -109,10 +205,5 @@ namespace Palmtree
                     _ => throw new Exception($"\"{whichCommandName}\" command terminated abnormally.: exit-code={process.ExitCode}, message=\"{errorMessage}\""),
                 };
         }
-
-        private static (IEnumerable<string> whichCommandDirs, string whichCommandName, IEnumerable<string> whichCommandOptions) GetWhichCommandInfo(string targetCommandName)
-            => OperatingSystem.IsWindows()
-                ? (new[] { Environment.GetFolderPath(Environment.SpecialFolder.System) }.AsEnumerable(), "where.exe", new[] { targetCommandName }.AsEnumerable())
-                : (new[] { "/usr/bin", "/bin" }.AsEnumerable(), "which", new[] { "-a", targetCommandName }.AsEnumerable());
     }
 }

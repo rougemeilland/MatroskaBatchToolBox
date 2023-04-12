@@ -60,6 +60,7 @@ namespace MatroskaBatchToolBox.Utility
             var previousTime = (TimeSpan?)null;
             foreach (var timeSpec in rawText.Split(','))
             {
+                // TODO: 先に + で始まるかどうかのチェックをしないといけない
                 if (!timeSpec.TryParse(false, out TimeSpan time))
                     throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                 if (timeSpec.StartsWith('+'))

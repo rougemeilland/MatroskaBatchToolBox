@@ -95,6 +95,6 @@ namespace Palmtree
             }
         }
 
-        // TODO: ShellArgumentEncode() の実装 (バッチ / シェルスクリプト内でコマンドを呼び出す場合の引数のエンコード)
+        // TODO: ShellArgumentEncode() の実装 (バッチ / シェルスクリプト内でコマンドを呼び出す場合の引数のエンコード) ffmpeg-normalize に json 形式のパラメタを渡すときに必要になる
     }
 }
