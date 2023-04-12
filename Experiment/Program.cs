@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Palmtree;
+using MatroskaBatchToolBox.Utility;
 
 namespace Experiment
 {
@@ -14,23 +15,9 @@ namespace Experiment
         [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0079:不要な抑制を削除します", Justification = "<保留中>")]
         public static int Main(string[] args)
         {
-            var thisCommandName = typeof(Program).Assembly.GetName().Name;
-            try
-            {
-                var location = ProcessUtility.WhereIs(args[0]);
-                TinyConsole.WriteLine(location ?? "(null)");
-                return 0;
-            }
-            catch (Exception ex)
-            {
-                TinyConsole.ForegroundColor = ConsoleColor.Red;
-                TinyConsole.Error.WriteLine($"{thisCommandName}:ERROR: {ex.Message}");
-                return 1;
-            }
-            finally
-            {
-                TinyConsole.ResetColor();
-            }
+            foreach (var time in "0,+00:01:41.835000000,+00:01:49.309000000,+00:01:44.971000000".ParseAsChapterStartTimes())
+                Console.WriteLine(time.FormatTime(3));
+            return 0;
         }
     }
 }

@@ -35,10 +35,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Palmtree.Console.InterOp.Unix\Palmtree.Console.InterOp.Unix.vcxproj" />
-    <ProjectReference Include="..\Palmtree.Console\Palmtree.Console.csproj" />
-    <ProjectReference Include="..\Palmtree.Core\Palmtree.Core.csproj" />
-    <ProjectReference Include="..\Palmtree.TerminalInfo\Palmtree.TerminalInfo.csproj" />
+    <ProjectReference Include="..\MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj" />
   </ItemGroup>
 
   <ItemGroup>

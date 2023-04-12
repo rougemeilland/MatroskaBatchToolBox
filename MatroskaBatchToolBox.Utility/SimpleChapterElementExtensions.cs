@@ -60,23 +60,25 @@ namespace MatroskaBatchToolBox.Utility
             var previousTime = (TimeSpan?)null;
             foreach (var timeSpec in rawText.Split(','))
             {
-                // TODO: 先に + で始まるかどうかのチェックをしないといけない
-                if (!timeSpec.TryParse(false, out TimeSpan time))
-                    throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                 if (timeSpec.StartsWith('+'))
                 {
+                    if (!timeSpec[1..].TryParse(false, out TimeSpan time))
+                        throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                     if (previousTime is null)
                         throw new Exception($"Do not prefix the start time of the first chapter with a plus sign (+).: \"{timeSpec}\" in \"{rawText}\"");
                     time += previousTime.Value;
+                    yield return time;
+                    previousTime = time;
                 }
                 else
                 {
+                    if (!timeSpec.TryParse(false, out TimeSpan time))
+                        throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                     if (previousTime is not null && time < previousTime.Value)
                         throw new Exception($"The list of start times is not in ascending order.: {rawText}");
+                    yield return time;
+                    previousTime = time;
                 }
-
-                yield return time;
-                previousTime = time;
             }
         }
 
