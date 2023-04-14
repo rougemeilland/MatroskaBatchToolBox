@@ -25,7 +25,8 @@ namespace Palmtree
         /// <exception cref="AssertionException">
         /// 検証条件が満たされませんでした。
         /// </exception>
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [Conditional("DEBUG")]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Assert([DoesNotReturnIf(false)] bool condition, string conditionText)
         {
             if (!condition)
