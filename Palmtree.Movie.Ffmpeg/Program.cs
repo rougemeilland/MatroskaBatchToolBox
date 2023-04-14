@@ -77,7 +77,7 @@ namespace Palmtree.Movie.Ffmpeg
                 StandardErrorEncoding = Encoding.UTF8,
             };
             using var process = Process.Start(startInfo) ?? throw new Exception("Could not start ffmpeg.");
-            var cancelled = ffmpegStandardErrorHandler(process.StandardError);
+            var cancelled = FfmpegStandardErrorHandler(process.StandardError);
             process.WaitForExit();
             return cancelled ? -1 : process.ExitCode;
         }
@@ -94,7 +94,7 @@ namespace Palmtree.Movie.Ffmpeg
             }
         }
 
-        private static bool ffmpegStandardErrorHandler(StreamReader reader)
+        private static bool FfmpegStandardErrorHandler(StreamReader reader)
         {
             var cancelled = false;
             var textCache = new char[1024];
@@ -108,7 +108,7 @@ namespace Palmtree.Movie.Ffmpeg
                     if (textCacheLength > 0)
                         _ = OutputFromCache(textCacheLength);
 
-                    var length =ReadChars(reader, textCache, 0, textCache.Length);
+                    var length = ReadChars(reader, textCache, 0, textCache.Length);
                     if (length <= 0)
                         detectedEndOfStream = true;
                     else
@@ -150,7 +150,9 @@ namespace Palmtree.Movie.Ffmpeg
             return cancelled;
 
             bool IsEndOfStream()
-                => textCacheLength <= 0 && detectedEndOfStream;
+            {
+                return textCacheLength <= 0 && detectedEndOfStream;
+            }
 
             bool ReadToCache()
             {
@@ -160,30 +162,32 @@ namespace Palmtree.Movie.Ffmpeg
                 Validation.Assert(textCacheLength < textCache.Length, "textCacheLength < textCache.Length");
 
                 var length = ReadChars(reader, textCache, textCacheLength, textCache.Length - textCacheLength);
-                if (length <=  0)
+                if (length <= 0)
                 {
                     detectedEndOfStream = true;
                     return false;
                 }
-                else
-                {
-#if DEBUG
-                    System.Diagnostics.Debug.Write(new string(textCache, textCacheLength, length));
-#endif
-                    textCacheLength += length;
-                    return true;
-                }
+
+                textCacheLength += length;
+                return true;
             }
 
+            // インタラクティブな入力ストリームで TextReader.Read(char[], int, int) / TextReader.Read(Span<char>) を使用すると
+            // 予期しないタイミングでブロックが発生することがあるため、代わりに ReadChars(TextReader, char[], int, int) を使用すること。
             static int ReadChars(TextReader reader, char[] buffer, int offset, int count)
             {
                 Validation.Assert(offset >= 0 && offset <= buffer.Length, "offset > 0 && offset <= buffer.Length");
                 Validation.Assert(count >= 0 && offset + count <= buffer.Length, "count >= 0 && offset + count <= buffer.Length");
+
                 for (var length = 0; length < count; ++length)
                 {
                     var c = reader.Peek();
                     if (length > 0 && c < 0)
+                    {
+                        // 少なくとも1文字以上を読み込み済みで、かつ現時点でブロックせずに読み込める文字がない場合は、それ以上の Read() を行わずに復帰する。
                         return length;
+                    }
+
                     c = reader.Read();
                     if (c < 0)
                         return length;
