@@ -6,7 +6,8 @@ namespace MatroskaBatchToolBox.Utility.Movie
     public enum MovieInformationType
     {
         None = 0,
-        Streams = 1 << 0,
-        Chapters = 1 << 1,
+        Format = 1 << 0,
+        Streams = 1 << 1,
+        Chapters = 1 << 2,
     }
 }

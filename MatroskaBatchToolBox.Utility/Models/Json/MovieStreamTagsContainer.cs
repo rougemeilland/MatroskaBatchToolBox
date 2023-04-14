@@ -4,6 +4,10 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
 {
     public class MovieStreamTagsContainer
     {
+        [JsonPropertyName("ENCODER")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Encoder { get; set; }
+
         [JsonPropertyName("DURATION")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Duration { get; set; }

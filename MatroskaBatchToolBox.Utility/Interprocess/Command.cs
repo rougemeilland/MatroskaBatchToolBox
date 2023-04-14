@@ -169,10 +169,12 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 "-v error",
                 "-print_format json"
             };
-            if ((requestedInfo & MovieInformationType.Chapters) != MovieInformationType.None)
-                commandParameters.Add("-show_chapters");
+            if ((requestedInfo & MovieInformationType.Format) != MovieInformationType.None)
+                commandParameters.Add("-show_format");
             if ((requestedInfo & MovieInformationType.Streams) != MovieInformationType.None)
                 commandParameters.Add("-show_streams");
+            if ((requestedInfo & MovieInformationType.Chapters) != MovieInformationType.None)
+                commandParameters.Add("-show_chapters");
             if (inFileFormat is not null)
                 commandParameters.Add($"-f {inFileFormat}");
             commandParameters.Add($"-i \"{inFile.FullName}\"");

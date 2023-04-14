@@ -26,6 +26,8 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public MovieStreamTagsContainer? Tags { get; set; }
 
+        #region for video stream
+
         [JsonPropertyName("width")]
         public int? Width { get; set; }
 
@@ -34,5 +36,47 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
 
         [JsonPropertyName("display_aspect_ratio")]
         public string? DisplayAspectRatio { get; set; }
+
+        #endregion
+
+        #region for audio stream
+
+        [JsonPropertyName("sample_fmt")]
+        public string? SampleFormat { get; set; }
+
+        [JsonPropertyName("sample_rate")]
+        public string? SampleRate { get; set; }
+
+        [JsonPropertyName("channels")]
+        public int? Channels { get; set; }
+
+        [JsonPropertyName("channel_layout")]
+        public string? ChannelLayout { get; set; }
+
+        [JsonPropertyName("bits_per_sample")]
+        public int? BitsPerSample { get; set; }
+
+        [JsonPropertyName("initial_padding")]
+        public int? InitialPadding { get; set; }
+
+        [JsonPropertyName("r_frame_rate")]
+        public string? RFrameRate { get; set; }
+
+        [JsonPropertyName("avg_frame_rate")]
+        public string? AverageFrameRate { get; set; }
+
+        [JsonPropertyName("time_base")]
+        public string? TimeBase { get; set; }
+
+        [JsonPropertyName("start_pts")]
+        public int? StartPts { get; set; }
+
+        [JsonPropertyName("start_time")]
+        public string? StartTime { get; set; }
+
+        [JsonPropertyName("bit_rate")]
+        public string? BitRate { get; set; }
+
+        #endregion
     }
 }

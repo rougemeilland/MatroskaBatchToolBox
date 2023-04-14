@@ -13,6 +13,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
         private MovieInformation(MovieInformationContainer info)
             => _info = info;
 
+        public MovieFormat Format => new(_info.Format ?? throw new Exception("ffprobe returned no format information."));
         public IEnumerable<ChapterInfo> Chapters => _info.EnumerateChapters().Select(chapter => new ChapterInfo(chapter));
         public IEnumerable<VideoStreamInfo> VideoStreams => _info.EnumerateVideoStreams().Select((stream, index) => new VideoStreamInfo(stream, index));
         public IEnumerable<AudioStreamInfo> AudioStreams => _info.EnumerateAudioStreams().Select((stream, index) => new AudioStreamInfo(stream, index));
@@ -25,7 +26,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
             var movieInformationContainer =
                 JsonSerializer.Deserialize<MovieInformationContainer>(
                     jsonText,
-                    new JsonSerializerOptions { AllowTrailingCommas = true })
+                    new JsonSerializerOptions { AllowTrailingCommas = true, PropertyNameCaseInsensitive = true })
                 ?? throw new Exception("ffprobe returned no information.");
             return new MovieInformation(movieInformationContainer);
         }

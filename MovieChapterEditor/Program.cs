@@ -158,6 +158,63 @@ namespace MovieChapterEditor
                     try
                     {
                         var movieInformation = GetMovieInformation(commandOptions, commandOptions.InputFormat, inputFile);
+
+                        var streams =
+                            movieInformation.VideoStreams
+                            .Select(stream => new
+                            {
+                                streamTypeSymbol = "v",
+                                index = stream.IndexWithinVideoStream,
+                                isDefault = stream.Disposition.Default,
+                                isForced = stream.Disposition.Forced,
+                                title = stream.Tags.Title,
+                                language = stream.Tags.Language,
+                            })
+                            .Concat(
+                                movieInformation.AudioStreams
+                                .Select(stream => new
+                                {
+                                    streamTypeSymbol = "a",
+                                    index = stream.IndexWithinAudioStream,
+                                    isDefault = stream.Disposition.Default,
+                                    isForced = stream.Disposition.Forced,
+                                    title = stream.Tags.Title,
+                                    language = stream.Tags.Language,
+                                }))
+                            .Concat(
+                                movieInformation.SubtitleStreams
+                                .Select(stream => new
+                                {
+                                    streamTypeSymbol = "s",
+                                    index = stream.IndexWithinSubtitleStream,
+                                    isDefault = stream.Disposition.Default,
+                                    isForced = stream.Disposition.Forced,
+                                    title = stream.Tags.Title,
+                                    language = stream.Tags.Language,
+                                }))
+                            .Concat(
+                                movieInformation.DataStreams
+                                .Select(stream => new
+                                {
+                                    streamTypeSymbol = "d",
+                                    index = stream.IndexWithinDataStream,
+                                    isDefault = stream.Disposition.Default,
+                                    isForced = stream.Disposition.Forced,
+                                    title = stream.Tags.Title,
+                                    language = stream.Tags.Language,
+                                }))
+                            .Concat(
+                                movieInformation.AttachmentStreams
+                                .Select(stream => new
+                                {
+                                    streamTypeSymbol = "t",
+                                    index = stream.IndexWithinAttachmentStream,
+                                    isDefault = stream.Disposition.Default,
+                                    isForced = stream.Disposition.Forced,
+                                    title = stream.Tags.Title,
+                                    language = stream.Tags.Language,
+                                }));
+
                         var ffmpegCommandParameters =
                             new List<string>
                             {
@@ -170,12 +227,8 @@ namespace MovieChapterEditor
                         ffmpegCommandParameters.Add($"-i \"{inputFile.FullName}\"");
                         ffmpegCommandParameters.Add("-f ffmetadata -i -");
                         ffmpegCommandParameters.Add("-c copy -map 0");
-                        foreach (var stream in movieInformation.VideoStreams)
-                            ffmpegCommandParameters.Add($"-disposition:v:{stream.IndexWithinVideoStream} {(stream.Disposition.Default ? "+" : "-")}default{(stream.Disposition.Forced ? "+" : "-")}forced");
-                        foreach (var stream in movieInformation.AudioStreams)
-                            ffmpegCommandParameters.Add($"-disposition:a:{stream.IndexWithinAudioStream} {(stream.Disposition.Default ? "+" : "-")}default{(stream.Disposition.Forced ? "+" : "-")}forced");
-                        foreach (var stream in movieInformation.SubtitleStreams)
-                            ffmpegCommandParameters.Add($"-disposition:s:{stream.IndexWithinSubtitleStream} {(stream.Disposition.Default ? "+" : "-")}default{(stream.Disposition.Forced ? "+" : "-")}forced");
+                        foreach (var stream in streams)
+                            ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {(stream.isDefault ? "+" : "-")}default{(stream.isForced ? "+" : "-")}forced");
                         ffmpegCommandParameters.Add("-map_chapters 1");
                         if (commandOptions.OutputFormat is not null)
                             ffmpegCommandParameters.Add($"-f {commandOptions.OutputFormat}");
@@ -266,7 +319,8 @@ namespace MovieChapterEditor
             }
             catch (InvalidCommandOptionException ex)
             {
-                PrintErrorMessage(ex.Message);
+                for (var e = ex as Exception; e is not null; e = e.InnerException)
+                    PrintErrorMessage(e.Message);
                 return null;
             }
         }

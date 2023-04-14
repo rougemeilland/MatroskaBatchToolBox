@@ -12,7 +12,6 @@ namespace MatroskaBatchToolBox.Utility.Movie
         }
 
         public bool Default { get; }
-
         public bool Forced { get; }
         public bool AttachedPicture { get; set; }
     }

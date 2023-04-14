@@ -70,7 +70,7 @@ namespace Palmtree
             var commandFileName = $"{targetCommandName}.exe";
             return EnumerateExecutableDirectoriesForWindows()
                         .Select(dir => Path.Combine(dir, commandFileName))
-                        .FirstOrDefault(path => File.Exists(path));
+                        .FirstOrDefault(File.Exists);
         }
 
         private static IEnumerable<string> EnumerateExecutableDirectoriesForWindows()
@@ -179,7 +179,7 @@ namespace Palmtree
 
             // 標準エラー出力を読み込むタスクの起動
             var standardErrorProcessingTask =
-                Task.Run(() => process.StandardError.ReadToEnd());
+                Task.Run(process.StandardError.ReadToEnd);
 
             // 標準出力読み込みタスクの結果の取得
             var foundPath = standardOutputProcessingTask.Result;

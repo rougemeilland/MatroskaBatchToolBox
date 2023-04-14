@@ -17,6 +17,16 @@ namespace MatroskaBatchToolBox.Utility.Movie
         }
 
         /// <summary>
+        /// ストリームのエンコーダーを表すメタデータ。
+        /// </summary>
+        /// <remarks>
+        /// <list type="bullet">
+        /// <item>ffmpeg 固有のメタデータなので、必ず存在するとは限らない。</item>
+        /// </list>
+        /// </remarks>
+        public string? Encoder { get; }
+
+        /// <summary>
         /// ストリームの長さを表す時間を表すメタデータ。
         /// </summary>
         /// <remarks>
