@@ -40,7 +40,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Palmtree.Console.InterOp.Un
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Palmtree.Movie.Ffmpeg", "Palmtree.Movie.Ffmpeg\Palmtree.Movie.Ffmpeg.csproj", "{85AFDA64-4A2E-437A-B422-8DE020E2B18E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AudioNormalizer", "AudioNormalizer\AudioNormalizer.csproj", "{E01FB94F-3F6E-4DEB-971B-9213326915C5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AudioNormalizer", "AudioNormalizer\AudioNormalizer.csproj", "{E01FB94F-3F6E-4DEB-971B-9213326915C5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MovieMetadataEditor", "MovieMetadataEditor\MovieMetadataEditor.csproj", "{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -393,6 +395,26 @@ Global
 		{E01FB94F-3F6E-4DEB-971B-9213326915C5}.Release|x64.Build.0 = Release|Any CPU
 		{E01FB94F-3F6E-4DEB-971B-9213326915C5}.Release|x86.ActiveCfg = Release|Any CPU
 		{E01FB94F-3F6E-4DEB-971B-9213326915C5}.Release|x86.Build.0 = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|ARM.ActiveCfg = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|ARM.Build.0 = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|x64.Build.0 = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Debug|x86.Build.0 = Debug|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|ARM.ActiveCfg = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|ARM.Build.0 = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|ARM64.Build.0 = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|x64.ActiveCfg = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|x64.Build.0 = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|x86.ActiveCfg = Release|Any CPU
+		{5D61E674-7945-4CCE-95C1-2D2B3E1F947F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

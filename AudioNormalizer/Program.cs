@@ -446,6 +446,7 @@ namespace AudioNormalizer
         private static void NormalizeAudio(MovieInformation movieInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile, bool verbose, bool keepMetadata, bool doOverwrite)
         {
             var audioEncoder = "libopus";
+            var audioFormat = "Opus";
             var audioEncoderOptions = Array.Empty<string>();
 
             // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームを抽出する
@@ -463,6 +464,7 @@ namespace AudioNormalizer
 
                 // 代わりに libvorbis でエンコードする
                 audioEncoder = "libvorbis";
+                audioFormat = "Vorbis";
 
                 // libvorbis のエンコーダオプションを作成する
                 // (元のオーディオストリームの (チャネル数 * _bitratePerChannelForLibVorbis) を q 値に変換して指定する)
@@ -496,22 +498,23 @@ namespace AudioNormalizer
                 ProcessUtility.WhereIs("ffmpeg-normalize")
                 ?? throw new Exception("ffmpeg-normalize command not found.");
             var normalizerCommandParameters = new List<string>();
-            if (outputFormat is not null)
-                normalizerCommandParameters.Add($"-ofmt {outputFormat.CommandLineArgumentEncode()}");
-            normalizerCommandParameters.Add($"-o {outputFile.FullName.CommandLineArgumentEncode()}");
+            if (verbose)
+                normalizerCommandParameters.Add("-v");
             if (doOverwrite)
                 normalizerCommandParameters.Add("-f");
             normalizerCommandParameters.Add("-pr");
             normalizerCommandParameters.Add("--keep-loudness-range-target");
+            if (inputFormat is not null)
+                normalizerCommandParameters.Add($"-ei={string.Join(" ", new[] { "-f", $"\"{inputFormat}\"" }).CommandLineArgumentEncode()}");
+            normalizerCommandParameters.Add(inputFile.FullName.CommandLineArgumentEncode());
             normalizerCommandParameters.Add($"-c:a {audioEncoder.CommandLineArgumentEncode()}");
             if (audioEncoderOptions.Any())
                 normalizerCommandParameters.Add($"-e={string.Join(" ", audioEncoderOptions).CommandLineArgumentEncode()}");
             if (!keepMetadata)
                 normalizerCommandParameters.Add("-mn -cn");
-            if (inputFormat is not null)
-                normalizerCommandParameters.Add($"-ei={string.Join(" ", new[] { "-f", $"\"{inputFormat}\"" }).CommandLineArgumentEncode()}");
-            normalizerCommandParameters.Add(inputFile.FullName.CommandLineArgumentEncode());
-
+            if (outputFormat is not null)
+                normalizerCommandParameters.Add($"-ofmt {outputFormat.CommandLineArgumentEncode()}");
+            normalizerCommandParameters.Add($"-o {outputFile.FullName.CommandLineArgumentEncode()}");
             var startInfo = new ProcessStartInfo
             {
                 Arguments = string.Join(" ", normalizerCommandParameters),
@@ -529,6 +532,9 @@ namespace AudioNormalizer
 
             if (process.ExitCode != 0)
                 throw new Exception($"An error occurred in the ffmpeg-normalize command.: exit-code={process.ExitCode}");
+
+            if (verbose)
+                PrintInformationMessage($"Audio streams normalization is complete.: audio-format={audioFormat}");
 
             static double CalculateLibVorbisQualityByBitRate(int bitRate)
             {
