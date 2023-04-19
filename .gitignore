@@ -360,3 +360,5 @@ MigrationBackup/
 *.exe
 /Experiment/Properties/launchSettings.json
 /Palmtree.Movie.Ffmpeg/Properties/launchSettings.json
+/MovieMetadataEditor/MovieMetadataEditor.csproj
+/MovieMetadataEditor/Program.cs
