@@ -8,6 +8,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
         internal StreamTags(MovieStreamTagsContainer? tags)
         {
             var durationText = tags?.Duration;
+            Encoder = tags?.Encoder;
             Duration =
                 durationText is null || !durationText.TryParse(false, out TimeSpan duration)
                 ? null
@@ -32,7 +33,6 @@ namespace MatroskaBatchToolBox.Utility.Movie
         /// <remarks>
         /// <list type="bullet">
         /// <item>ffmpeg 固有のメタデータなので、必ず存在するとは限らない。</item>
-        /// <item>もし、ffmpeg の "-map_metadata -1" オプションによってメタデータが削除された場合でも、このメタデータは削除されない。</item>
         /// </list>
         /// </remarks>
         public TimeSpan? Duration { get; }

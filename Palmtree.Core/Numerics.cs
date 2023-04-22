@@ -56,9 +56,8 @@ namespace Palmtree
             else if (v == 0)
                 return u;
 
-            System.Diagnostics.Debug.Assert(u != 0 && v != 0);
-
             // この時点で u と v は共に正数
+            System.Diagnostics.Debug.Assert(u >= 0 && v >= 0);
 
             // 「互減法」アルゴリズムを使用して最大公約数を求める。
             // 乗算/除算/剰余算を一切使わなくて済むので互除法よりも極めて高速に計算できる。
@@ -90,13 +89,29 @@ namespace Palmtree
 #endif
 
             // この時点で、u と v は共に正で、かつ少なくとも u と v のどちらかが奇数で、かつ、 u << k が元の u に等しく、v << k が元の v に等しい
+            System.Diagnostics.Debug.Assert(u > 0 && v > 0 && ((u & 1) != 0 || (v & 1) != 0));
+
+            // u が偶数であれば奇数になるまで右シフトする。
+#if USE_SYSTEM_BIT_OPERATION
+            u >>= BitOperations.TrailingZeroCount(u);
+#else
+                while ((u & 1) == 0)
+                    u >>= 1;
+#endif
+
+            // v が偶数であれば奇数になるまで右シフトする。
+#if USE_SYSTEM_BIT_OPERATION
+            v >>= BitOperations.TrailingZeroCount(v);
+#else
+                while ((v & 1) == 0)
+                    v >>= 1;
+#endif
 
             // 最大公約数が求まるまで繰り返す。
             while (true)
             {
-                System.Diagnostics.Debug.Assert(u != 0 && v != 0);
-
-                // この時点で、u と v は共に正で、かつ少なくとも u と v のどちらかが奇数(2回目以降はともに奇数)である。
+                // この時点で、u と v は共に正の奇数である。
+                System.Diagnostics.Debug.Assert(u > 0 && v > 0 && (u & 1) != 0 && (v & 1) != 0);
 
                 if (u == v)
                 {
@@ -112,11 +127,13 @@ namespace Palmtree
                     (v, u) = (u, v);
                 }
 
-                // この時点で、u と v は共に正で、かつ u > v かつ 少なくとも u と v のどちらかが奇数(2回目以降はともに奇数)である。
+                // この時点で、u と v は共に正で、かつ u > v かつ 少なくとも u と v はともに奇数である。
+                System.Diagnostics.Debug.Assert(u > 0 && v > 0 && u > v && (u & 1) != 0 && (v & 1) != 0);
 
                 u -= v;
 
-                // 2回目以降ではこの時点で u は偶数
+                // この時点で u は正の偶数
+                System.Diagnostics.Debug.Assert(u > 0 && (u & 1) == 0);
 
                 // u が奇数になるまで u を右シフトする
 #if USE_SYSTEM_BIT_OPERATION
@@ -162,9 +179,8 @@ namespace Palmtree
             else if (v == 0)
                 return u;
 
-            System.Diagnostics.Debug.Assert(u != 0 && v != 0);
-
             // この時点で u と v は共に正数
+            System.Diagnostics.Debug.Assert(u >= 0 && v >= 0);
 
             // 「互減法」アルゴリズムを使用して最大公約数を求める。
             // 乗算/除算/剰余算を一切使わなくて済むので互除法よりも極めて高速に計算できる。
@@ -196,13 +212,29 @@ namespace Palmtree
 #endif
 
             // この時点で、u と v は共に正で、かつ少なくとも u と v のどちらかが奇数で、かつ、 u << k が元の u に等しく、v << k が元の v に等しい
+            System.Diagnostics.Debug.Assert(u > 0 && v > 0 && ((u & 1) != 0 || (v & 1) != 0));
+
+            // u が偶数であれば奇数になるまで右シフトする。
+#if USE_SYSTEM_BIT_OPERATION
+            u >>= BitOperations.TrailingZeroCount(u);
+#else
+                while ((u & 1) == 0)
+                    u >>= 1;
+#endif
+
+            // v が偶数であれば奇数になるまで右シフトする。
+#if USE_SYSTEM_BIT_OPERATION
+            v >>= BitOperations.TrailingZeroCount(v);
+#else
+                while ((v & 1) == 0)
+                    v >>= 1;
+#endif
 
             // 最大公約数が求まるまで繰り返す。
             while (true)
             {
-                System.Diagnostics.Debug.Assert(u != 0 && v != 0);
-
-                // この時点で、u と v は共に正で、かつ少なくとも u と v のどちらかが奇数(2回目以降はともに奇数)である。
+                // この時点で、u と v は共に正の奇数である。
+                System.Diagnostics.Debug.Assert(u > 0 && v > 0 && (u & 1) != 0 && (v & 1) != 0);
 
                 if (u == v)
                 {
@@ -218,11 +250,13 @@ namespace Palmtree
                     (v, u) = (u, v);
                 }
 
-                // この時点で、u と v は共に正で、かつ u > v かつ 少なくとも u と v のどちらかが奇数(2回目以降はともに奇数)である。
+                // この時点で、u と v は共に正で、かつ u > v かつ 少なくとも u と v はともに奇数である。
+                System.Diagnostics.Debug.Assert(u > 0 && v > 0 && u > v && (u & 1) != 0 && (v & 1) != 0);
 
                 u -= v;
 
-                // 2回目以降ではこの時点で u は偶数
+                // この時点で u は正の偶数
+                System.Diagnostics.Debug.Assert(u > 0 && (u & 1) == 0);
 
                 // u が奇数になるまで u を右シフトする
 #if USE_SYSTEM_BIT_OPERATION

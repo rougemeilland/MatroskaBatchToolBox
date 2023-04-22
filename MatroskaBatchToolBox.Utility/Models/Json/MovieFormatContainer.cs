@@ -40,7 +40,7 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
         public string Size { get; set; }
 
         [JsonPropertyName("bit_rate")]
-        public string BitRate { get; set; }
+        public string? BitRate { get; set; }
 
         [JsonPropertyName("probe_score")]
         public int ProbeScore { get; set; }

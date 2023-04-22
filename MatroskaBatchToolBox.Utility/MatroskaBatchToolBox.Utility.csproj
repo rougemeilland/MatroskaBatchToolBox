@@ -33,9 +33,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="ffmpeg.exe">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="ffprobe.exe">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -43,6 +40,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Palmtree.Core\Palmtree.Core.csproj" />
+    <ProjectReference Include="..\Palmtree.Movie.Ffmpeg\Palmtree.Movie.Ffmpeg.csproj" />
   </ItemGroup>
 
 </Project>

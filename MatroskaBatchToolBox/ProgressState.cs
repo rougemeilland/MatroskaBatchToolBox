@@ -150,7 +150,8 @@ namespace MatroskaBatchToolBox
         {
             lock (this)
             {
-                Validation.Assert(_processingSourceFiles.TryGetValue(sourceFieId, out SourceFileInfo? item), "_processingSourceFiles.TryGetValue(sourceFieId, out SourceFileInfo? item)");
+                if (!_processingSourceFiles.TryGetValue(sourceFieId, out var item))
+                    throw Validation.GetFailErrorException("Failed in '_processingSourceFiles.TryGetValue(sourceFieId, out var item)'");
                 _processedSourceFiles[actionResult].Add(item);
                 _ = _processingSourceFiles.Remove(sourceFieId);
                 switch (actionResult)

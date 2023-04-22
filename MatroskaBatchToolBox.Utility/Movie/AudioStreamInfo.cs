@@ -13,9 +13,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
             IndexWithinAudioStream = indexWithinAudioStream;
             ChannelLayout = stream.ChannelLayout;
             Channels = stream.Channels ?? throw new Exception("\"channels\" property not found.");
-            if (stream.BitRate is null)
-                throw new Exception("\"bit_rate\" property not found.");
-            BitRate = stream.BitRate.TryParse(out int bitRateValue) ? bitRateValue : null;
+            BitRate = stream.BitRate is not null && stream.BitRate.TryParse(out int bitRateValue) ? bitRateValue : null;
         }
 
         public int IndexWithinAudioStream { get; }

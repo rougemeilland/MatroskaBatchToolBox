@@ -87,6 +87,13 @@ namespace ChapterConverter
 
         public static int Main(string[] args)
         {
+            // このプロセスでは Ctrl+C を無視する。
+            TinyConsole.CancelKeyPress += (sender, e) => e.Cancel = true;
+
+            // コマンドの入出力エンコーディングを UTF8 にする
+            TinyConsole.InputEncoding = Encoding.UTF8;
+            TinyConsole.OutputEncoding = Encoding.UTF8;
+
             var options = ParseOptions(args);
             if (options.ActionMode == ActionMode.Help)
             {

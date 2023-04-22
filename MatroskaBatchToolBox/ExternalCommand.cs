@@ -47,8 +47,9 @@ namespace MatroskaBatchToolBox
         public static CommandResultCode NormalizeAudioFile(FileInfo logFile, FileInfo inFile, AudioEncoderType audioEncoder, FileInfo outFile, IProgress<double> progressReporter)
         {
             var ffmpegCommandFile =
-                Command.SearchExecutableFile("ffmpeg")
-                ?? throw new Exception("ffmpeg command is not installed.");
+                new FileInfo(
+                    ProcessUtility.WhereIs("ffmpeg")
+                    ?? throw new Exception("ffmpeg command is not installed."));
             Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, ffmpegCommandFile.FullName);
 
             var commandParameter = $"\"{inFile.FullName}\" -o \"{outFile.FullName}\" -pr -v -d --keep-loudness-range-target --audio-codec {audioEncoder.ToCodecSpec()}";

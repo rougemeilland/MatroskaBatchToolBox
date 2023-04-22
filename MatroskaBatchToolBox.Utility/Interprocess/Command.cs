@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using MatroskaBatchToolBox.Utility.Movie;
+using Palmtree;
 
 namespace MatroskaBatchToolBox.Utility.Interprocess
 {
@@ -133,21 +133,17 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         }
 
         private const int _ioBufferSize = 64 * 1024;
-        private static readonly string _baseDirectory;
         private static readonly TimeSpan _childProcessCancellationInterval;
         private static readonly Regex _ffmpegConversionDurationPattern;
         private static readonly Regex _ffmpegConversionProgressPattern;
-        private static readonly IDictionary<string, string?> _cachedExecutableFilePaths;
         private static bool _requestedCancellation;
 
         static Command()
         {
-            _baseDirectory = Path.GetDirectoryName(typeof(Command).Assembly.Location) ?? ".";
             _childProcessCancellationInterval = TimeSpan.FromSeconds(10);
             _ffmpegConversionDurationPattern = new Regex(@"\s*(Duration|DURATION)\s*:\s*(?<time>\d+:\d+:\d+(\.\d+)?)", RegexOptions.Compiled);
             _ffmpegConversionProgressPattern = new Regex(@" time=(?<time>\d+:\d+:\d+(\.\d+)?) ", RegexOptions.Compiled);
             _requestedCancellation = false;
-            _cachedExecutableFilePaths = new Dictionary<string, string?>();
         }
 
         public static void AbortExternalCommands()
@@ -160,8 +156,9 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             Action<string, string> logger)
         {
             var ffprobeCommandFile =
-                SearchExecutableFile("ffprobe")
-                ?? throw new Exception("ffprobe command is not installed.");
+                new FileInfo(
+                    ProcessUtility.WhereIs("ffprobe")
+                    ?? throw new Exception("ffprobe command is not installed."));
 
             var commandParameters = new List<string>
             {
@@ -212,8 +209,9 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             IProgress<double> progressReporter)
         {
             var ffmpegCommandFile =
-                SearchExecutableFile("ffmpeg")
-                ?? throw new Exception("ffmpeg command is not installed.");
+                new FileInfo(
+                    ProcessUtility.WhereIs("pffmpeg")
+                    ?? throw new Exception("ffmpeg command is not installed."));
 
             var logState = new FfmpegLogState();
             return
@@ -221,18 +219,18 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                     ffmpegCommandFile,
                     args,
                     new UTF8Encoding(false),
-                    standardInputRedirector ?? GetNullInputRedirector(), // 標準入力は、データ入力として使用されない場合は ffpeg の中断手段として使用されるので、null は指定しない。
+                    standardInputRedirector,
                     standardOutputRedirector,
                     GetTextOutputRedirector(lineText =>
                     {
-                        if (lineText == "[q] command received. Exiting.")
+                        if (lineText.StartsWith("[q] command received. Exiting.", StringComparison.Ordinal))
                         {
                             // ffmpeg が q の入力を検出して終了ログである場合
 
                             logState.DetectedToQuit = true;
                             return;
                         }
-                        else if (lineText.StartsWith("frame=", StringComparison.InvariantCulture))
+                        else if (lineText.StartsWith("frame=", StringComparison.Ordinal))
                         {
                             // 進捗状況のログである場合
 
@@ -411,53 +409,5 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
 
         public static IChildProcessCancellable GetChildProcessCanceller(Action<Process> childProcessCanceller)
             => new ChildProcessCanceller(childProcessCanceller);
-
-        public static FileInfo? SearchExecutableFile(string fileName)
-        {
-            var fileNameExe = fileName + ".exe";
-            var pathElements =
-                (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';')
-                .SelectMany(
-                    dir => new[] { fileName, fileNameExe },
-                    (dir, name) => new { dir, name })
-                .Concat(new[]
-                    {
-                        new { dir = "/usr/bin", name = fileName },
-                        new { dir = "/usr/lib", name = fileName },
-                        new { dir = "/usr/local/bin", name = fileName },
-                        new { dir = "/usr/local/lib", name = fileName },
-                        new { dir = _baseDirectory, name = fileName },
-                        new { dir = _baseDirectory, name = fileNameExe },
-                    });
-            lock (_cachedExecutableFilePaths)
-            {
-                foreach (var pathElement in pathElements)
-                {
-                    if (_cachedExecutableFilePaths.TryGetValue(fileName, out string? executablePath))
-                    {
-                        return
-                            executablePath is not null
-                            ? new FileInfo(executablePath)
-                            : null;
-                    }
-
-                    try
-                    {
-                        var file = new FileInfo(Path.Combine(pathElement.dir, pathElement.name));
-                        if (file.Exists)
-                        {
-                            _cachedExecutableFilePaths.Add(fileName, file.FullName);
-                            return file;
-                        }
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-
-                _cachedExecutableFilePaths.Add(fileName, null);
-                return null;
-            }
-        }
     }
 }

@@ -348,17 +348,6 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
-/MatroskaBatchToolBox/Properties/launchSettings.json
-/MatroskaBatchToolBox/ffprobe.exe
-/MatroskaBatchToolBox/ffplay.exe
-/MatroskaBatchToolBox/ffmpeg.exe
-/EncoderBenchmarkTest/Properties/launchSettings.json
-/CalcVMAF/ffmpeg.exe
-/MatroskaBatchToolBox/TODO.txt
-/ChapterConverter/Properties/launchSettings.json
-/CalcVMAF/Properties/launchSettings.json
+launchSettings.json
 *.exe
-/Experiment/Properties/launchSettings.json
-/Palmtree.Movie.Ffmpeg/Properties/launchSettings.json
-/MovieMetadataEditor/MovieMetadataEditor.csproj
-/MovieMetadataEditor/Program.cs
+/MatroskaBatchToolBox/TODO.txt

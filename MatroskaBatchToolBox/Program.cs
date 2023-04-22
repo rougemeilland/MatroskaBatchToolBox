@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MatroskaBatchToolBox.Properties;
@@ -41,7 +43,14 @@ namespace MatroskaBatchToolBox
 
         public static void Main(string[] args)
         {
-            TinyConsole.Title = nameof(MatroskaBatchToolBox);
+            // このプロセスでは Ctrl+C を無視する。
+            TinyConsole.CancelKeyPress += (sender, e) => e.Cancel = true;
+
+            // コマンドの入出力エンコーディングを UTF8 にする
+            TinyConsole.InputEncoding = Encoding.UTF8;
+            TinyConsole.OutputEncoding = Encoding.UTF8;
+
+            TinyConsole.Title = Process.GetCurrentProcess().ProcessName;
 
             try
             {

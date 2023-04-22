@@ -70,5 +70,60 @@ namespace Palmtree.IO
                 unreadBufferSpan = unreadBufferSpan[length..];
             }
         }
+
+        /// <summary>
+        /// 進捗状況を報告しながら、あるストリームからバイトデータを読み込み、別のストリームの書き込みます。
+        /// どちらのストリーム位置もコピーされたバイト数だけ進みます。
+        /// </summary>
+        /// <param name="inputStream">
+        /// コピー元のストリームである <see cref="Stream"/> オブジェクトです。このストリームは読み込み可能でなければなりません。
+        /// </param>
+        /// <param name="outputStream">
+        /// コピー先のストリームである <see cref="Stream"/> オブジェクトです。このストリームは書き込み可能でなければなりません。
+        /// </param>
+        /// <param name="progress">
+        /// コピーされたバイト数を報告する <see cref="IProgress{T}"/> オブジェクトです。
+        /// </param>
+        public static void CopyTo(this Stream inputStream, Stream outputStream, IProgress<long> progress)
+            => inputStream.CopyTo(outputStream, 80 * 1024, progress);
+
+        /// <summary>
+        /// 指定されたサイズのバッファーを使用して、進捗状況を報告しながら、あるストリームからバイトデータを読み込み、別のストリームの書き込みます。
+        /// どちらのストリーム位置もコピーされたバイト数だけ進みます。
+        /// </summary>
+        /// <param name="inputStream">
+        /// コピー元のストリームである <see cref="Stream"/> オブジェクトです。このストリームは読み込み可能でなければなりません。
+        /// </param>
+        /// <param name="outputStream">
+        /// コピー先のストリームである <see cref="Stream"/> オブジェクトです。このストリームは書き込み可能でなければなりません。
+        /// </param>
+        /// <param name="bufferSize">
+        /// バッファーのサイズである <see cref="long"/> 値です。
+        /// </param>
+        /// <param name="progress">
+        /// コピーされたバイト数を報告する <see cref="IProgress{T}"/> オブジェクトです。
+        /// </param>
+        public static void CopyTo(this Stream inputStream, Stream outputStream, int bufferSize, IProgress<long> progress)
+        {
+            if (bufferSize < 1)
+                throw new ArgumentOutOfRangeException(nameof(bufferSize));
+
+            if (inputStream.CanSeek)
+                bufferSize = (int)((long)bufferSize).Minimum(inputStream.Length - inputStream.Position).Maximum(1);
+
+            inputStream.CopyTo(outputStream);
+            var buffer = new byte[bufferSize];
+            var totalLength = 0L;
+            progress.Report(totalLength);
+            while (true)
+            {
+                var length = inputStream.Read(buffer);
+                if (length <= 0)
+                    break;
+                outputStream.Write(buffer, 0, length);
+                totalLength += length;
+                progress.Report(totalLength);
+            }
+        }
     }
 }
