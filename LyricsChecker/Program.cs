@@ -26,6 +26,9 @@ namespace LyricsChecker
 
         private static int Main(string[] args)
         {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
+
             var options = new List<string>();
             var lyricsFilePath = (string?)null;
             var musicFilePath = (string?)null;
