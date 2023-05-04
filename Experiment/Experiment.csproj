@@ -35,6 +35,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Palmtree.Core\Palmtree.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="xterm">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

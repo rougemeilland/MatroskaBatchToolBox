@@ -19,5 +19,9 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
         [JsonPropertyName("title")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Title { get; set; }
+
+        [JsonPropertyName("comment")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Comment { get; set; }
     }
 }

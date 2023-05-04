@@ -19,17 +19,19 @@ namespace MatroskaBatchToolBox.Utility.Movie
             Size = format.Size is not null && format.Size.TryParse(out int sizeValue) ? sizeValue : null;
             BitRate = format.BitRate is not null && format.BitRate.TryParse(out int bitRateValue) ? bitRateValue : null;
             ProbeScore = format.ProbeScore;
+            Tags = new MovieFormatTags(format.Tags);
         }
 
-        public FileInfo File { get; set; }
-        public int StreamsCount { get; set; }
-        public int ProgramsCount { get; set; }
-        public string FormatName { get; set; }
-        public string? FormatLongName { get; set; }
-        public TimeSpan? StartTime { get; set; }
-        public TimeSpan? Duration { get; set; }
-        public long? Size { get; set; }
-        public int? BitRate { get; set; }
-        public int ProbeScore { get; set; }
+        public FileInfo File { get; }
+        public int StreamsCount { get; }
+        public int ProgramsCount { get; }
+        public string FormatName { get; }
+        public string? FormatLongName { get; }
+        public TimeSpan? StartTime { get; }
+        public TimeSpan? Duration { get; }
+        public long? Size { get; }
+        public int? BitRate { get; }
+        public int ProbeScore { get; }
+        public MovieFormatTags Tags { get; }
     }
 }

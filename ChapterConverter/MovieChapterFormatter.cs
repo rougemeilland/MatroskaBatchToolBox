@@ -25,7 +25,7 @@ namespace ChapterConverter
                     MovieInformationType.Chapters,
                     (level, message) =>
                     {
-                        if (level != "INFO")
+                        if (level != "INFORMATION")
                             Parameter.ReportWarningMessage(message);
                     });
             return

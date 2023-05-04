@@ -259,7 +259,7 @@ namespace MovieChapterEditor
                         {
                             0 => new object[] { arg },
                             1 =>
-                                arg.TryParse(false, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
                             _ => throw Validation.GetFailErrorException($"parsing {optionName}"),
@@ -289,7 +289,7 @@ namespace MovieChapterEditor
                         {
                             0 => new object[] { arg },
                             1 =>
-                                arg.TryParse(false, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
                             _ => throw Validation.GetFailErrorException($"parsing {optionName}"),
@@ -330,7 +330,7 @@ namespace MovieChapterEditor
                         {
                             0 => new object[] { arg },
                             1 =>
-                                arg.TryParse(false, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
                             _ => throw Validation.GetFailErrorException($"parsing {optionName}"),
@@ -369,7 +369,7 @@ namespace MovieChapterEditor
                         {
                             0 => new object[] { arg },
                             1 =>
-                                arg.TryParse(false, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
                             _ => throw Validation.GetFailErrorException($"parsing {optionName}"),
@@ -408,7 +408,7 @@ namespace MovieChapterEditor
                         {
                             0 => new object[] { arg },
                             1 =>
-                                arg.TryParse(false, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
                             _ => throw Validation.GetFailErrorException($"parsing {optionName}"),

@@ -33,9 +33,9 @@ namespace ChapterConverter
                             Id = index + 1,
                             TimeBase = $"{DefaultTimeBaseNumerator}/{DefaultTimeBaseDenominator}",
                             Start = chapter.StartTime.FromTimeSpanToTimeCount(DefaultTimeBaseNumerator, DefaultTimeBaseDenominator),
-                            StartTime = chapter.StartTime.FormatTime(6),
+                            StartTime = chapter.StartTime.FormatTime(TimeFormatType.LongFormat, 6),
                             End = chapter.EndTime.FromTimeSpanToTimeCount(DefaultTimeBaseNumerator, DefaultTimeBaseDenominator),
-                            EndTime = chapter.EndTime.FormatTime(6),
+                            EndTime = chapter.EndTime.FormatTime(TimeFormatType.LongFormat, 6),
                             Tags = !string.IsNullOrEmpty(chapter.Title) ? new MovieChapterTagContainer { Title = chapter.Title } : null,
                         })
                     .ToList(),

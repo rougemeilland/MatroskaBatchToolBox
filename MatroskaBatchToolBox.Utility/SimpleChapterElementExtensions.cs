@@ -62,7 +62,7 @@ namespace MatroskaBatchToolBox.Utility
             {
                 if (timeSpec.StartsWith('+'))
                 {
-                    if (!timeSpec[1..].TryParse(false, out TimeSpan time))
+                    if (!timeSpec[1..].TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
                         throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                     if (previousTime is null)
                         throw new Exception($"Do not prefix the start time of the first chapter with a plus sign (+).: \"{timeSpec}\" in \"{rawText}\"");
@@ -72,7 +72,7 @@ namespace MatroskaBatchToolBox.Utility
                 }
                 else
                 {
-                    if (!timeSpec.TryParse(false, out TimeSpan time))
+                    if (!timeSpec.TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
                         throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                     if (previousTime is not null && time < previousTime.Value)
                         throw new Exception($"The list of start times is not in ascending order.: {rawText}");
@@ -86,13 +86,13 @@ namespace MatroskaBatchToolBox.Utility
         {
             var startTimesArray = startTimes.ToArray();
             if (startTimesArray.Length > 0 && startTimesArray[0] != TimeSpan.Zero)
-                warningReporter($"The time of the first chapter in the input data is not zero.: start-time=\"{startTimesArray[0].FormatTime(6)}({startTimesArray[0].TotalSeconds:F6})\"");
+                warningReporter($"The time of the first chapter in the input data is not zero.: start-time=\"{startTimesArray[0].FormatTime(TimeFormatType.LongFormat, 6)}({startTimesArray[0].TotalSeconds:F6})\"");
 
             for (var index = 0; index < startTimesArray.Length; ++index)
             {
                 var startTime = startTimesArray[index];
                 if (startTime >= maximumDuration)
-                    throw new Exception($"The chapter start time is too large in the input data. Change the maximum chapter duration with the \"--maximum_duration\" option.: start-time=\"{startTime.FormatTime(6)}({startTime.TotalSeconds:F6})\" at #{index}");
+                    throw new Exception($"The chapter start time is too large in the input data. Change the maximum chapter duration with the \"--maximum_duration\" option.: start-time=\"{startTime.FormatTime(TimeFormatType.LongFormat, 6)}({startTime.TotalSeconds:F6})\" at #{index}");
                 var endTime = index + 1 < startTimesArray.Length ? startTimesArray[index + 1] : maximumDuration;
                 yield return new SimpleChapterElement(startTime, endTime, "");
             }

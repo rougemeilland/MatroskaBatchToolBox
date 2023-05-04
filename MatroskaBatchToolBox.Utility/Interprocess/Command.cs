@@ -164,7 +164,9 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             {
                 "-hide_banner",
                 "-v error",
-                "-print_format json"
+                "-analyzeduration 100M",
+                "-probesize 100M",
+                "-print_format json",
             };
             if ((requestedInfo & MovieInformationType.Format) != MovieInformationType.None)
                 commandParameters.Add("-show_format");
@@ -186,7 +188,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                     null,
                     logger,
                     null);
-            logger("INFO", $"ffprobe exited with exit code {exitCode}.");
+            logger("INFORMATION", $"ffprobe exited with exit code {exitCode}.");
             if (exitCode != 0)
                 throw new Exception($"ffprobe failed. (exit code {exitCode})");
             var jsonText = string.Join("\r\n", standardOutputTextLines);
@@ -317,7 +319,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 ?? throw new Exception("Could not start process");
             try
             {
-                logger("INFO", $"Child process started.: id={process.Id} \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
+                logger("INFORMATION", $"Child process started.: id={process.Id} \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
                 process.PriorityClass = ProcessPriorityClass.BelowNormal;
                 var cancelled = false;
                 var cancellationWatcherTask =
@@ -379,7 +381,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 standardErrorRedirectorTask?.Wait();
 
                 process.WaitForExit();
-                logger("INFO", $"Child process exited.: id={process.Id}, process-total-time={process.TotalProcessorTime.TotalSeconds:F2}[sec], \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
+                logger("INFORMATION", $"Child process exited.: id={process.Id}, process-total-time={process.TotalProcessorTime.TotalSeconds:F2}[sec], \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
 
                 return
                     !cancelled

@@ -156,7 +156,7 @@ namespace MatroskaBatchToolBox
                                 }
                             }
                         }));
-                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg-normalize exited with exit code {exitCode}." });
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: ffmpeg-normalize exited with exit code {exitCode}." });
                 if (isNotAvailableCodec)
                 {
                     Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: The specified movie's audio was not supported by libopus." });
@@ -170,7 +170,7 @@ namespace MatroskaBatchToolBox
             }
             catch (OperationCanceledException)
             {
-                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg-normalize aborted at user request." });
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: ffmpeg-normalize aborted at user request." });
                 return CommandResultCode.Cancelled;
             }
         }
@@ -380,7 +380,7 @@ namespace MatroskaBatchToolBox
                             lineText => Log(logFile, new[] { lineText }),
                             (level, message) => Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }),
                             progressReporter);
-                    Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
+                    Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: ffmpeg exited with exit code {exitCode}." });
                     return
                         exitCode == 0
                         ? CommandResultCode.Completed
@@ -388,7 +388,7 @@ namespace MatroskaBatchToolBox
                 }
                 catch (OperationCanceledException)
                 {
-                    Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
+                    Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: ffmpeg aborted at user request." });
                     return CommandResultCode.Cancelled;
                 }
             }
@@ -439,7 +439,7 @@ namespace MatroskaBatchToolBox
                         },
                         (level, message) => Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:{level}:{message}" }),
                         progressReporter);
-                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg exited with exit code {exitCode}." });
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: ffmpeg exited with exit code {exitCode}." });
                 if (exitCode != 0)
                     throw new Exception($"ffmpeg failed. (exit code {exitCode})");
                 if (vmafScoreValue is null)
@@ -449,7 +449,7 @@ namespace MatroskaBatchToolBox
             }
             catch (OperationCanceledException)
             {
-                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: ffmpeg aborted at user request." });
+                Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: ffmpeg aborted at user request." });
                 vmafScore = double.NaN;
                 return CommandResultCode.Cancelled;
             }

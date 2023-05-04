@@ -62,7 +62,7 @@ namespace MatroskaBatchToolBox
             if (audioCodecIsNotSupported)
             {
                 CleanUpLogFile(logFile);
-                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Failed to normalize the audio of the video with libopus, so normalize with libvorbis instead.: \"{sourceFile.FullName}\"", });
+                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Failed to normalize the audio of the video with libopus, so normalize with libvorbis instead.: \"{sourceFile.FullName}\"", });
                 (actionResult, audioCodecIsNotSupported) =
                     NormalizeMovieFile(
                         sourceFile,
@@ -110,7 +110,7 @@ namespace MatroskaBatchToolBox
                 if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
                 {
                     // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return (actionResult = ActionResult.Failed, false);
                 }
 
@@ -126,7 +126,7 @@ namespace MatroskaBatchToolBox
                 }
 
                 actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
-                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\".", });
+                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\".", });
                 return (actionResult = ActionResult.Success, false);
             }
             catch (AggregateException ex)
@@ -134,7 +134,7 @@ namespace MatroskaBatchToolBox
                 if (destinationFile.Exists)
                 {
                     DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"", });
                 }
 
                 ExternalCommand.ReportAggregateException(logFile, ex);
@@ -145,7 +145,7 @@ namespace MatroskaBatchToolBox
                 if (destinationFile.Exists)
                 {
                     DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"", });
                 }
 
                 ExternalCommand.ReportException(logFile, ex);
@@ -156,13 +156,13 @@ namespace MatroskaBatchToolBox
                 if (workingFile.Exists)
                 {
                     DeleteFileSafety(workingFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile.FullName}\"", });
                 }
 
                 switch (actionResult)
                 {
                     case ActionResult.Success:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The audio in movie file was successfully normalized.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: The audio in movie file was successfully normalized.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
                         FinalizeLogFile(logFile, "OK");
                         break;
                     case ActionResult.Skipped:
@@ -173,7 +173,7 @@ namespace MatroskaBatchToolBox
                         FinalizeLogFile(logFile, "NG");
                         break;
                     case ActionResult.Cancelled:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie audio normalization was interrupted by the user.: \"{sourceFile.FullName}\"", });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Movie audio normalization was interrupted by the user.: \"{sourceFile.FullName}\"", });
                         break;
                     default:
                         break;
@@ -249,7 +249,7 @@ namespace MatroskaBatchToolBox
                 if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
                 {
                     // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
                     return actionResult = ActionResult.Failed;
                 }
 
@@ -345,7 +345,7 @@ namespace MatroskaBatchToolBox
                 }
 
                 actualDestinationFilePath = MoveToDestinationFile(workingFile1, destinationFile);
-                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
+                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
                 return actionResult = ActionResult.Success;
             }
             catch (AggregateException ex)
@@ -353,7 +353,7 @@ namespace MatroskaBatchToolBox
                 if (destinationFile.Exists)
                 {
                     DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"" });
                 }
 
                 ExternalCommand.ReportAggregateException(logFile, ex);
@@ -364,7 +364,7 @@ namespace MatroskaBatchToolBox
                 if (destinationFile.Exists)
                 {
                     DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"" });
                 }
 
                 ExternalCommand.ReportException(logFile, ex);
@@ -375,19 +375,19 @@ namespace MatroskaBatchToolBox
                 if (workingFile1.Exists)
                 {
                     DeleteFileSafety(workingFile1);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile1.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile1.FullName}\"", });
                 }
 
                 if (workingFile2.Exists)
                 {
                     DeleteFileSafety(workingFile2);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile2.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile2.FullName}\"", });
                 }
 
                 switch (actionResult)
                 {
                     case ActionResult.Success:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: The movie file was successfully converted.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: The movie file was successfully converted.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
                         FinalizeLogFile(logFile, "OK");
                         break;
                     case ActionResult.Skipped:
@@ -398,7 +398,7 @@ namespace MatroskaBatchToolBox
                         FinalizeLogFile(logFile, "NG");
                         break;
                     case ActionResult.Cancelled:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Movie file conversion was interrupted by the user.: \"{sourceFile.FullName}\"", });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Movie file conversion was interrupted by the user.: \"{sourceFile.FullName}\"", });
                         break;
                     default:
                         break;
@@ -535,7 +535,7 @@ namespace MatroskaBatchToolBox
                         if (commandResult3 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
 
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: VMAF Score: {vmafScore:F6}" });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: VMAF Score: {vmafScore:F6}" });
                     }
                     else
                     {
@@ -628,7 +628,7 @@ namespace MatroskaBatchToolBox
                                 new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress) / totalWeight)));
                         if (commandResult2 == CommandResultCode.Cancelled)
                             return actionResult = ActionResult.Cancelled;
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: VMAF Score: {vmafScore:F6}" });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: VMAF Score: {vmafScore:F6}" });
                     }
                     else
                     {
@@ -654,7 +654,7 @@ namespace MatroskaBatchToolBox
                 }
 
                 actualDestinationFilePath = MoveToDestinationFile(workingFile1, destinationFile);
-                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
+                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
                 return actionResult = ActionResult.Success;
             }
             catch (AggregateException ex)
@@ -662,7 +662,7 @@ namespace MatroskaBatchToolBox
                 if (destinationFile.Exists)
                 {
                     DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"" });
                 }
 
                 ExternalCommand.ReportAggregateException(logFile, ex);
@@ -673,7 +673,7 @@ namespace MatroskaBatchToolBox
                 if (destinationFile.Exists)
                 {
                     DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{destinationFile.FullName}\"" });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"" });
                 }
 
                 ExternalCommand.ReportException(logFile, ex);
@@ -684,13 +684,13 @@ namespace MatroskaBatchToolBox
                 if (workingFile1.Exists)
                 {
                     DeleteFileSafety(workingFile1);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile1.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile1.FullName}\"", });
                 }
 
                 if (workingFile2.Exists)
                 {
                     DeleteFileSafety(workingFile2);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: File was deleted: \"{workingFile2.FullName}\"", });
+                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile2.FullName}\"", });
                 }
 
                 switch (actionResult)
@@ -700,12 +700,12 @@ namespace MatroskaBatchToolBox
                             logFile,
                             new[]
                             {
-                                $"{nameof(MatroskaBatchToolBox)}: INFO: The video resolution of the movie fie was successfully changed.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? "<???>"}\"",
-                                $"{nameof(MatroskaBatchToolBox)}: INFO: Source file: \"{sourceFile.FullName}\"",
-                                $"{nameof(MatroskaBatchToolBox)}: INFO: Source file size: {sourceFile.Length:N0}[bytes]",
-                                $"{nameof(MatroskaBatchToolBox)}: INFO: Destination file: \"{actualDestinationFilePath?.FullName ?? "<???>"}\"",
-                                $"{nameof(MatroskaBatchToolBox)}: INFO: Destination file size: {actualDestinationFilePath?.Length ?? 0:N0}[bytes]",
-                                $"{nameof(MatroskaBatchToolBox)}: INFO: Compression ratio (<Destination file size> / <Source file size>): {(actualDestinationFilePath is not null ? (100.0 * actualDestinationFilePath.Length / sourceFile.Length).ToString("F2") : "<???>" )}%",
+                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: The video resolution of the movie fie was successfully changed.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? "<???>"}\"",
+                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Source file: \"{sourceFile.FullName}\"",
+                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Source file size: {sourceFile.Length:N0}[bytes]",
+                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Destination file: \"{actualDestinationFilePath?.FullName ?? "<???>"}\"",
+                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Destination file size: {actualDestinationFilePath?.Length ?? 0:N0}[bytes]",
+                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Compression ratio (<Destination file size> / <Source file size>): {(actualDestinationFilePath is not null ? (100.0 * actualDestinationFilePath.Length / sourceFile.Length).ToString("F2") : "<???>" )}%",
                             });
                         FinalizeLogFile(logFile, "OK");
                         break;
@@ -717,7 +717,7 @@ namespace MatroskaBatchToolBox
                         FinalizeLogFile(logFile, "NG");
                         break;
                     case ActionResult.Cancelled:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: INFO: Changing the video resolution of the movie file was interrupted by the user.: \"{sourceFile.FullName}\"", });
+                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Changing the video resolution of the movie file was interrupted by the user.: \"{sourceFile.FullName}\"", });
                         break;
                     default:
                         break;

@@ -665,7 +665,7 @@ namespace ChapterConverter
 
                         ++index;
                         {
-                            if (!args[index].TryParse(false, out TimeSpan maximumDurationValue))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan maximumDurationValue))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--maximum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
@@ -697,7 +697,7 @@ namespace ChapterConverter
 
                         ++index;
                         {
-                            if (!args[index].TryParse(false, out TimeSpan time))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--ss\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
@@ -729,7 +729,7 @@ namespace ChapterConverter
 
                         ++index;
                         {
-                            if (!args[index].TryParse(false, out TimeSpan time))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
@@ -761,7 +761,7 @@ namespace ChapterConverter
 
                         ++index;
                         {
-                            if (!args[index].TryParse(false, out TimeSpan time))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
@@ -793,7 +793,7 @@ namespace ChapterConverter
 
                         ++index;
                         {
-                            if (!args[index].TryParse(false, out TimeSpan minimumDurationValue))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan minimumDurationValue))
                             {
                                 PrintErrorMessage($"The format of the value of the \"--minimum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;

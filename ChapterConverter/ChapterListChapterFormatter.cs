@@ -35,7 +35,7 @@ namespace ChapterConverter
                     if (times.TryGetValue(index, out (TimeSpan time, string lineText) value))
                         throw new Exception($"There are duplicate rows in the input data.: \"{currentLineText}\", \"{value.lineText}\"");
 
-                    if (!match.Groups["time"].Value.TryParse(true, out TimeSpan currentTime))
+                    if (!match.Groups["time"].Value.TryParse(TimeParsingMode.StrictForLongTimeFormat, out TimeSpan currentTime))
                         throw new Exception($"There is an error in the format of the input line.: \"{currentLineText}\"");
 
                     times.Add(index, (currentTime, currentLineText));
@@ -102,7 +102,7 @@ namespace ChapterConverter
                     return
                         new[]
                         {
-                            $"CHAPTER{indexText}={summary.startTime.FormatTime(3)}",
+                            $"CHAPTER{indexText}={summary.startTime.FormatTime(TimeFormatType.LongFormat, 3)}",
                             $"CHAPTER{indexText}NAME={summary.name}",
                         };
                 });

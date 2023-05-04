@@ -65,7 +65,7 @@ namespace MovieChapterEditor
                     return
                         from <= toValue.Value
                         ? (from, toValue.Value)
-                        : throw new InvalidCommandOptionException($"The time specified with the \"-to\" option is less than the time specified with the \"-ss\" option.\r\nCheck the \"-ss\" option value and \"-to\" option value.: -ss {from.FormatTime(3)} -to {toValue.Value.FormatTime(3)}");
+                        : throw new InvalidCommandOptionException($"The time specified with the \"-to\" option is less than the time specified with the \"-ss\" option.\r\nCheck the \"-ss\" option value and \"-to\" option value.: -ss {from.FormatTime(TimeFormatType.LongFormat, 3)} -to {toValue.Value.FormatTime(TimeFormatType.LongFormat, 3)}");
                 }
                 else
                 {

@@ -1,5 +1,6 @@
 ﻿#define NEED_HIGH_PRECISION_FOR_TIME
 using System;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Palmtree;
 
@@ -7,12 +8,16 @@ namespace MatroskaBatchToolBox.Utility
 {
     public static class TimeSpanExtensions
     {
-        private static readonly Regex _strictTimePattern;
+        private static readonly Regex _strictLongTimePattern;
+        private static readonly Regex _strictShortTimePattern;
+        private static readonly Regex _strictVeryShortTimePattern;
         private static readonly Regex _lazyTimePattern;
 
         static TimeSpanExtensions()
         {
-            _strictTimePattern = new Regex(@"^(?<hour>\d+):(?<minute>\d+):(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            _strictLongTimePattern = new Regex(@"^(?<hour>\d+):(?<minute>\d+):(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            _strictShortTimePattern = new Regex(@"^(?<minute>\d+):(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            _strictVeryShortTimePattern = new Regex(@"^(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
             _lazyTimePattern = new Regex(@"^(((?<hour>\d+):)?(?<minute>\d+):)?(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         }
 
@@ -20,7 +25,7 @@ namespace MatroskaBatchToolBox.Utility
         {
             if (strict)
             {
-                var match = _strictTimePattern.Match(s);
+                var match = _strictLongTimePattern.Match(s);
                 if (!match.Success)
                     throw new FormatException($"Time string is expected.: \"{s}\"");
 
@@ -59,65 +64,105 @@ namespace MatroskaBatchToolBox.Utility
             }
         }
 
-        public static bool TryParse(this string s, bool strict, out TimeSpan value)
+        public static bool TryParse(this string s, TimeParsingMode parsingMode, out TimeSpan value)
         {
-            if (strict)
+            switch (parsingMode)
             {
-                var match = _strictTimePattern.Match(s);
-                if (!match.Success)
+                case TimeParsingMode.StrictForLongTimeFormat:
                 {
-                    value = TimeSpan.Zero;
-                    return false;
-                }
+                    var match = _strictLongTimePattern.Match(s);
+                    if (!match.Success)
+                    {
+                        value = TimeSpan.Zero;
+                        return false;
+                    }
 
-                var hour = match.Groups["hour"].Value.ParseAsInt32();
-
-                var minute = match.Groups["minute"].Value.ParseAsInt32();
-                if (minute >= 60)
-                {
-                    value = TimeSpan.Zero;
-                    return false;
-                }
-
-                var second = match.Groups["second"].Value.ParseAsDouble();
-                if (second >= 60)
-                {
-                    value = TimeSpan.Zero;
-                    return false;
-                }
-
-                value = TimeSpan.FromSeconds((hour * 60.0 + minute) * 60.0 + second);
-                return true;
-            }
-            else
-            {
-                var match = _lazyTimePattern.Match(s);
-                if (!match.Success)
-                {
-                    value = TimeSpan.Zero;
-                    return false;
-                }
-
-                var totalSeconds = match.Groups["second"].Value.ParseAsDouble();
-
-                if (match.Groups["minute"].Success)
-                {
-                    var minute = match.Groups["minute"].Value.ParseAsInt32();
-                    totalSeconds += minute * 60;
-                }
-
-                if (match.Groups["hour"].Success)
-                {
                     var hour = match.Groups["hour"].Value.ParseAsInt32();
-                    totalSeconds += hour * (60 * 60);
-                }
 
-                value = TimeSpan.FromSeconds(totalSeconds);
-                return true;
+                    var minute = match.Groups["minute"].Value.ParseAsInt32();
+                    if (minute >= 60)
+                    {
+                        value = TimeSpan.Zero;
+                        return false;
+                    }
+
+                    var second = match.Groups["second"].Value.ParseAsDouble();
+                    if (second >= 60)
+                    {
+                        value = TimeSpan.Zero;
+                        return false;
+                    }
+
+                    value = TimeSpan.FromSeconds((hour * 60.0 + minute) * 60.0 + second);
+                    return true;
+                }
+                case TimeParsingMode.StrictForShortTimeFormat:
+                {
+                    var match = _strictShortTimePattern.Match(s);
+                    if (!match.Success)
+                    {
+                        value = TimeSpan.Zero;
+                        return false;
+                    }
+
+                    var minute = match.Groups["minute"].Value.ParseAsInt32();
+
+                    var second = match.Groups["second"].Value.ParseAsDouble();
+                    if (second >= 60)
+                    {
+                        value = TimeSpan.Zero;
+                        return false;
+                    }
+
+                    value = TimeSpan.FromSeconds(minute * 60.0 + second);
+                    return true;
+                }
+                case TimeParsingMode.StrictForVeryShortTimeFormat:
+                {
+                    var match = _strictVeryShortTimePattern.Match(s);
+                    if (!match.Success)
+                    {
+                        value = TimeSpan.Zero;
+                        return false;
+                    }
+
+                    var second = match.Groups["second"].Value.ParseAsDouble();
+
+                    value = TimeSpan.FromSeconds(second);
+                    return true;
+                }
+                case TimeParsingMode.LazyMode:
+                {
+                    var match = _lazyTimePattern.Match(s);
+                    if (!match.Success)
+                    {
+                        value = TimeSpan.Zero;
+                        return false;
+                    }
+
+                    var totalSeconds = match.Groups["second"].Value.ParseAsDouble();
+
+                    if (match.Groups["minute"].Success)
+                    {
+                        var minute = match.Groups["minute"].Value.ParseAsInt32();
+                        totalSeconds += minute * 60;
+                    }
+
+                    if (match.Groups["hour"].Success)
+                    {
+                        var hour = match.Groups["hour"].Value.ParseAsInt32();
+                        totalSeconds += hour * (60 * 60);
+                    }
+
+                    value = TimeSpan.FromSeconds(totalSeconds);
+                    return true;
+                }
+                default:
+                    throw new ArgumentException($"Invalid {nameof(parsingMode)} value.: \"{parsingMode}\"", nameof(parsingMode));
             }
         }
 
-        public static string FormatTime(this TimeSpan time, int precision)
+        public static string FormatTime(this TimeSpan time, TimeFormatType format, int precision)
         {
             if (time < TimeSpan.Zero)
                 throw new ArgumentException("internal error (time < 0)");
@@ -128,11 +173,40 @@ namespace MatroskaBatchToolBox.Utility
 
             var secondFormat = precision <= 0 ? "D2" : $"00.{new string('0', precision)}";
             var totalSeconds = (decimal)time.TotalSeconds;
-            var totalMinutes = (int)Math.Floor(totalSeconds / 60);
-            var second = totalSeconds - totalMinutes * 60;
-            var minute = totalMinutes % 60;
-            var hour = totalMinutes / 60;
-            return $"{hour:D2}:{minute:D2}:{second.ToString(secondFormat)}";
+            switch (format)
+            {
+                case TimeFormatType.LongFormat:
+                {
+                    var totalMinutes = (int)Math.Floor(totalSeconds / 60);
+                    var second = totalSeconds - totalMinutes * 60;
+                    var minute = totalMinutes % 60;
+                    var totalHours = totalMinutes / 60;
+                    return $"{totalHours:D2}:{minute:D2}:{second.ToString(secondFormat)}";
+                }
+                case TimeFormatType.ShortFormat:
+                {
+                    var totalMinutes = (int)Math.Floor(totalSeconds / 60);
+                    var second = totalSeconds - totalMinutes * 60;
+                    return $"{totalMinutes:D2}:{second.ToString(secondFormat)}";
+                }
+                case TimeFormatType.OnlySeconds:
+                    return $"{totalSeconds.ToString(secondFormat)}";
+                case TimeFormatType.LazyFormat:
+                {
+                    var totalMinutes = (int)Math.Floor(totalSeconds / 60);
+                    var second = totalSeconds - totalMinutes * 60;
+                    var minute = totalMinutes % 60;
+                    var totalHours = totalMinutes / 60;
+                    if (totalHours > 0)
+                        return $"{totalHours:D2}:{minute:D2}:{second.ToString(secondFormat)}";
+                    else if (totalMinutes > 0)
+                        return $"{totalMinutes:D2}:{second.ToString(secondFormat)}";
+                    else
+                        return $"{totalSeconds.ToString(secondFormat)}";
+                }
+                default:
+                    throw new ArgumentException($"Invalid {nameof(format)} value.: \"{format}\"", nameof(format));
+            }
         }
 
         public static TimeSpan FromTimeCountToTimeSpan(this long timeValue, long timeBaseNumerator, long timeBaseDenominator)

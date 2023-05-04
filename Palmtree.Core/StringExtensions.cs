@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Palmtree
 {
@@ -8,8 +9,11 @@ namespace Palmtree
     /// </summary>
     public static class StringExtensions
     {
+        private static readonly Regex _questionMarksAndExclamationMarksSequencePattern;
         static StringExtensions()
         {
+            _questionMarksAndExclamationMarksSequencePattern = new Regex(@"([\?!]*\?[\?!]*)", RegexOptions.Compiled);
+
             Validation.Assert('\u0007' == '\a', "'\u0007' == '\a'");
             Validation.Assert('\u0008' == '\b', "'\u0008' == '\b'");
             Validation.Assert('\u0009' == '\t', "'\u0009' == '\t'");
@@ -94,5 +98,39 @@ namespace Palmtree
                 return string.Concat(arg.Select(c => c == '\\' ? "\\\\" : c == '"' ? "\\\"" : c.ToString()));
             }
         }
+
+        /// <summary>
+        /// 指定された文字列を Windows のファイルシステムで使用可能な形式でエンコードします。
+        /// </summary>
+        /// <param name="s">エンコード対象の文字列です。</param>
+        /// <returns>エンコードされた文字列です。</returns>
+        public static string WindowsFileNameEncoding(this string s)
+            => string.Concat(
+                _questionMarksAndExclamationMarksSequencePattern.Replace(
+                    s,
+                    m =>
+                        string.Concat(
+                            m.Value
+                            .Select(c =>
+                                c switch
+                                {
+                                    '?' => '？',
+                                    '!' => '！',
+                                    _ => c,
+                                })))
+                    .Select(c =>
+                        c switch
+                        {
+                            '\\' => '＼',
+                            '/' => '／',
+                            ':' => '：',
+                            '*' => '＊',
+                            '?' => '？',
+                            '"' => '”',
+                            '<' => '＜',
+                            '>' => '＞',
+                            '|' => '｜',
+                            _ => c,
+                        }));
     }
 }

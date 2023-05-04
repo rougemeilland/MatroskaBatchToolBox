@@ -44,5 +44,8 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
 
         [JsonPropertyName("probe_score")]
         public int ProbeScore { get; set; }
+
+        [JsonPropertyName("tags")]
+        public MovieFormatTagsContainer? Tags { get; set; }
     }
 }

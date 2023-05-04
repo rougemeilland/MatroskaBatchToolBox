@@ -67,7 +67,7 @@ namespace MatroskaBatchToolBox.Model
         private static (bool success, TimeSpan? time) ParseTime(string s)
             => string.IsNullOrEmpty(s)
             ? (true, null)
-            : s.TryParse(false, out TimeSpan time)
+            : s.TryParse(TimeParsingMode.LazyMode, out TimeSpan time)
             ? (true, time)
             : (false, null);
     }

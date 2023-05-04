@@ -25,7 +25,7 @@ namespace ChapterConverter
                     row.Length.IsInClosedInterval(1, 2)
                     ? (new
                     {
-                        startTime = row[0].TryParse(false, out TimeSpan time) ? time : throw new Exception($"Invalid row format in input data.: {row[0]}"),
+                        startTime = row[0].TryParse(TimeParsingMode.LazyMode, out TimeSpan time) ? time : throw new Exception($"Invalid row format in input data.: {row[0]}"),
                         title = row.Length >= 2 ? row[1] : "",
                     })
                     : throw new Exception("The format of the input CSV data is invalid. (not enough columns in row)"))
@@ -45,7 +45,7 @@ namespace ChapterConverter
                 chapters
                 .Select((chapter, index) =>
                 {
-                    var row = new[] { chapter.StartTime.FormatTime(6), }.AsEnumerable();
+                    var row = new[] { chapter.StartTime.FormatTime(TimeFormatType.LongFormat, 6), }.AsEnumerable();
                     if (!string.IsNullOrEmpty(chapter.Title))
                         row = row.Append(chapter.Title);
                     return row;
