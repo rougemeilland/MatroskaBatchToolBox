@@ -21,46 +21,73 @@ namespace MatroskaBatchToolBox.Utility
             _lazyTimePattern = new Regex(@"^(((?<hour>\d+):)?(?<minute>\d+):)?(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         }
 
-        public static TimeSpan ParseAsTimeSpan(this string s, bool strict)
+        public static TimeSpan ParseAsTimeSpan(this string s, TimeParsingMode parsingMode)
         {
-            if (strict)
+            switch (parsingMode)
             {
-                var match = _strictLongTimePattern.Match(s);
-                if (!match.Success)
-                    throw new FormatException($"Time string is expected.: \"{s}\"");
-
-                var hour = match.Groups["hour"].Value.ParseAsInt32();
-
-                var minute = match.Groups["minute"].Value.ParseAsInt32();
-                if (minute >= 60)
-                    throw new FormatException($"Time string in time format is expected. (Minute value out of range): \"{s}\"");
-
-                var second = match.Groups["second"].Value.ParseAsDouble();
-                return second < 60
-                    ? TimeSpan.FromSeconds((hour * 60.0 + minute) * 60.0 + second)
-                    : throw new FormatException($"Time string in time format is expected. (Second value out of range): \"{s}\"");
-            }
-            else
-            {
-                var match = _lazyTimePattern.Match(s);
-                if (!match.Success)
-                    throw new FormatException($"Time string is expected.: \"{s}\"");
-
-                var totalSeconds = match.Groups["second"].Value.ParseAsDouble();
-
-                if (match.Groups["minute"].Success)
+                case TimeParsingMode.StrictForLongTimeFormat:
                 {
-                    var minute = match.Groups["minute"].Value.ParseAsInt32();
-                    totalSeconds += minute * 60;
-                }
+                    var match = _strictLongTimePattern.Match(s);
+                    if (!match.Success)
+                        throw new FormatException($"Time string is expected.: \"{s}\"");
 
-                if (match.Groups["hour"].Success)
-                {
                     var hour = match.Groups["hour"].Value.ParseAsInt32();
-                    totalSeconds += hour * (60 * 60);
-                }
 
-                return TimeSpan.FromSeconds(totalSeconds);
+                    var minute = match.Groups["minute"].Value.ParseAsInt32();
+                    if (minute >= 60)
+                        throw new FormatException($"Time string in time format is expected. (Minute value out of range): \"{s}\"");
+
+                    var second = match.Groups["second"].Value.ParseAsDouble();
+                    return second < 60
+                        ? TimeSpan.FromSeconds((hour * 60.0 + minute) * 60.0 + second)
+                        : throw new FormatException($"Time string in time format is expected. (Second value out of range): \"{s}\"");
+                }
+                case TimeParsingMode.StrictForShortTimeFormat:
+                {
+                    var match = _strictShortTimePattern.Match(s);
+                    if (!match.Success)
+                        throw new FormatException($"Time string is expected.: \"{s}\"");
+
+                    var minute = match.Groups["minute"].Value.ParseAsInt32();
+
+                    var second = match.Groups["second"].Value.ParseAsDouble();
+                    return second < 60
+                        ? TimeSpan.FromSeconds(minute * 60.0 + second)
+                        : throw new FormatException($"Time string in time format is expected. (Second value out of range): \"{s}\"");
+                }
+                case TimeParsingMode.StrictForVeryShortTimeFormat:
+                {
+                    var match = _strictVeryShortTimePattern.Match(s);
+                    if (!match.Success)
+                        throw new FormatException($"Time string is expected.: \"{s}\"");
+
+                    var second = match.Groups["second"].Value.ParseAsDouble();
+                    return TimeSpan.FromSeconds(second);
+                }
+                case TimeParsingMode.LazyMode:
+                {
+                    var match = _lazyTimePattern.Match(s);
+                    if (!match.Success)
+                        throw new FormatException($"Time string is expected.: \"{s}\"");
+
+                    var totalSeconds = match.Groups["second"].Value.ParseAsDouble();
+
+                    if (match.Groups["minute"].Success)
+                    {
+                        var minute = match.Groups["minute"].Value.ParseAsInt32();
+                        totalSeconds += minute * 60;
+                    }
+
+                    if (match.Groups["hour"].Success)
+                    {
+                        var hour = match.Groups["hour"].Value.ParseAsInt32();
+                        totalSeconds += hour * (60 * 60);
+                    }
+
+                    return TimeSpan.FromSeconds(totalSeconds);
+                }
+                default:
+                    throw new ArgumentException($"Invalid {nameof(parsingMode)} value.: \"{parsingMode}\"", nameof(parsingMode));
             }
         }
 
@@ -127,7 +154,6 @@ namespace MatroskaBatchToolBox.Utility
                     }
 
                     var second = match.Groups["second"].Value.ParseAsDouble();
-
                     value = TimeSpan.FromSeconds(second);
                     return true;
                 }

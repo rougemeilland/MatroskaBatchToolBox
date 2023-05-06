@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -21,7 +22,7 @@ namespace LyricsChecker
         {
             _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
             _lengthTagPattern = new Regex(@"^\[(?<name>[a-z]+):\s*(?<value>.*)\]\s*$", RegexOptions.Compiled);
-            _lyricsTextPattern = new Regex(@"^(?<lyricsTime>\[\d\d:\d\d\.\d\d\])(?<lyricsText>.*)$", RegexOptions.Compiled);
+            _lyricsTextPattern = new Regex(@"^(?<lyricsTime>\[(\d+:)?\d+(\.\d+)?\])(?<lyricsText>.*)$", RegexOptions.Compiled);
         }
 
         private static int Main(string[] args)
@@ -156,11 +157,11 @@ namespace LyricsChecker
                     });
             var ok = true;
             ok = CheckFileNameStrictly(musicFileInfo, musicFile) && ok;
-            ok = CheckTag("Artist name", "ar", () => musicFileInfo.Format.Tags.Artist, musicFile) && ok;
-            ok = CheckTag("Album name", "al", () => musicFileInfo.Format.Tags.Album, musicFile) && ok;
-            ok = CheckTag("Song title", "ti", () => musicFileInfo.Format.Tags.Title, musicFile) && ok;
+            ok = CheckTag("artist name", "ar", () => musicFileInfo.Format.Tags.Artist, musicFile) && ok;
+            ok = CheckTag("album name", "al", () => musicFileInfo.Format.Tags.Album, musicFile) && ok;
+            ok = CheckTag("song title", "ti", () => musicFileInfo.Format.Tags.Title, musicFile) && ok;
             ok = CheckTag(
-                "Lyricist name",
+                "lyricist name",
                 "au",
                 () =>
                     musicFileInfo.Format.FormatName switch
@@ -170,7 +171,7 @@ namespace LyricsChecker
                         _ => throw new Exception($"Not supported music file format.: \"{musicFile.FullName}\""),
                     },
                 musicFile) && ok;
-            ok = CheckTag("Song length", "length", () => musicFileInfo.Format.Duration, musicFile) && ok;
+            ok = CheckTag("song length", "length", () => musicFileInfo.Format.Duration, musicFile) && ok;
 
             return ok;
         }
@@ -217,11 +218,11 @@ namespace LyricsChecker
                 var ok = true;
                 ok = CheckFileNameStrictly(musicFileInfo, musicFile, lyricsFile) && ok;
                 ok = CheclLyricsFile(lyricsFile) && ok;
-                ok = CheckTag("Artist name", "ar", () => musicFileInfo.Format.Tags.Artist, lyricsData.Tags, lyricsFile) && ok;
-                ok = CheckTag("Album name", "al", () => musicFileInfo.Format.Tags.Album, lyricsData.Tags, lyricsFile) && ok;
-                ok = CheckTag("Song title", "ti", () => musicFileInfo.Format.Tags.Title, lyricsData.Tags, lyricsFile) && ok;
+                ok = CheckTag("artist name", "ar", () => musicFileInfo.Format.Tags.Artist, lyricsData.Tags, lyricsFile) && ok;
+                ok = CheckTag("album name", "al", () => musicFileInfo.Format.Tags.Album, lyricsData.Tags, lyricsFile) && ok;
+                ok = CheckTag("song title", "ti", () => musicFileInfo.Format.Tags.Title, lyricsData.Tags, lyricsFile) && ok;
                 ok = CheckTag(
-                    "Lyricist name",
+                    "lyricist name",
                     "au",
                     () =>
                         musicFileInfo.Format.FormatName switch
@@ -232,7 +233,7 @@ namespace LyricsChecker
                         },
                     lyricsData.Tags,
                     lyricsFile) && ok;
-                ok = CheckTag("Song length", "length", () => musicFileInfo.Format.Duration, lyricsData.Tags, lyricsFile) && ok;
+                ok = CheckTag("song length", "length", () => musicFileInfo.Format.Duration, lyricsData.Tags, lyricsFile) && ok;
                 foreach (var lyricsText in lyricsData.LyricsTexts)
                 {
                     if (string.IsNullOrEmpty(lyricsText))
@@ -240,10 +241,14 @@ namespace LyricsChecker
                         TinyConsole.Out.WriteLine($"Contains empty lines.: \"{lyricsFile.FullName}\"");
                         ok = false;
                     }
-                    else if (!_lyricsTextPattern.IsMatch(lyricsText))
+                    else
                     {
-                        TinyConsole.Out.WriteLine($"Invalid  lyric line.: \"{lyricsText}\", \"{lyricsFile.FullName}\"");
-                        ok = false;
+                        var normalizedLyricsText = NormalizeLyricsText(lyricsText);
+                        if (normalizedLyricsText != lyricsText)
+                        {
+                            TinyConsole.Out.WriteLine($"Inappropriate lyrics timeline.: Current: \"{lyricsText}\", Desired: \"{normalizedLyricsText}\", \"{lyricsFile.FullName}\"");
+                            ok = false;
+                        }
                     }
                 }
 
@@ -316,9 +321,13 @@ namespace LyricsChecker
                 }
                 else
                 {
-                    var newLyricsText = ModifyLyricsText(lyricsText);
-                    newLyricsTexts.Add(newLyricsText);
-                    modified = modified || newLyricsText != lyricsText;
+                    var normalizedLyricsText = NormalizeLyricsText(lyricsText);
+                    newLyricsTexts.Add(normalizedLyricsText);
+                    if (normalizedLyricsText != lyricsText)
+                    {
+                        TinyConsole.Out.WriteLine($"Replace inappropriate lyric text. : Current: \"{lyricsText}\", New: \"{normalizedLyricsText}\", \"{lyricsFile.FullName}\"");
+                        modified = true;
+                    }
                 }
             }
 
@@ -326,62 +335,64 @@ namespace LyricsChecker
             foreach (var lyricsText in newLyricsTexts)
                 lyricsData.LyricsTexts.Add(lyricsText);
             if (modified)
-            {
-                var tempFilePath = Path.GetTempFileName();
-                try
-                {
-                    WriteLyricsFile(lyricsData, tempFilePath);
-                    var backupFilePath = "";
-                    if (File.Exists(lyricsFile.FullName))
-                    {
-                        for (var index = 1; ; ++index)
-                        {
-                            backupFilePath = index == 1 ? $"{lyricsFile.FullName}.backup" : $"{lyricsFile.FullName}.{index}.backup";
-                            if (!File.Exists(backupFilePath))
-                            {
-                                var SuccessfulBackup = false;
-                                try
-                                {
-                                    File.Move(lyricsFile.FullName, backupFilePath);
-                                    SuccessfulBackup = true;
-                                }
-                                catch (Exception)
-                                {
-                                }
+                SaveNewLyricsFile(lyricsFile, lyricsData);
+            return modified;
+        }
 
-                                if (SuccessfulBackup)
-                                    break;
+        private static void SaveNewLyricsFile(FileInfo lyricsFile, LyricsContainer lyricsData)
+        {
+            var tempFilePath = Path.GetTempFileName();
+            try
+            {
+                WriteLyricsFile(lyricsData, tempFilePath);
+                var backupFilePath = "";
+                if (File.Exists(lyricsFile.FullName))
+                {
+                    for (var index = 1; ; ++index)
+                    {
+                        backupFilePath = index == 1 ? $"{lyricsFile.FullName}.backup" : $"{lyricsFile.FullName}.{index}.backup";
+                        if (!File.Exists(backupFilePath))
+                        {
+                            var SuccessfulBackup = false;
+                            try
+                            {
+                                File.Move(lyricsFile.FullName, backupFilePath);
+                                SuccessfulBackup = true;
                             }
+                            catch (Exception)
+                            {
+                            }
+
+                            if (SuccessfulBackup)
+                                break;
                         }
                     }
+                }
 
-                    Validation.Assert(!File.Exists(lyricsFile.FullName), "!File.Exists(lyricsFile.FullName)");
-                    var successfullRenaming = false;
-                    try
-                    {
-                        File.Move(tempFilePath, lyricsFile.FullName);
-                        successfullRenaming = true;
-                    }
-                    finally
-                    {
-                        if (!successfullRenaming)
-                            File.Move(backupFilePath, lyricsFile.FullName);
-                    }
+                Validation.Assert(!File.Exists(lyricsFile.FullName), "!File.Exists(lyricsFile.FullName)");
+                var successfullRenaming = false;
+                try
+                {
+                    File.Move(tempFilePath, lyricsFile.FullName);
+                    successfullRenaming = true;
                 }
                 finally
                 {
-                    try
-                    {
-                        if (File.Exists(tempFilePath))
-                            File.Delete(tempFilePath);
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    if (!successfullRenaming)
+                        File.Move(backupFilePath, lyricsFile.FullName);
                 }
             }
-
-            return modified;
+            finally
+            {
+                try
+                {
+                    if (File.Exists(tempFilePath))
+                        File.Delete(tempFilePath);
+                }
+                catch (Exception)
+                {
+                }
+            }
         }
 
         private static bool CheckFileNameStrictly(MovieInformation musicFileInfo, FileInfo musicFile)
@@ -398,7 +409,7 @@ namespace LyricsChecker
                         "flac" => ".flac",
                         _ => throw new Exception($"Not supported music file format.: \"{musicFile.FullName}\""),
                     };
-                var expectedMusicFileName = $"{track:D2} {mp3TagEncode(musicTitleText.Trim())}{extension}";
+                var expectedMusicFileName = $"{track:D2} {Mp3TagEncode(musicTitleText.Trim())}{extension}";
                 ok = CheckMusicFilePath(musicFileInfo, musicFile) && ok;
                 ok = CheckFileName(musicFile, expectedMusicFileName) && ok;
             }
@@ -420,7 +431,7 @@ namespace LyricsChecker
                         "flac" => ".flac",
                         _ => throw new Exception($"Not supported music file format.: \"{musicFile.FullName}\""),
                     };
-                var expectedMusicFileName = $"{track:D2} {mp3TagEncode(musicTitleText.Trim())}{extension}";
+                var expectedMusicFileName = $"{track:D2} {Mp3TagEncode(musicTitleText.Trim())}{extension}";
                 ok = CheckMusicFilePath(musicFileInfo, musicFile) && ok;
                 ok = CheckFileName(musicFile, expectedMusicFileName) && ok;
                 ok = CheckFileName(lyricsFile, expectedMusicFileName) && ok;
@@ -454,7 +465,7 @@ namespace LyricsChecker
             Validation.Assert(actualAlbumDirectory is not null, "actualAlbumDirectory is not null");
 
             var desiredAlbumArtistDirectoryName = albumArtist.WindowsFileNameEncoding();
-                
+
             // いくつかのプレイヤーソフトでは "." で始まるディレクトリ/ファイル名を無視するため、置き換える。
             if (desiredAlbumArtistDirectoryName.StartsWith(".", StringComparison.Ordinal))
                 desiredAlbumArtistDirectoryName = $"．{desiredAlbumArtistDirectoryName[1..]}";
@@ -529,21 +540,27 @@ namespace LyricsChecker
             return lyricsData;
         }
 
-        private static string ModifyLyricsText(string lyricsLineText)
+        private static string NormalizeLyricsText(string lyricsLineText)
         {
             var lyricsTextMatch = _lyricsTextPattern.Match(lyricsLineText);
-            if (lyricsTextMatch.Success)
-            {
-                var lyricsTime = lyricsTextMatch.Groups["lyricsTime"].Value;
-                var lyricsText = lyricsTextMatch.Groups["lyricsText"].Value.Trim();
-                if (lyricsText.Length <= 0)
-                    lyricsText = " ";
-                return $"{lyricsTime}{lyricsText}";
-            }
-            else
-            {
+            if (!lyricsTextMatch.Success)
                 return lyricsLineText;
-            }
+
+            var lyricsTime = lyricsTextMatch.Groups["lyricsTime"].Value;
+
+            // 歌詞テキストの前後に誤って空白を挿入してしまうことがよくあるので、前後の空白を除去する
+            var lyricsText = lyricsTextMatch.Groups["lyricsText"].Value.Trim();
+
+            // 一部の lrc ファイルエディタが空の歌詞を受け入れないため、タイムライン上の歌詞が空であっても1文字の空白文字に置換する
+            if (lyricsText.Length <= 0)
+                lyricsText = " ";
+
+            // タイムラインの時刻表記を正規化する。
+            var reformattedTime =
+                lyricsTime.ParseAsTimeSpan(TimeParsingMode.LazyMode)
+                .FormatTime(TimeFormatType.ShortFormat, 2);
+
+            return $"{reformattedTime}{lyricsText}";
         }
 
         private static void WriteLyricsFile(LyricsContainer lyricsData, string tempFilePath)
@@ -614,45 +631,49 @@ namespace LyricsChecker
             }
         }
 
-        private static bool CheckTag(string friendlyTagName, string tagName, Func<string?> musicTagValueGetter, FileInfo musicFile)
+        // 将来の拡張性のために残してある未使用のパラメタへのコンパイラの警告を抑止する。
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:未使用のパラメーターを削除します", Justification = "<保留中>")]
+        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<string?> musicTagValueGetter, FileInfo musicFile)
         {
             var ok = true;
             var musicTagValue = musicTagValueGetter();
             if (musicTagValue is not null && musicTagValue.Trim() != musicTagValue)
             {
-                TinyConsole.Out.WriteLine($"The music file contains blank characters at the beginning or end of the {friendlyTagName.ToLower()} tag.: \"{musicTagValue}\", \"{musicFile.FullName}\"");
+                TinyConsole.Out.WriteLine($"The music file contains blank characters at the beginning or end of the {lyricsFileFriendlyTagName} tag.: \"{musicTagValue}\", \"{musicFile.FullName}\"");
                 ok = false;
             }
 
             return ok;
         }
 
-        private static bool CheckTag(string friendlyTagName, string tagName, Func<string?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
+        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<string?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
         {
             var ok = true;
             var musicTagValue = musicTagValueGetter();
             if (musicTagValue is not null && musicTagValue.Trim() != musicTagValue)
             {
-                TinyConsole.Out.WriteLine($"The music file contains blank characters at the beginning or end of the {friendlyTagName.ToLower()} tag.: \"{musicTagValue}\", \"{lyricsFile.FullName}\"");
+                TinyConsole.Out.WriteLine($"The music file contains blank characters at the beginning or end of the {lyricsFileFriendlyTagName} tag.: \"{musicTagValue}\", \"{lyricsFile.FullName}\"");
                 ok = false;
             }
 
-            var lyricsTagValue = lyricsTags.TryGetValue(tagName, out var tagValue) ? tagValue : null;
+            var lyricsTagValue = lyricsTags.TryGetValue(lyricsFileTagName, out var tagValue) ? tagValue : null;
             if (musicTagValue != lyricsTagValue)
             {
-                TinyConsole.Out.WriteLine($"{friendlyTagName} does not match.: {(lyricsTagValue is not null ? $"\"{lyricsTagValue}\"" : "(none)")} for lyrics, {(musicTagValue is not null ? $"\"{musicTagValue}\"" : "(none)")} for music, \"{lyricsFile.FullName}\"");
+                TinyConsole.Out.WriteLine($"{CultureInfo.CurrentCulture.TextInfo.ToTitleCase(lyricsFileFriendlyTagName)} does not match.: {(lyricsTagValue is not null ? $"\"{lyricsTagValue}\"" : "(none)")} for lyrics, {(musicTagValue is not null ? $"\"{musicTagValue}\"" : "(none)")} for music, \"{lyricsFile.FullName}\"");
                 ok = false;
             }
 
             return ok;
         }
 
-        private static bool CheckTag(string friendlyTagName, string tagName, Func<TimeSpan?> musicTagValueGetter, FileInfo musicFile) => true;
+        // 将来の拡張性のために残してある未使用のパラメタへのコンパイラの警告を抑止する。
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:未使用のパラメーターを削除します", Justification = "<保留中>")]
+        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<TimeSpan?> musicTagValueGetter, FileInfo musicFile) => true;
 
-        private static bool CheckTag(string friendlyTagName, string tagName, Func<TimeSpan?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
+        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<TimeSpan?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
         {
             var musicTagValue = musicTagValueGetter();
-            var lyricsTagValue = lyricsTags.TryGetValue(tagName, out var tagValue) ? tagValue : null;
+            var lyricsTagValue = lyricsTags.TryGetValue(lyricsFileTagName, out var tagValue) ? tagValue : null;
             if (musicTagValue is null)
             {
 
@@ -662,7 +683,7 @@ namespace LyricsChecker
                 }
                 else
                 {
-                    TinyConsole.Out.WriteLine($"{friendlyTagName} does not match.: \"{lyricsTagValue}\" for lyrics, (none) for music, \"{lyricsFile.FullName}\"");
+                    TinyConsole.Out.WriteLine($"{CultureInfo.CurrentCulture.TextInfo.ToTitleCase(lyricsFileFriendlyTagName)} does not match.: \"{lyricsTagValue}\" for lyrics, (none) for music, \"{lyricsFile.FullName}\"");
                     return false;
                 }
             }
@@ -670,7 +691,7 @@ namespace LyricsChecker
             {
                 if (lyricsTagValue is null)
                 {
-                    TinyConsole.Out.WriteLine($"{friendlyTagName} does not match.: (none) for lyrics, \"{musicTagValue.Value.FormatTime(TimeFormatType.ShortFormat, 2)}\" for music, \"{lyricsFile.FullName}\"");
+                    TinyConsole.Out.WriteLine($"{CultureInfo.CurrentCulture.TextInfo.ToTitleCase(lyricsFileFriendlyTagName)} does not match.: (none) for lyrics, \"{musicTagValue.Value.FormatTime(TimeFormatType.ShortFormat, 2)}\" for music, \"{lyricsFile.FullName}\"");
                     return false;
                 }
                 else
@@ -686,7 +707,7 @@ namespace LyricsChecker
                         difference = -difference;
                     if (difference >= TimeSpan.FromMilliseconds(10))
                     {
-                        TinyConsole.Out.WriteLine($"{friendlyTagName} does not match.: \"{lyricsTagValue}\" for lyrics, \"{musicTagValue.Value.FormatTime(TimeFormatType.ShortFormat, 2)}\" for music, \"{lyricsFile.FullName}\"");
+                        TinyConsole.Out.WriteLine($"{CultureInfo.CurrentCulture.TextInfo.ToTitleCase(lyricsFileFriendlyTagName)} does not match.: \"{lyricsTagValue}\" for lyrics, \"{musicTagValue.Value.FormatTime(TimeFormatType.ShortFormat, 2)}\" for music, \"{lyricsFile.FullName}\"");
                         return false;
                     }
 
@@ -695,10 +716,10 @@ namespace LyricsChecker
             }
         }
 
-        private static bool ModifyTag(string friendlyTagName, string tagName, Func<string?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
+        private static bool ModifyTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<string?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
         {
             var musicTagValue = musicTagValueGetter();
-            if (lyricsTags.TryGetValue(tagName, out var lyricsTagValue))
+            if (lyricsTags.TryGetValue(lyricsFileTagName, out var lyricsTagValue))
             {
                 if (musicTagValue is not null)
                 {
@@ -708,15 +729,15 @@ namespace LyricsChecker
                     }
                     else
                     {
-                        TinyConsole.Out.WriteLine($"Replace the {friendlyTagName} in the lyrics file as it does not match the music file.: \"{lyricsTagValue}\" for lyrics, \"{musicTagValue}\" for music, \"{lyricsFile.FullName}\"");
-                        lyricsTags[tagName] = musicTagValue;
+                        TinyConsole.Out.WriteLine($"Replace the {lyricsFileFriendlyTagName} in the lyrics file as it does not match the music file.: \"{lyricsTagValue}\" for lyrics, \"{musicTagValue}\" for music, \"{lyricsFile.FullName}\"");
+                        lyricsTags[lyricsFileTagName] = musicTagValue;
                         return true;
                     }
                 }
                 else
                 {
-                    TinyConsole.Out.WriteLine($"Replace the {friendlyTagName} in the lyrics file as it does not match the music file.: \"{lyricsTagValue}\" for lyrics, (none) for music, \"{lyricsFile.FullName}\"");
-                    _ = lyricsTags.Remove(tagName);
+                    TinyConsole.Out.WriteLine($"Replace the {lyricsFileFriendlyTagName} in the lyrics file as it does not match the music file.: \"{lyricsTagValue}\" for lyrics, (none) for music, \"{lyricsFile.FullName}\"");
+                    _ = lyricsTags.Remove(lyricsFileTagName);
                     return true;
                 }
             }
@@ -724,8 +745,8 @@ namespace LyricsChecker
             {
                 if (musicTagValue is not null)
                 {
-                    TinyConsole.Out.WriteLine($"Replace the {friendlyTagName} in the lyrics file as it does not match the music file.: (none) for lyrics, \"{musicTagValue}\" for music, \"{lyricsFile.FullName}\"");
-                    lyricsTags.Add(tagName, musicTagValue);
+                    TinyConsole.Out.WriteLine($"Replace the {lyricsFileFriendlyTagName} in the lyrics file as it does not match the music file.: (none) for lyrics, \"{musicTagValue}\" for music, \"{lyricsFile.FullName}\"");
+                    lyricsTags.Add(lyricsFileTagName, musicTagValue);
                     return true;
                 }
                 else
@@ -735,10 +756,10 @@ namespace LyricsChecker
             }
         }
 
-        private static bool ModifyTag(string friendlyTagName, string tagName, Func<TimeSpan?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
+        private static bool ModifyTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<TimeSpan?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
         {
             var musicTagValue = musicTagValueGetter();
-            if (lyricsTags.TryGetValue(tagName, out var lyricsTagValue))
+            if (lyricsTags.TryGetValue(lyricsFileTagName, out var lyricsTagValue))
             {
                 if (musicTagValue is not null)
                 {
@@ -753,8 +774,8 @@ namespace LyricsChecker
                         difference = -difference;
                     if (difference >= TimeSpan.FromMilliseconds(10))
                     {
-                        lyricsTags[tagName] = musicTagValue.Value.FormatTime(TimeFormatType.ShortFormat, 2);
-                        TinyConsole.Out.WriteLine($"Replace the {friendlyTagName} in the lyrics file as it does not match the music file.: \"{lyricsTagValue}\" for lyrics, \"{musicTagValue.Value.FormatTime(TimeFormatType.ShortFormat, 2)}\" for music, \"{lyricsFile.FullName}\"");
+                        lyricsTags[lyricsFileTagName] = musicTagValue.Value.FormatTime(TimeFormatType.ShortFormat, 2);
+                        TinyConsole.Out.WriteLine($"Replace the {lyricsFileFriendlyTagName} in the lyrics file as it does not match the music file.: \"{lyricsTagValue}\" for lyrics, \"{musicTagValue.Value.FormatTime(TimeFormatType.ShortFormat, 2)}\" for music, \"{lyricsFile.FullName}\"");
                         return true;
                     }
                     else
@@ -764,8 +785,8 @@ namespace LyricsChecker
                 }
                 else
                 {
-                    _ = lyricsTags.Remove(tagName);
-                    TinyConsole.Out.WriteLine($"Replace the {friendlyTagName} in the lyrics file as it does not match the music file.: \"{lyricsTagValue}\" for lyrics, (none) for music, \"{lyricsFile.FullName}\"");
+                    _ = lyricsTags.Remove(lyricsFileTagName);
+                    TinyConsole.Out.WriteLine($"Replace the {lyricsFileFriendlyTagName} in the lyrics file as it does not match the music file.: \"{lyricsTagValue}\" for lyrics, (none) for music, \"{lyricsFile.FullName}\"");
                     return true;
                 }
             }
@@ -774,8 +795,8 @@ namespace LyricsChecker
                 if (musicTagValue is not null)
                 {
                     var musicTagValueText = musicTagValue.Value.FormatTime(TimeFormatType.ShortFormat, 2);
-                    lyricsTags.Add(tagName, musicTagValueText);
-                    TinyConsole.Out.WriteLine($"Replace the {friendlyTagName} in the lyrics file as it does not match the music file.: (none) for lyrics, \"{musicTagValueText}\" for music, \"{lyricsFile.FullName}\"");
+                    lyricsTags.Add(lyricsFileTagName, musicTagValueText);
+                    TinyConsole.Out.WriteLine($"Replace the {lyricsFileFriendlyTagName} in the lyrics file as it does not match the music file.: (none) for lyrics, \"{musicTagValueText}\" for music, \"{lyricsFile.FullName}\"");
                     return true;
                 }
                 else
@@ -809,12 +830,12 @@ namespace LyricsChecker
         }
 
         // mp3tag のファイル名自動生成時のエンコードに準拠
-        private static string mp3TagEncode(string s)
+        private static string Mp3TagEncode(string s)
             => string.Concat(
                 s.Select(c =>
                     c switch
                     {
-                        // mp3tag は '\ 'にだけは正常に対応できていないようだが一応含める
+                        // Mp3tag は '\' にだけは正常に対応できていないようだが一応含める
                         '\\' or '/' or ':' or '*' or '?' or '"' or '<' or '>' or '|' => "",
                         _ => c.ToString(),
                     }));

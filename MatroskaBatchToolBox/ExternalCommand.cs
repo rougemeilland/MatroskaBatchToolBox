@@ -516,7 +516,7 @@ namespace MatroskaBatchToolBox
                 var durationMatch = _ffmpegConversionDurationPattern.Match(lineText);
                 if (durationMatch.Success)
                 {
-                    var duration = durationMatch.Groups["time"].Value.ParseAsTimeSpan(false).TotalSeconds;
+                    var duration = durationMatch.Groups["time"].Value.ParseAsTimeSpan(TimeParsingMode.LazyMode).TotalSeconds;
                     if (double.IsNaN(maximumDurationSeconds) || duration > maximumDurationSeconds)
                         maximumDurationSeconds = duration;
 
@@ -560,7 +560,7 @@ namespace MatroskaBatchToolBox
                     return;
                 }
 
-                var progress = match.Groups["time"].Value.ParseAsTimeSpan(false).TotalSeconds / maximumDurationSeconds;
+                var progress = match.Groups["time"].Value.ParseAsTimeSpan(TimeParsingMode.LazyMode).TotalSeconds / maximumDurationSeconds;
                 if (progress < 0)
                     progress = 0;
                 if (progress > 1)

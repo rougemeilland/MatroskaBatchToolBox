@@ -251,7 +251,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                             }
 
                             // 進捗率の計算
-                            var progress = match.Groups["time"].Value.ParseAsTimeSpan(false).TotalSeconds / logState.MaximumDurationSeconds.Value;
+                            var progress = match.Groups["time"].Value.ParseAsTimeSpan(TimeParsingMode.LazyMode).TotalSeconds / logState.MaximumDurationSeconds.Value;
                             if (progress < 0)
                                 progress = 0;
                             if (progress > 1)
@@ -274,7 +274,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                             {
                                 // ログの中に Duration 値が含まれている場合
 
-                                var duration = durationMatch.Groups["time"].Value.ParseAsTimeSpan(false).TotalSeconds;
+                                var duration = durationMatch.Groups["time"].Value.ParseAsTimeSpan(TimeParsingMode.LazyMode).TotalSeconds;
                                 if (logState.MaximumDurationSeconds is null || duration > logState.MaximumDurationSeconds.Value)
                                 {
                                     // Duration 値が初めて見つかったか、または以前に見つかった Duration 値より大きい場合は MaximumDurationSeconds を更新する
