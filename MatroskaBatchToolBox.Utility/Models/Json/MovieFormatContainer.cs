@@ -1,4 +1,6 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MatroskaBatchToolBox.Utility.Models.Json
 {
@@ -46,6 +48,10 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
         public int ProbeScore { get; set; }
 
         [JsonPropertyName("tags")]
+#if true
+        public Dictionary<string, JsonElement>? Tags { get; set; }
+#else
         public MovieFormatTagsContainer? Tags { get; set; }
+#endif
     }
 }

@@ -1,4 +1,6 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MatroskaBatchToolBox.Utility.Models.Json
 {
@@ -24,7 +26,11 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
 
         [JsonPropertyName("tags")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+#if true
+        public Dictionary<string, JsonElement>? Tags { get; set; }
+#else
         public MovieStreamTagsContainer? Tags { get; set; }
+#endif
 
         #region for video stream
 

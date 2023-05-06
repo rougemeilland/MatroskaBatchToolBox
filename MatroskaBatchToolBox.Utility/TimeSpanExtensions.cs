@@ -1,6 +1,5 @@
 ﻿#define NEED_HIGH_PRECISION_FOR_TIME
 using System;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Palmtree;
 

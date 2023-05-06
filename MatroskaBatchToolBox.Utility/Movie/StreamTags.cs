@@ -1,21 +1,24 @@
 ﻿using System;
-using MatroskaBatchToolBox.Utility.Models.Json;
+using System.Collections.Generic;
+using System.Text.Json;
 
 namespace MatroskaBatchToolBox.Utility.Movie
 {
     public class StreamTags
+        : TagCollection
     {
-        internal StreamTags(MovieStreamTagsContainer? tags)
+        internal StreamTags(Dictionary<string, JsonElement>? tags)
+            : base(tags)
         {
-            var durationText = tags?.Duration;
-            Encoder = tags?.Encoder;
+            var durationText = GetTagValue(InternalTags, "duration");
+            Encoder = GetTagValue(InternalTags, "encoder");
             Duration =
                 durationText is null || !durationText.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
                 ? null
                 : duration;
-            Title = tags?.Title;
-            Language = NormalizeLanguageCode(tags?.Language);
-            Comment = tags?.Comment;
+            Title = GetTagValue(InternalTags, "title");
+            Language = NormalizeLanguageCode(GetTagValue(InternalTags, "language"));
+            Comment = GetTagValue(InternalTags, "comment");
         }
 
         /// <summary>
@@ -58,6 +61,5 @@ namespace MatroskaBatchToolBox.Utility.Movie
         private static string? NormalizeLanguageCode(string? language)
             // 言語コード "und" は未定義 (null) とみなす。
             => language == "und" ? null : language;
-
     }
 }

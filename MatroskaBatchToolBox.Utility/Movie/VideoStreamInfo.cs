@@ -24,7 +24,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
             Resolution = $"{Width}x{Height}";
             IsImageVideoStream =
                 stream.CodecName is not null && stream.CodecName.IsAnyOf(_mpngVideoStreamName, _mjpegVideoStreamName) ||
-                Disposition.AttachedPicture;
+                Disposition.AttachedPic;
         }
 
         public int IndexWithinVideoStream { get; }
