@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Palmtree;
 
@@ -37,6 +38,8 @@ namespace MatroskaBatchToolBox.Utility.Movie
         }
 
         public string? this[string tagName] => GetTagValue(InternalTags, tagName);
+
+        public IEnumerable<string> EnumerateTagNames() => InternalTags.Keys.Select(key => key.ToLowerInvariant());
 
         internal protected static string? GetTagValue(IDictionary<string, string> tags, string tagName)
             => tags.TryGetValue(tagName, out var tagValue) ? tagValue : null;

@@ -26,11 +26,7 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
 
         [JsonPropertyName("tags")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-#if true
         public Dictionary<string, JsonElement>? Tags { get; set; }
-#else
-        public MovieStreamTagsContainer? Tags { get; set; }
-#endif
 
         #region for video stream
 

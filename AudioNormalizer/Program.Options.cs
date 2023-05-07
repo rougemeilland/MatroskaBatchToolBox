@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using MatroskaBatchToolBox.Utility.Interprocess;
+using Palmtree;
 
 namespace AudioNormalizer
 {
@@ -125,6 +126,46 @@ namespace AudioNormalizer
                     }),
 
                 new StraightStringCommandOptionDefinition<OptionType>(
+                    OptionType.Encoder,
+                     // エイリアスも含めたオプション名の配列
+                    new string[]{ "-e", "--encoder" },
+                    // 追加引数の数
+                    1,
+                    // 引数の変換
+                    (index, arg, optionName) => new[]{ arg },
+                    // 同一オプションの重複のみ NG
+                    (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
+                    // 常に OK (必須ではない)
+                    (options) => null,
+                    "--encoder <music file encoder>  or  -e <music file encoder>",
+                    new[]
+                    {
+                        "Specifies the encoder of the music file. (e.g. libopus/pcm_s16le/…)",
+                        "The default value depends on the output file format (\"--output_format\") and the extension of the output file.",
+                    }),
+
+                new StraightStringCommandOptionDefinition<OptionType>(
+                    OptionType.EncoderOption,
+                     // エイリアスも含めたオプション名の配列
+                    new string[]{ "-eop", "--encoder_option" },
+                    // 追加引数の数
+                    1,
+                    // 引数の変換
+                    (index, arg, optionName) => new[]{ arg },
+                    // 同一オプションの重複のみ NG
+                    (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
+                    // "--encoder" オプションとともに指定する必要がある
+                    (options)
+                        => options.None(option => option.OptionType == OptionType.Encoder) && options.Any(option => option.OptionType == OptionType.EncoderOption)
+                            ? "The ”--encoder_option” option must be specified with the \"--encoder\" option."
+                            : null,
+                    "--encoder_option <music file encoder option>  or  -eop <music file encoder option>",
+                    new[]
+                    {
+                        "Specifies encoding options for music files.",
+                    }),
+
+                new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.Force,
                      // エイリアスも含めたオプション名の配列
                     new string[]{ "-f", "--force" },
@@ -140,21 +181,6 @@ namespace AudioNormalizer
                     }),
 
                 new StraightStringCommandOptionDefinition<OptionType>(
-                    OptionType.KeepMetadata,
-                     // エイリアスも含めたオプション名の配列
-                    "--keep_metadata",
-                    // 同一オプションの重複のみ NG
-                    (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
-                    // 常に OK (必須ではない)
-                    (options) => null,
-                    "--keep_metadata",
-                    new[]
-                    {
-                        "Keep all metadata.",
-                        "By default, the audioorm only keeps the stream title/language and chapter titles.",
-                    }),
-
-                new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.Verbose,
                      // エイリアスも含めたオプション名の配列
                     new string[]{ "-v", "--verbose" },
@@ -166,6 +192,23 @@ namespace AudioNormalizer
                     new[]
                     {
                         "More information will be displayed.",
+                    }),
+
+                new StraightStringCommandOptionDefinition<OptionType>(
+                    OptionType.DisableVideoStream,
+                     // エイリアスも含めたオプション名の配列
+                    new string[]{ "-vn", "--video_disable" },
+                    // 同一オプションの重複のみ NG
+                    (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
+                    // 常に OK (必須ではない)
+                    (options) => null,
+                    "--video_disable  or  -vn",
+                    new[]
+                    {
+                        "Strip the video stream during conversion.",
+                        "For example, specify this option if you want to remove cover art when converting music files.",
+                        "   * Some versions of ffmpeg have an error when converting music files with cover art to .opus/.ogg format.",
+                        "     You can use this option to work around that problem.",
                     }),
 
                 new StraightStringCommandOptionDefinition<OptionType>(

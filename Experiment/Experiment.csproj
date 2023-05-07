@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -33,10 +33,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net60|AnyCPU'">
     <NoWarn>1701;1702;SYSLIB1045;SYSLIB1054</NoWarn>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Palmtree.Core\Palmtree.Core.csproj" />
-  </ItemGroup>
 
   <ItemGroup>
     <None Update="xterm">

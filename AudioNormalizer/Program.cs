@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
-using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
-using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
 using Palmtree.IO;
 
@@ -22,9 +19,11 @@ namespace AudioNormalizer
                 Input = options.SingleOrNone(option => option.OptionType == OptionType.Input)?.OptionParameter[1] as string;
                 OutputFormat = options.SingleOrNone(option => option.OptionType == OptionType.OutputFormat)?.OptionParameter[1] as string;
                 Output = options.SingleOrNone(option => option.OptionType == OptionType.Output)?.OptionParameter[1] as string;
+                MusicFileEncoder = options.SingleOrNone(option => option.OptionType == OptionType.Encoder)?.OptionParameter[1] as string;
+                MusicFileEncoderOption = options.SingleOrNone(option => option.OptionType == OptionType.EncoderOption)?.OptionParameter[1] as string;
                 IsForceMode = options.Any(option => option.OptionType == OptionType.Force);
-                KeepMetadata = options.Any(option => option.OptionType == OptionType.KeepMetadata);
                 Verbose = options.Any(option => option.OptionType == OptionType.Verbose);
+                DisableVideoStream = options.Any(option => option.OptionType == OptionType.DisableVideoStream);
                 IsHelpMode = options.Any(option => option.OptionType == OptionType.Help);
             }
 
@@ -32,17 +31,17 @@ namespace AudioNormalizer
             public string? Input { get; }
             public string? OutputFormat { get; }
             public string? Output { get; }
+            public string? MusicFileEncoder { get; }
+            public string? MusicFileEncoderOption { get; }
             public bool IsForceMode { get; }
-            public bool KeepMetadata { get; }
             public bool Verbose { get; }
+            public bool DisableVideoStream { get; }
             public bool IsHelpMode { get; }
 
             public static CommandParameter Parse(IEnumerable<CommandOptionDefinition<OptionType>> optionDefinitions, string[] args)
                 => new(optionDefinitions.ParseCommandArguments(args.AsReadOnlyArray()));
         }
 
-        private const string _ffmpegPathEnvironmentVariableName = "FFMPEG_PATH";
-        private const int _bitratePerChannelForLibVorbis = 96000;
         private static readonly string _thisProgramName;
         private static readonly IEnumerable<CommandOptionDefinition<OptionType>> _optionDefinitions;
 
@@ -125,162 +124,51 @@ namespace AudioNormalizer
                     PrintInformationMessage("Start processing.");
                 try
                 {
+                    // 入力のフォーマットを調べる
+                    var inputMusicFileProvider =
+                        new[]
+                        {
+                            new ID3MusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null) as IMusicFileMetadataProvider,
+                            new FlacMusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null),
+                            new OggMusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null),
+                        }
+                        .FirstOrDefault(provider => provider.Supported);
+
+                    // 出力のフォーマットを調べる
+                    var outputMusicFileProvider =
+                        new[]
+                        {
+                            new ID3MusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null) as IMusicFileMetadataProvider,
+                            new FlacMusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null),
+                            new OggMusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null),
+                        }
+                        .FirstOrDefault(provider => provider.Supported);
+
                     // 入力の準備をする (入力元が標準入力である場合は一時ファイルにコピーする)
                     var (inputFormat, inputFile, temporaryInputFile) = GetInputMovieFile(commandOptions);
-
-                    var temporaryIntermediateFile1 = (FileInfo?)null;
-                    var temporaryIntermediateFile2 = (FileInfo?)null;
 
                     // 出力の準備をする (出力先が標準出力である場合は一時ファイルを作成する)
                     var (outputFormat, outputFile, temporaryOutputFile) = GetOutputMovieFile(commandOptions);
 
                     try
                     {
-                        // 入力動画ファイルの情報を取得する
-                        var movieInformation = GetMovieInformation(inputFormat, inputFile, commandOptions.Verbose);
-
-                        if (movieInformation.AudioStreams.None())
-                        {
-                            // 入力動画ファイルに音声ストリームが存在しない場合
-
-                            // 出力先に単純コピーする
-
-                            if (commandOptions.Verbose)
-                            {
-                                PrintInformationMessage("Since the video file does not contain an audio track, simply copy it.");
-                                if (inputFormat is not null)
-                                    PrintInformationMessage($"  Input file format: {inputFormat}");
-                                PrintInformationMessage($"  Input file format: \"{inputFile.FullName}\"");
-                                if (outputFormat is not null)
-                                    PrintInformationMessage($"  Output file format: {outputFormat}");
-                                PrintInformationMessage($"  Output file format: \"{outputFile.FullName}\"");
-                            }
-
-                            using var instream = inputFile.OpenRead();
-                            using var outstream = outputFile.Create();
-                            CopyStream(instream, outstream, inputFile.Length);
-
-                            if (commandOptions.Verbose)
-                                PrintInformationMessage("Copy finished.");
-                        }
-                        else if (commandOptions.KeepMetadata)
-                        {
-                            // 動画ファイルの音声の正規化後にメタデータを消去しない場合
-
-                            if (commandOptions.Verbose)
-                            {
-                                PrintInformationMessage("Start audio normalization.");
-                                if (inputFormat is not null)
-                                    PrintInformationMessage($"  Input file format: {inputFormat}");
-                                PrintInformationMessage($"  Input file format: \"{inputFile.FullName}\"");
-                                if (outputFormat is not null)
-                                    PrintInformationMessage($"  Output file format: {outputFormat}");
-                                PrintInformationMessage($"  Output file format: \"{outputFile.FullName}\"");
-                            }
-
-                            // 動画ファイルの音声を正規化する
-                            NormalizeAudio(
-                                movieInformation,
-                                inputFormat,
-                                inputFile,
-                                outputFormat,
-                                outputFile,
+                        var state =
+                            new NormalizationState(
+                                inputMusicFileProvider,
+                                outputMusicFileProvider,
+                                commandOptions.MusicFileEncoder,
+                                commandOptions.MusicFileEncoderOption,
+                                temporaryOutputFile is not null || commandOptions.IsForceMode,
                                 commandOptions.Verbose,
-                                temporaryOutputFile is not null || commandOptions.IsForceMode);
+                                commandOptions.DisableVideoStream,
+                                CopyStream,
+                                PrintInformationMessage,
+                                PrintWarningMessage,
+                                PrintWarningMessage,
+                                PrintErrorMessage,
+                                PrintErrorMessage);
 
-                            if (commandOptions.Verbose)
-                                PrintInformationMessage("Audio normalization finished.");
-                        }
-                        else
-                        {
-                            // 動画ファイルの音声の正規化後にメタデータを消去する場合
-
-                            // 中間一時ファイルを作成する
-                            temporaryIntermediateFile1 = new FileInfo(Path.GetTempFileName());
-                            temporaryIntermediateFile2 = new FileInfo(Path.GetTempFileName());
-                            var temporaryIntermediateFileFormat = outputFormat ?? "matroska";
-                            if (commandOptions.Verbose)
-                            {
-                                PrintInformationMessage($"Temprary file is created.: \"{temporaryIntermediateFile1.FullName}\"");
-                                PrintInformationMessage($"Temprary file is created.: \"{temporaryIntermediateFile2.FullName}\"");
-                            }
-
-                            // 動画ファイルの音声を正規化して中間一時ファイルに保存する
-                            if (commandOptions.Verbose)
-                            {
-                                PrintInformationMessage("Start audio normalization.");
-                                if (inputFormat is not null)
-                                    PrintInformationMessage($"  Input file format: {inputFormat}");
-                                PrintInformationMessage($"  Input file format: \"{inputFile.FullName}\"");
-                                if (temporaryIntermediateFileFormat is not null)
-                                    PrintInformationMessage($"  Output file format: {temporaryIntermediateFileFormat}");
-                                PrintInformationMessage($"  Output file format: \"{temporaryIntermediateFile1.FullName}\"");
-                            }
-
-                            NormalizeAudio(
-                                movieInformation,
-                                inputFormat,
-                                inputFile,
-                                temporaryIntermediateFileFormat,
-                                temporaryIntermediateFile1,
-                                commandOptions.Verbose,
-                                true);
-
-                            if (commandOptions.Verbose)
-                                PrintInformationMessage("Audio normalization finished.");
-
-                            // 正規化された動画ファイルの情報を取得する (オーディオストリームの情報が変化しているはずなのでそれの取得が目的)
-                            var normalizedMovieInformation = GetMovieInformation(temporaryIntermediateFileFormat, temporaryIntermediateFile1, commandOptions.Verbose);
-
-                            // 動画ファイルのメタデータを消去する
-
-                            if (commandOptions.Verbose)
-                            {
-                                PrintInformationMessage("Start clearing metadata.");
-                                if (temporaryIntermediateFileFormat is not null)
-                                    PrintInformationMessage($"  Input file format: {temporaryIntermediateFileFormat}");
-                                PrintInformationMessage($"  Input file format: \"{temporaryIntermediateFile1.FullName}\"");
-                                if (temporaryIntermediateFileFormat is not null)
-                                    PrintInformationMessage($"  Output file format: {temporaryIntermediateFileFormat}");
-                                PrintInformationMessage($"  Output file format: \"{temporaryIntermediateFile2.FullName}\"");
-                            }
-
-                            ClearMetadata(
-                                temporaryIntermediateFileFormat,
-                                temporaryIntermediateFile1,
-                                temporaryIntermediateFileFormat,
-                                temporaryIntermediateFile2,
-                                commandOptions.Verbose,
-                                true);
-
-                            if (commandOptions.Verbose)
-                                PrintInformationMessage("Metadata clearing completed.");
-
-                            // 動画ファイルのメタデータを復元する
-                            if (commandOptions.Verbose)
-                            {
-                                PrintInformationMessage("Start restoring metadata.");
-                                if (temporaryIntermediateFileFormat is not null)
-                                    PrintInformationMessage($"  Input file format: {temporaryIntermediateFileFormat}");
-                                PrintInformationMessage($"  Input file format: \"{temporaryIntermediateFile2.FullName}\"");
-                                if (outputFormat is not null)
-                                    PrintInformationMessage($"  Output file format: {outputFormat}");
-                                PrintInformationMessage($"  Output file format: \"{outputFile.FullName}\"");
-                            }
-
-                            SetMetadata(
-                                movieInformation,
-                                normalizedMovieInformation,
-                                temporaryIntermediateFileFormat,
-                                temporaryIntermediateFile2,
-                                outputFormat,
-                                outputFile,
-                                commandOptions.Verbose,
-                                commandOptions.IsForceMode || temporaryOutputFile is not null);
-
-                            if (commandOptions.Verbose)
-                                PrintInformationMessage("Audio normalization finished.");
-                        }
+                        state.NormalizeFile(inputFormat, inputFile, outputFormat, outputFile);
 
                         if (temporaryOutputFile is not null)
                         {
@@ -313,32 +201,6 @@ namespace AudioNormalizer
                                 File.Delete(temporaryInputFile.FullName);
                                 if (commandOptions.Verbose)
                                     PrintInformationMessage($"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
-                            }
-                            catch (Exception)
-                            {
-                            }
-                        }
-
-                        if (temporaryIntermediateFile1 is not null)
-                        {
-                            try
-                            {
-                                File.Delete(temporaryIntermediateFile1.FullName);
-                                if (commandOptions.Verbose)
-                                    PrintInformationMessage($"Temporary file is deleted.: \"{temporaryIntermediateFile1.FullName}\"");
-                            }
-                            catch (Exception)
-                            {
-                            }
-                        }
-
-                        if (temporaryIntermediateFile2 is not null)
-                        {
-                            try
-                            {
-                                File.Delete(temporaryIntermediateFile2.FullName);
-                                if (commandOptions.Verbose)
-                                    PrintInformationMessage($"Temporary file is deleted.: \"{temporaryIntermediateFile2.FullName}\"");
                             }
                             catch (Exception)
                             {
@@ -429,6 +291,8 @@ namespace AudioNormalizer
                     try
                     {
                         File.Delete(temporaryInputFile.FullName);
+                        if (commandParameters.Verbose)
+                            PrintInformationMessage($"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                     }
                     catch (Exception)
                     {
@@ -462,334 +326,6 @@ namespace AudioNormalizer
 
                 return (commandParameters.OutputFormat, temporaryOutputFile, temporaryOutputFile);
             }
-        }
-
-        private static MovieInformation GetMovieInformation(string? inputFormat, FileInfo inputFile, bool verbose)
-        {
-            if (verbose)
-                PrintInformationMessage($"Probe movie information.: \"{inputFile.FullName}\"");
-            try
-            {
-                return
-                    Command.GetMovieInformation(
-                        inputFormat,
-                        inputFile,
-                        MovieInformationType.Chapters | MovieInformationType.Streams,
-                        (level, message) =>
-                        {
-                            switch (level)
-                            {
-                                case "WARNING":
-                                    PrintWarningMessage("ffprobe", message);
-                                    break;
-                                case "ERROR":
-                                    PrintWarningMessage("ffprobe", message);
-                                    break;
-                                default:
-                                    break;
-                            }
-                        });
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Failed to get movie information.", ex);
-            }
-        }
-
-        private static void NormalizeAudio(MovieInformation movieInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile, bool verbose, bool doOverwrite)
-        {
-            var audioEncoder = "libopus";
-            var audioFormat = "Opus";
-            var audioEncoderOptions = Array.Empty<string>();
-
-            // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームを抽出する
-            var audioStreamsNotSupportedByLibOpus =
-                movieInformation.AudioStreams
-                .Where(stream => stream.ChannelLayout.IsAnyOf("5.0(side)", "5.1(side)"))
-                .ToList();
-
-            if (audioStreamsNotSupportedByLibOpus.Any())
-            {
-                // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームが存在する場合
-
-                if (verbose)
-                    PrintInformationMessage($"Normalize the audio stream and encode it with \"libovorbis\". Because some audio stream channel layouts are not supported by \"libopus\".: {string.Join(", ", audioStreamsNotSupportedByLibOpus.Select(stream => $"a:{stream.IndexWithinAudioStream}(\"{stream.ChannelLayout}\")"))}");
-
-                // 代わりに libvorbis でエンコードする
-                audioEncoder = "libvorbis";
-                audioFormat = "Vorbis";
-
-                // libvorbis のエンコーダオプションを作成する
-                // (元のオーディオストリームの (チャネル数 * _bitratePerChannelForLibVorbis) を q 値に変換して指定する)
-                audioEncoderOptions =
-                    movieInformation.AudioStreams
-                    .Select(stream => new
-                    {
-                        index = stream.IndexWithinAudioStream,
-                        channels = stream.Channels,
-                    })
-                    .SelectMany(item => new[]
-                    {
-                        $"-q:a:{item.index}",
-                        CalculateLibVorbisQualityByBitRate(item.channels * _bitratePerChannelForLibVorbis).ToString("F1"),
-                    })
-                    .ToArray();
-            }
-            else
-            {
-                // すべてのオーディオストリームのチャンネルレイアウトが libopus によってサポートされている場合
-
-                if (verbose)
-                    PrintInformationMessage("Normalize the audio stream and encode it by \"libopus\".");
-            }
-
-            var ffmpegCommandFilePath =
-                ProcessUtility.WhereIs("ffmpeg")
-                ?? throw new Exception("ffmpeg command not found.");
-            Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, ffmpegCommandFilePath);
-            var normalizeCommandFilePath =
-                ProcessUtility.WhereIs("ffmpeg-normalize")
-                ?? throw new Exception("ffmpeg-normalize command not found.");
-            var normalizerCommandParameters = new List<string>();
-            if (verbose)
-                normalizerCommandParameters.Add("-v");
-            if (doOverwrite)
-                normalizerCommandParameters.Add("-f");
-            normalizerCommandParameters.Add("-pr");
-            normalizerCommandParameters.Add("--keep-loudness-range-target");
-            if (inputFormat is not null)
-                normalizerCommandParameters.Add($"-ei={string.Join(" ", new[] { "-f", $"\"{inputFormat}\"" }).CommandLineArgumentEncode()}");
-            normalizerCommandParameters.Add(inputFile.FullName.CommandLineArgumentEncode());
-            normalizerCommandParameters.Add($"-c:a {audioEncoder.CommandLineArgumentEncode()}");
-            if (audioEncoderOptions.Any())
-                normalizerCommandParameters.Add($"-e={string.Join(" ", audioEncoderOptions).CommandLineArgumentEncode()}");
-            if (outputFormat is not null)
-                normalizerCommandParameters.Add($"-ofmt {outputFormat.CommandLineArgumentEncode()}");
-            normalizerCommandParameters.Add($"-o {outputFile.FullName.CommandLineArgumentEncode()}");
-            var startInfo = new ProcessStartInfo
-            {
-                Arguments = string.Join(" ", normalizerCommandParameters),
-                FileName = normalizeCommandFilePath,
-                UseShellExecute = false,
-            };
-
-            if (verbose)
-                PrintInformationMessage($"Execute: {startInfo.FileName} {startInfo.Arguments}");
-
-            using var process =
-                Process.Start(startInfo)
-                ?? throw new Exception($"Could not start process. :\"{normalizeCommandFilePath}\"");
-            process.WaitForExit();
-
-            if (process.ExitCode != 0)
-                throw new Exception($"An error occurred in the ffmpeg-normalize command.: exit-code={process.ExitCode}");
-
-            if (verbose)
-                PrintInformationMessage($"Audio streams normalization is complete.: audio-format={audioFormat}");
-
-            static double CalculateLibVorbisQualityByBitRate(int bitRate)
-            {
-                // -1 <= q <= 4 : 16k * (q + 4) bps  (48k <= bps <= 128k)
-                // 4 < q < 8    : 32k * q bps        (128k < bps < 256k)    
-                // 8 <= q <= 10 : 64k * (q - 4) bps  (256k <= bps <= 384k)
-
-                if (bitRate <= 48000)
-                    return -1;
-                else if (bitRate <= 128000)
-                    return (double)bitRate / 16000 - 4;
-                else if (bitRate <= 256000)
-                    return (double)bitRate / 32000;
-                else if (bitRate <= 384000)
-                    return (double)bitRate / 64000 + 4;
-                else
-                    return 10.0;
-            }
-        }
-
-        private static void ClearMetadata(
-            string? inputFormat,
-            FileInfo inputFile,
-            string? outputFormat,
-            FileInfo outputFile,
-            bool verbose,
-            bool doOverwrite)
-        {
-            var ffmpegCommandParameters =
-                new List<string>
-                {
-                    "-hide_banner",
-                };
-            if (doOverwrite)
-                ffmpegCommandParameters.Add("-y");
-            if (inputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {inputFormat.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add($"-i {inputFile.FullName.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add("-c copy -map 0");
-            ffmpegCommandParameters.Add("-map_chapters -1");
-            ffmpegCommandParameters.Add("-map_metadata -1");
-            if (outputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {outputFormat.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add($"{outputFile.FullName.CommandLineArgumentEncode()}");
-
-            var ffmpegCommandParameterText = string.Join(" ", ffmpegCommandParameters);
-            if (verbose)
-                PrintInformationMessage($"Execute: ffmpeg {ffmpegCommandParameterText}");
-            var exitCode =
-                Command.ExecuteFfmpeg(
-                    ffmpegCommandParameterText,
-                    null,
-                    null,
-                    TinyConsole.Error.WriteLine,
-                    (level, message) =>
-                    {
-                        switch (level)
-                        {
-                            case "WARNING":
-                                PrintWarningMessage(message);
-                                break;
-                            case "ERROR":
-                                PrintErrorMessage(message);
-                                break;
-                            default:
-                                // NOP
-                                break;
-                        }
-                    },
-                    new Progress<double>(_ => { }));
-
-            if (exitCode != 0)
-                throw new Exception($"An error occurred in the \"ffmpeg\" command. : exit-code={exitCode}");
-        }
-
-        private static void SetMetadata(
-            MovieInformation movieInformation,
-            MovieInformation normalizedMovieInformation,
-            string? inputFormat,
-            FileInfo inputFile,
-            string? outputFormat,
-            FileInfo outputFile,
-            bool verbose,
-            bool doOverwrite)
-        {
-            var audioEncoders =
-                normalizedMovieInformation.AudioStreams
-                .ToDictionary(stream => stream.IndexWithinAudioStream, stream => stream.Tags.Encoder);
-
-            var streams =
-                movieInformation.VideoStreams
-                .Select(stream => new
-                {
-                    streamTypeSymbol = "v",
-                    index = stream.IndexWithinVideoStream,
-                    isDefault = stream.Disposition.Default,
-                    isForced = stream.Disposition.Forced,
-                    title = stream.Tags.Title,
-                    language = stream.Tags.Language,
-                    encoder = stream.Tags.Encoder,
-                })
-                .Concat(
-                    movieInformation.AudioStreams
-                    .Select(stream => new
-                    {
-                        streamTypeSymbol = "a",
-                        index = stream.IndexWithinAudioStream,
-                        isDefault = stream.Disposition.Default,
-                        isForced = stream.Disposition.Forced,
-                        title = stream.Tags.Title,
-                        language = stream.Tags.Language,
-                        encoder = audioEncoders.TryGetValue(stream.IndexWithinAudioStream, out var encoderValue) ? encoderValue : null,
-                    }))
-                .Concat(
-                    movieInformation.SubtitleStreams
-                    .Select(stream => new
-                    {
-                        streamTypeSymbol = "s",
-                        index = stream.IndexWithinSubtitleStream,
-                        isDefault = stream.Disposition.Default,
-                        isForced = stream.Disposition.Forced,
-                        title = stream.Tags.Title,
-                        language = stream.Tags.Language,
-                        encoder = stream.Tags.Encoder,
-                    }))
-                .Concat(
-                    movieInformation.DataStreams
-                    .Select(stream => new
-                    {
-                        streamTypeSymbol = "d",
-                        index = stream.IndexWithinDataStream,
-                        isDefault = stream.Disposition.Default,
-                        isForced = stream.Disposition.Forced,
-                        title = stream.Tags.Title,
-                        language = stream.Tags.Language,
-                        encoder = stream.Tags.Encoder,
-                    }))
-                .Concat(
-                    movieInformation.AttachmentStreams
-                    .Select(stream => new
-                    {
-                        streamTypeSymbol = "t",
-                        index = stream.IndexWithinAttachmentStream,
-                        isDefault = stream.Disposition.Default,
-                        isForced = stream.Disposition.Forced,
-                        title = stream.Tags.Title,
-                        language = stream.Tags.Language,
-                        encoder = stream.Tags.Encoder,
-                    }));
-
-            var ffmpegCommandParameters =
-                new List<string>
-                {
-                    "-hide_banner",
-                };
-            if (doOverwrite)
-                ffmpegCommandParameters.Add("-y");
-            if (inputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {inputFormat.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add($"-i {inputFile.FullName.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add("-f ffmetadata -i -");
-            ffmpegCommandParameters.Add("-c copy -map 0");
-            foreach (var stream in streams)
-            {
-                ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} title={(stream.title ?? "").CommandLineArgumentEncode()}");
-                ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} language={(stream.language ?? "").CommandLineArgumentEncode()}");
-                ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} ENCODER={(stream.encoder ?? "").CommandLineArgumentEncode()}");
-                ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {(stream.isDefault ? "+" : "-")}default{(stream.isForced ? "+" : "-")}forced");
-            }
-
-            ffmpegCommandParameters.Add("-map_chapters 1");
-            if (outputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {outputFormat.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add($"{outputFile.FullName.CommandLineArgumentEncode()}");
-
-            var ffmpegCommandParameterText = string.Join(" ", ffmpegCommandParameters);
-            if (verbose)
-                PrintInformationMessage($"Execute: ffmpeg {ffmpegCommandParameterText}");
-            using var inMetadataReader = new StringReader(movieInformation.Chapters.ToMetadataString());
-            var exitCode =
-                Command.ExecuteFfmpeg(
-                    ffmpegCommandParameterText,
-                    Command.GetTextInputRedirector(inMetadataReader.ReadLine),
-                    null,
-                    TinyConsole.Error.WriteLine,
-                    (level, message) =>
-                    {
-                        switch (level)
-                        {
-                            case "WARNING":
-                                PrintWarningMessage(message);
-                                break;
-                            case "ERROR":
-                                PrintErrorMessage(message);
-                                break;
-                            default:
-                                // NOP
-                                break;
-                        }
-                    },
-                    new Progress<double>(_ => { }));
-
-            if (exitCode != 0)
-                throw new Exception($"An error occurred in the \"ffmpeg\" command. : exit-code={exitCode}");
         }
 
         private static void CopyStream(Stream instream, Stream outstream)

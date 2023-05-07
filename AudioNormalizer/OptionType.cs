@@ -8,8 +8,10 @@
         OutputFormat,
         Output,
         Force,
-        KeepMetadata,
         Verbose,
+        Encoder,
+        EncoderOption,
+        DisableVideoStream,
         Help,
     }
 }

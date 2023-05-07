@@ -48,10 +48,6 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
         public int ProbeScore { get; set; }
 
         [JsonPropertyName("tags")]
-#if true
         public Dictionary<string, JsonElement>? Tags { get; set; }
-#else
-        public MovieFormatTagsContainer? Tags { get; set; }
-#endif
     }
 }
