@@ -105,32 +105,39 @@ namespace Palmtree
         /// <param name="s">エンコード対象の文字列です。</param>
         /// <returns>エンコードされた文字列です。</returns>
         public static string WindowsFileNameEncoding(this string s)
-            => string.Concat(
-                _questionMarksAndExclamationMarksSequencePattern.Replace(
-                    s,
-                    m =>
-                        string.Concat(
-                            m.Value
-                            .Select(c =>
-                                c switch
-                                {
-                                    '?' => '？',
-                                    '!' => '！',
-                                    _ => c,
-                                })))
-                    .Select(c =>
-                        c switch
-                        {
-                            '\\' => '＼',
-                            '/' => '／',
-                            ':' => '：',
-                            '*' => '＊',
-                            '?' => '？',
-                            '"' => '”',
-                            '<' => '＜',
-                            '>' => '＞',
-                            '|' => '｜',
-                            _ => c,
-                        }));
+        {
+            var pathName =
+                string.Concat(
+                    _questionMarksAndExclamationMarksSequencePattern.Replace(
+                        s,
+                        m =>
+                            string.Concat(
+                                m.Value
+                                .Select(c =>
+                                    c switch
+                                    {
+                                        '?' => '？',
+                                        '!' => '！',
+                                        _ => c,
+                                    })))
+                        .Select(c =>
+                            c switch
+                            {
+                                '\\' => '＼',
+                                '/' => '／',
+                                ':' => '：',
+                                '*' => '＊',
+                                '?' => '？',
+                                '"' => '”',
+                                '<' => '＜',
+                                '>' => '＞',
+                                '|' => '｜',
+                                _ => c,
+                            }));
+
+            if (pathName.EndsWith(".", StringComparison.Ordinal))
+                pathName = pathName[..^1];
+            return pathName;
+        }
     }
 }
