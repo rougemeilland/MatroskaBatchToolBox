@@ -433,7 +433,7 @@ namespace LyricsChecker
             if (desiredAlbumArtistDirectoryName.StartsWith(".", StringComparison.Ordinal))
                 desiredAlbumArtistDirectoryName = $"．{desiredAlbumArtistDirectoryName[1..]}";
 
-            var desiredAlbumDirectoryName = $"{album.WindowsFileNameEncoding()} - {date.WindowsFileNameEncoding()}年";
+            var desiredAlbumDirectoryName = $"{album} - {date}年".WindowsFileNameEncoding();
 
             // いくつかのプレイヤーソフトでは "." で始まるディレクトリ/ファイル名を無視するため、置き換える。
             if (desiredAlbumDirectoryName.StartsWith(".", StringComparison.Ordinal))
