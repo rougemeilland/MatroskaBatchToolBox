@@ -231,7 +231,7 @@ namespace LyricsChecker
                     else
                     {
                         var normalizedLyricsText = NormalizeLyricsText(lyricsText);
-                        if (normalizedLyricsText != lyricsText)
+                        if ($"{normalizedLyricsText.timeStamp}{normalizedLyricsText.text}" != lyricsText)
                         {
                             TinyConsole.Out.WriteLine($"Inappropriate lyrics timeline.: Current: \"{lyricsText}\", Desired: \"{normalizedLyricsText}\", \"{lyricsFile.FullName}\"");
                             ok = false;
@@ -288,15 +288,25 @@ namespace LyricsChecker
             modified = ModifyTag("lyricist name", "au", () => GetLyricistFromMusicFile(musicFileInfo), lyricsData.Tags, lyricsFile) || modified;
             modified = ModifyTag("song length", "length", () => musicFileInfo.Format.Duration, lyricsData.Tags, lyricsFile) || modified;
             var newLyricsTexts = new List<string>();
+            var modifiedLyricsTimeStamp = false;
             foreach (var lyricsText in lyricsData.LyricsTexts)
             {
                 if (string.IsNullOrEmpty(lyricsText))
                 {
+                    newLyricsTexts.Add("[00:00.00] ");
                     modified = true;
+                    modifiedLyricsTimeStamp = true;
                 }
                 else
                 {
-                    var normalizedLyricsText = NormalizeLyricsText(lyricsText);
+                    var (timeStamp, text) = NormalizeLyricsText(lyricsText);
+                    if (string.IsNullOrEmpty(timeStamp) && !text.StartsWith("[", StringComparison.Ordinal))
+                    {
+                        timeStamp = "[00:00.00]";
+                        modifiedLyricsTimeStamp = true;
+                    }
+
+                    var normalizedLyricsText = $"{timeStamp}{text}";
                     newLyricsTexts.Add(normalizedLyricsText);
                     if (normalizedLyricsText != lyricsText)
                     {
@@ -306,6 +316,8 @@ namespace LyricsChecker
                 }
             }
 
+            if (modifiedLyricsTimeStamp && !newLyricsTexts.Any(newLyricsText => newLyricsText.Contains("#要タイミング調整")))
+                newLyricsTexts.Add("[00:00.00]#要タイミング調整");
             lyricsData.LyricsTexts.Clear();
             foreach (var lyricsText in newLyricsTexts)
                 lyricsData.LyricsTexts.Add(lyricsText);
@@ -503,11 +515,11 @@ namespace LyricsChecker
             return lyricsData;
         }
 
-        private static string NormalizeLyricsText(string lyricsLineText)
+        private static (string timeStamp, string text) NormalizeLyricsText(string lyricsLineText)
         {
             var lyricsTextMatch = _lyricsTextPattern.Match(lyricsLineText);
             if (!lyricsTextMatch.Success)
-                return lyricsLineText;
+                return ("", lyricsLineText);
 
             var lyricsTime = lyricsTextMatch.Groups["lyricsTime"].Value;
 
@@ -523,7 +535,7 @@ namespace LyricsChecker
                 lyricsTime.ParseAsTimeSpan(TimeParsingMode.LazyMode)
                 .FormatTime(TimeFormatType.ShortFormat, 2);
 
-            return $"[{reformattedTime}]{lyricsText}";
+            return ($"[{reformattedTime}]", lyricsText);
         }
 
         private static void WriteLyricsFile(LyricsContainer lyricsData, string tempFilePath)
