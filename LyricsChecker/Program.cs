@@ -23,13 +23,13 @@ namespace LyricsChecker
         private const string _metadataNameTitle = "title";
         private const string _metadataNameTrack = "track";
         private static readonly string _thisProgramName;
-        private static readonly Regex _lengthTagPattern = new(@"\[(?<name>[a-z]+):\s*(?<value>[^\]]*)\]", RegexOptions.Compiled);
+        private static readonly Regex _lyricsFileTagPattern;
         private static readonly Regex _lyricsTextPattern;
 
         static Program()
         {
             _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
-            _lengthTagPattern = new Regex(@"^\[(?<name>[a-z]+):\s*(?<value>.*)\]\s*$", RegexOptions.Compiled);
+            _lyricsFileTagPattern = new Regex(@"^\[(?<name>[a-z]+):\s*(?<value>.*)\]\s*$", RegexOptions.Compiled);
             _lyricsTextPattern = new Regex(@"^\[(?<lyricsTime>(\d+:)?\d+(\.\d+)?)\](?<lyricsText>.*)$", RegexOptions.Compiled);
         }
 
@@ -303,6 +303,7 @@ namespace LyricsChecker
                     if (string.IsNullOrEmpty(timeStamp) && !text.StartsWith("[", StringComparison.Ordinal))
                     {
                         timeStamp = "[00:00.00]";
+                        modified = true;
                         modifiedLyricsTimeStamp = true;
                     }
 
@@ -317,7 +318,11 @@ namespace LyricsChecker
             }
 
             if (modifiedLyricsTimeStamp && !newLyricsTexts.Any(newLyricsText => newLyricsText.Contains("#要タイミング調整")))
+            {
                 newLyricsTexts.Add("[00:00.00]#要タイミング調整");
+                modified = true;
+            }
+
             lyricsData.LyricsTexts.Clear();
             foreach (var lyricsText in newLyricsTexts)
                 lyricsData.LyricsTexts.Add(lyricsText);
@@ -498,7 +503,7 @@ namespace LyricsChecker
                 var lineText = lyricsReader.ReadLine();
                 if (lineText is null)
                     break;
-                var tagMatch = _lengthTagPattern.Match(lineText);
+                var tagMatch = _lyricsFileTagPattern.Match(lineText);
                 if (tagMatch.Success)
                 {
                     var tagName = tagMatch.Groups["name"].Value;
