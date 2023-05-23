@@ -212,6 +212,7 @@ namespace LyricsChecker
                     });
             try
             {
+                // TODO: oggフォーマットにも対応 (oggのメタデータはストリームにある)
                 var lyricsData = ReadLyricsFile(lyricsFile);
                 var ok = true;
                 ok = CheckFileNameStrictly(musicFileInfo, musicFile, lyricsFile) && ok;
@@ -524,7 +525,7 @@ namespace LyricsChecker
         {
             var lyricsTextMatch = _lyricsTextPattern.Match(lyricsLineText);
             if (!lyricsTextMatch.Success)
-                return ("", lyricsLineText);
+                return ("", lyricsLineText.Trim());
 
             var lyricsTime = lyricsTextMatch.Groups["lyricsTime"].Value;
 
