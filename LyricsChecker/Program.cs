@@ -165,9 +165,9 @@ namespace LyricsChecker
                     });
             var ok = true;
             ok = CheckFileNameStrictly(musicFileInfo, musicFile) && ok;
-            ok = CheckTag("artist name", "ar", () => musicFileInfo.Format.Tags[_metadataNameArtist], musicFile) && ok;
-            ok = CheckTag("album name", "al", () => musicFileInfo.Format.Tags[_metadataNameAlbum], musicFile) && ok;
-            ok = CheckTag("song title", "ti", () => musicFileInfo.Format.Tags[_metadataNameTitle], musicFile) && ok;
+            ok = CheckTag("artist name", "ar", () => GetTagValue(musicFileInfo, _metadataNameArtist), musicFile) && ok;
+            ok = CheckTag("album name", "al", () => GetTagValue(musicFileInfo, _metadataNameAlbum), musicFile) && ok;
+            ok = CheckTag("song title", "ti", () => GetTagValue(musicFileInfo, _metadataNameTitle), musicFile) && ok;
             ok = CheckTag("lyricist name", "au", () => GetLyricistFromMusicFile(musicFileInfo), musicFile) && ok;
             ok = CheckTag("song length", "length", () => musicFileInfo.Format.Duration, musicFile) && ok;
 
@@ -217,9 +217,9 @@ namespace LyricsChecker
                 var ok = true;
                 ok = CheckFileNameStrictly(musicFileInfo, musicFile, lyricsFile) && ok;
                 ok = CheclLyricsFile(lyricsFile) && ok;
-                ok = CheckTag("artist name", "ar", () => musicFileInfo.Format.Tags[_metadataNameArtist], lyricsData.Tags, lyricsFile) && ok;
-                ok = CheckTag("album name", "al", () => musicFileInfo.Format.Tags[_metadataNameAlbum], lyricsData.Tags, lyricsFile) && ok;
-                ok = CheckTag("song title", "ti", () => musicFileInfo.Format.Tags[_metadataNameTitle], lyricsData.Tags, lyricsFile) && ok;
+                ok = CheckTag("artist name", "ar", () => GetTagValue(musicFileInfo, _metadataNameArtist), lyricsData.Tags, lyricsFile) && ok;
+                ok = CheckTag("album name", "al", () => GetTagValue(musicFileInfo, _metadataNameAlbum), lyricsData.Tags, lyricsFile) && ok;
+                ok = CheckTag("song title", "ti", () => GetTagValue(musicFileInfo, _metadataNameTitle), lyricsData.Tags, lyricsFile) && ok;
                 ok = CheckTag("lyricist name", "au", () => GetLyricistFromMusicFile(musicFileInfo), lyricsData.Tags, lyricsFile) && ok;
                 ok = CheckTag("song length", "length", () => musicFileInfo.Format.Duration, lyricsData.Tags, lyricsFile) && ok;
                 foreach (var lyricsText in lyricsData.LyricsTexts)
@@ -283,9 +283,9 @@ namespace LyricsChecker
             var modified = false;
             modified = ModifyLyricsFile(lyricsFile) || modified;
             var lyricsData = lyricsFile.Exists ? ReadLyricsFile(lyricsFile) : new LyricsContainer();
-            modified = ModifyTag("artist name", "ar", () => musicFileInfo.Format.Tags[_metadataNameArtist], lyricsData.Tags, lyricsFile) || modified;
-            modified = ModifyTag("album name", "al", () => musicFileInfo.Format.Tags[_metadataNameAlbum], lyricsData.Tags, lyricsFile) || modified;
-            modified = ModifyTag("song title", "ti", () => musicFileInfo.Format.Tags[_metadataNameTitle], lyricsData.Tags, lyricsFile) || modified;
+            modified = ModifyTag("artist name", "ar", () => GetTagValue(musicFileInfo, _metadataNameArtist), lyricsData.Tags, lyricsFile) || modified;
+            modified = ModifyTag("album name", "al", () => GetTagValue(musicFileInfo, _metadataNameAlbum), lyricsData.Tags, lyricsFile) || modified;
+            modified = ModifyTag("song title", "ti", () => GetTagValue(musicFileInfo, _metadataNameTitle), lyricsData.Tags, lyricsFile) || modified;
             modified = ModifyTag("lyricist name", "au", () => GetLyricistFromMusicFile(musicFileInfo), lyricsData.Tags, lyricsFile) || modified;
             modified = ModifyTag("song length", "length", () => musicFileInfo.Format.Duration, lyricsData.Tags, lyricsFile) || modified;
             var newLyricsTexts = new List<string>();
@@ -391,8 +391,8 @@ namespace LyricsChecker
         private static bool CheckFileNameStrictly(MovieInformation musicFileInfo, FileInfo musicFile)
         {
             var ok = true;
-            var musicTracktext = musicFileInfo.Format.Tags[_metadataNameTrack];
-            var musicTitleText = musicFileInfo.Format.Tags[_metadataNameTitle];
+            var musicTracktext = GetTagValue(musicFileInfo, _metadataNameTrack);
+            var musicTitleText = GetTagValue(musicFileInfo, _metadataNameTitle);
             if (musicTracktext is not null && musicTitleText is not null && musicTracktext.TryParse(out int track))
             {
                 var extension = GetMusicFileExtension(musicFileInfo);
@@ -407,8 +407,8 @@ namespace LyricsChecker
         private static bool CheckFileNameStrictly(MovieInformation musicFileInfo, FileInfo musicFile, FileInfo lyricsFile)
         {
             var ok = true;
-            var musicTracktext = musicFileInfo.Format.Tags[_metadataNameTrack];
-            var musicTitleText = musicFileInfo.Format.Tags[_metadataNameTitle];
+            var musicTracktext = GetTagValue(musicFileInfo, _metadataNameTrack);
+            var musicTitleText = GetTagValue(musicFileInfo, _metadataNameTitle);
             if (musicTracktext is not null && musicTitleText is not null && musicTracktext.TryParse(out int track))
             {
                 var extension = GetMusicFileExtension(musicFileInfo);
@@ -423,9 +423,9 @@ namespace LyricsChecker
 
         private static bool CheckMusicFilePath(MovieInformation musicFileInfo, FileInfo musicFile)
         {
-            var albumArtist = musicFileInfo.Format.Tags[_metadataMameAlbumArtist];
-            var album = musicFileInfo.Format.Tags[_metadataNameAlbum];
-            var date = musicFileInfo.Format.Tags[_metadataNameDate];
+            var albumArtist = GetTagValue(musicFileInfo, _metadataMameAlbumArtist);
+            var album = GetTagValue(musicFileInfo, _metadataNameAlbum);
+            var date = GetTagValue(musicFileInfo, _metadataNameDate);
             if (albumArtist is null || album is null || date is null)
                 return true;
 
@@ -813,8 +813,16 @@ namespace LyricsChecker
         private static string? GetLyricistFromMusicFile(MovieInformation musicFileInfo)
             => musicFileInfo.Format.FormatName switch
             {
-                "mp3" or "wav" => musicFileInfo.Format.Tags[_metadataNameText],
-                "flac" or "ogg" => musicFileInfo.Format.Tags[_metadataNameLyricist],
+                "mp3" or "wav" => GetTagValue(musicFileInfo, _metadataNameText),
+                "flac" or "ogg" => GetTagValue(musicFileInfo, _metadataNameLyricist),
+                _ => throw new Exception($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
+            };
+
+        private static string GetTagValue(MovieInformation musicFileInfo, string tagName)
+            => musicFileInfo.Format.FormatName switch
+            {
+                "wav" or "mp3" or "flac" => musicFileInfo.Format.Tags[tagName] ?? "",
+                "ogg" => musicFileInfo.AudioStreams.FirstOrDefault()?.Tags[tagName] ?? "",
                 _ => throw new Exception($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
             };
 

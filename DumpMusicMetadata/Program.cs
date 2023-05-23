@@ -139,7 +139,7 @@ namespace DumpMusicMetadata
                 musicInfo.Format.FormatName switch
                 {
                     "wav" or "mp3" or "flac" => musicInfo.Format.Tags[metadataName] ?? "",
-                    "ogg" => musicInfo.AudioStreams.First().Tags[metadataName] ?? "",
+                    "ogg" => musicInfo.AudioStreams.FirstOrDefault()?.Tags[metadataName] ?? "",
                     _ => throw new Exception($"Not supported music file format.: \"{musicInfo.Format.FormatName}\""),
                 };
         }
