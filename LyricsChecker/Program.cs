@@ -212,7 +212,6 @@ namespace LyricsChecker
                     });
             try
             {
-                // TODO: oggフォーマットにも対応 (oggのメタデータはストリームにある)
                 var lyricsData = ReadLyricsFile(lyricsFile);
                 var ok = true;
                 ok = CheckFileNameStrictly(musicFileInfo, musicFile, lyricsFile) && ok;
@@ -222,21 +221,35 @@ namespace LyricsChecker
                 ok = CheckTag("song title", "ti", () => GetTagValue(musicFileInfo, _metadataNameTitle), lyricsData.Tags, lyricsFile) && ok;
                 ok = CheckTag("lyricist name", "au", () => GetLyricistFromMusicFile(musicFileInfo), lyricsData.Tags, lyricsFile) && ok;
                 ok = CheckTag("song length", "length", () => musicFileInfo.Format.Duration, lyricsData.Tags, lyricsFile) && ok;
+
+                var previousLyricsText = "<dummy>";
                 foreach (var lyricsText in lyricsData.LyricsTexts)
                 {
                     if (string.IsNullOrEmpty(lyricsText))
                     {
                         TinyConsole.Out.WriteLine($"Contains empty lines.: \"{lyricsFile.FullName}\"");
-                        ok = false;
+                        if (string.IsNullOrEmpty(previousLyricsText))
+                            TinyConsole.Out.WriteLine($"Consecutive lines with no lyrics found.: \"{lyricsFile.FullName}\"");
+                        previousLyricsText = "";
+                            ok = false;
                     }
                     else
                     {
-                        var normalizedLyricsText = NormalizeLyricsText(lyricsText);
-                        if ($"{normalizedLyricsText.timeStamp}{normalizedLyricsText.text}" != lyricsText)
+                        var (timeStamp, text) = NormalizeLyricsText(lyricsText);
+                        var normalizedLyricsText = $"{timeStamp}{text}";
+                        if (normalizedLyricsText != lyricsText)
                         {
                             TinyConsole.Out.WriteLine($"Inappropriate lyrics timeline.: Current: \"{lyricsText}\", Desired: \"{normalizedLyricsText}\", \"{lyricsFile.FullName}\"");
                             ok = false;
                         }
+
+                        if (string.IsNullOrEmpty(previousLyricsText) && string.IsNullOrEmpty(text.Trim()))
+                        {
+                            TinyConsole.Out.WriteLine($"Consecutive lines with no lyrics found.: \"{lyricsFile.FullName}\"");
+                            ok = false;
+                        }
+
+                        previousLyricsText = text.Trim();
                     }
                 }
 
@@ -316,6 +329,17 @@ namespace LyricsChecker
                         modified = true;
                     }
                 }
+            }
+
+            if (newLyricsTexts.Any() && !newLyricsTexts.First().StartsWith("[00:00.00]"))
+            {
+                // 最初の歌詞行がタイムスタンプ [00:00.00] で始まっていない場合
+
+                // ダミーのタイムスタンプ [00:00.00] を先頭に挿入する。
+                newLyricsTexts.Insert(0, "[00:00.00] ");
+                TinyConsole.Out.WriteLine($"Inserts \"[00:00.00] \" because the timestamp of the first lyric is not \"[00:00.00]\".: \"{lyricsFile.FullName}\"");
+                modified = true;
+                modifiedLyricsTimeStamp = true;
             }
 
             if (modifiedLyricsTimeStamp && !newLyricsTexts.Any(newLyricsText => newLyricsText.Contains("#要タイミング調整")))
