@@ -18,8 +18,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MovieChapterEditor", "MovieChapterEditor\MovieChapterEditor.csproj", "{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MatroskaBatchToolBox.Utility", "MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj", "{0A5FAA1C-2588-425C-B30D-615B1DDF4025}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Experiment.Cpp", "Experiment.Cpp\Experiment.Cpp.vcxproj", "{803FBAF1-8F0E-484E-80C4-1BFFD74FB7E5}"
@@ -46,7 +44,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MovieMetadataEditor", "Movi
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LyricsChecker", "LyricsChecker\LyricsChecker.csproj", "{E2CF8FB7-5BE3-4E11-A4C1-4BE9ECC55A27}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DumpMusicMetadata", "DumpMusicMetadata\DumpMusicMetadata.csproj", "{CDEE2B5E-F6D7-4310-9E04-A3B13E3717D2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DumpMusicMetadata", "DumpMusicMetadata\DumpMusicMetadata.csproj", "{CDEE2B5E-F6D7-4310-9E04-A3B13E3717D2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -162,26 +160,6 @@ Global
 		{FE5EE9EB-7E51-4C4A-9840-3ED049F51F6C}.Release|x64.Build.0 = Release|Any CPU
 		{FE5EE9EB-7E51-4C4A-9840-3ED049F51F6C}.Release|x86.ActiveCfg = Release|Any CPU
 		{FE5EE9EB-7E51-4C4A-9840-3ED049F51F6C}.Release|x86.Build.0 = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|ARM.ActiveCfg = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|ARM.Build.0 = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|ARM64.ActiveCfg = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|ARM64.Build.0 = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|x64.Build.0 = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Debug|x86.Build.0 = Debug|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|ARM.ActiveCfg = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|ARM.Build.0 = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|ARM64.ActiveCfg = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|ARM64.Build.0 = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|x64.ActiveCfg = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|x64.Build.0 = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|x86.ActiveCfg = Release|Any CPU
-		{CFE898CC-875C-43DB-B9E1-5F8E99B82EF1}.Release|x86.Build.0 = Release|Any CPU
 		{0A5FAA1C-2588-425C-B30D-615B1DDF4025}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0A5FAA1C-2588-425C-B30D-615B1DDF4025}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0A5FAA1C-2588-425C-B30D-615B1DDF4025}.Debug|ARM.ActiveCfg = Debug|Any CPU

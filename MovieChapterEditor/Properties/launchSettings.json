@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "MovieChapterEditor": {
-      "commandName": "Project",
-      "commandLineArgs": "-f -i \"D:\\テストデータ\\chapter\\test_without_chapters.mkv\" -ct 0,1,2 -tt:0 abc -tt:2 def -o output.mkv"
-    }
-  }
-}
