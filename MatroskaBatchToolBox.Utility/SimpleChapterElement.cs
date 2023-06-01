@@ -12,7 +12,7 @@ namespace MatroskaBatchToolBox.Utility
         static SimpleChapterElement()
         {
             DefaultMaximumDuration = TimeSpan.FromDays(7);
-            DefaultMinimumDuration = TimeSpan.FromMilliseconds(10);
+            DefaultMinimumDuration = TimeSpan.FromMilliseconds(100);
         }
 
         public SimpleChapterElement(TimeSpan startTime, TimeSpan endTime, string title)

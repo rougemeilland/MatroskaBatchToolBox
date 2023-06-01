@@ -632,7 +632,7 @@ namespace MovieMetadataEditor
                     new[]
                     {
                         "Specifies the minimum valid chapter length.",
-                        "The default is 0.01 (10 ms).",
+                        "The default is 0.1 (100 ms).",
                         "Chapters shorter than this value are automatically merged with the chapters before and after them.",
                         "",
                         "* Commentary",
