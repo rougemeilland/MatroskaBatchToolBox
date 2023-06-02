@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,6 +14,42 @@ namespace MovieMetadataEditor
 {
     public static partial class Program
     {
+        [Flags]
+        private enum MetadataType
+        {
+            /// <summary>
+            /// 対象メタデータなし
+            /// </summary>
+            None = 0,
+
+            /// <summary>
+            /// 最低限のメタデータ
+            /// </summary>
+            /// <remarks>
+            /// <list type="bullet">
+            /// <item>ストリームのtitle</item>
+            /// <item>ストリームのlanguage</item>
+            /// <item>ストリームのencoder</item>
+            /// </list>
+            /// </remarks>
+            MinimumMetadata = 1 << 0,
+
+            /// <summary>
+            /// チャプターのメタデータ (title)
+            /// </summary>
+            ChapterMetadata = 1 << 1,
+
+            /// <summary>
+            /// その他のメタデータ
+            /// </summary>
+            OtherMetadata = 1 << 2,
+
+            /// <summary>
+            /// すべてのメタデータ
+            /// </summary>
+            All = MinimumMetadata | ChapterMetadata | OtherMetadata,
+        }
+
         private class CommandParameter
         {
             private CommandParameter(IEnumerable<CommandOption<OptionType>> options)
@@ -26,11 +63,15 @@ namespace MovieMetadataEditor
                 ChapterTitles = options.Where(option => option.OptionType == OptionType.ChapterTitle).ToDictionary(option => (int)option.OptionParameter[1], option => (string)option.OptionParameter[2]);
                 StreamMetadata = options.Where(option => option.OptionType == OptionType.StreamMetadata).ToDictionary(option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2], metadataName: (string)option.OptionParameter[3]), option => (string)option.OptionParameter[4]);
                 StreamDisposition = options.Where(option => option.OptionType == OptionType.StreamDisposition).ToDictionary(option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2], dispositionName: (string)option.OptionParameter[3]), option => (bool)option.OptionParameter[4]);
-                ClearMetadata = options.Any(option => option.OptionType == OptionType.ClearMetadata);
-                ClearAllMetadata = options.Any(option => option.OptionType == OptionType.ClearAllMetadata);
+                MetadataToClear = MetadataType.None;
+                if (options.Any(option => option.OptionType == OptionType.ClearMetadata))
+                    MetadataToClear |= MetadataType.All & ~(MetadataType.MinimumMetadata | MetadataType.ChapterMetadata);
+                if (options.Any(option => option.OptionType == OptionType.ClearChapterMetadata))
+                    MetadataToClear |= MetadataType.ChapterMetadata;
+                if (options.Any(option => option.OptionType == OptionType.ClearAllMetadata))
+                    MetadataToClear |= MetadataType.All;
                 ClearDisposition = options.Any(option => option.OptionType == OptionType.ClearDisposition);
                 ClearChapters = options.Any(option => option.OptionType == OptionType.ClearChapters);
-                ClearChapterMetadata = options.Any(option => option.OptionType == OptionType.ClearChapterMetadata);
                 MaximumDuration = options.SingleOrNone(option => option.OptionType == OptionType.MaximumDuration)?.OptionParameter[1] as TimeSpan? ?? SimpleChapterElement.DefaultMaximumDuration;
                 MinimumDuration = options.SingleOrNone(option => option.OptionType == OptionType.MinimumDuration)?.OptionParameter[1] as TimeSpan? ?? SimpleChapterElement.DefaultMinimumDuration;
                 (From, To) = GetTrimmingRange(
@@ -51,11 +92,9 @@ namespace MovieMetadataEditor
             public IDictionary<int, string> ChapterTitles { get; }
             public IDictionary<(string streamType, int streamIndex, string metadataName), string> StreamMetadata { get; }
             public IDictionary<(string streamType, int streamIndex, string dispositionName), bool> StreamDisposition { get; }
-            public bool ClearMetadata { get; }
-            public bool ClearAllMetadata { get; }
+            public MetadataType MetadataToClear { get; }
             public bool ClearDisposition { get; }
             public bool ClearChapters { get; }
-            public bool ClearChapterMetadata { get; }
             public TimeSpan MaximumDuration { get; }
             public TimeSpan MinimumDuration { get; }
             public TimeSpan From { get; }
@@ -197,7 +236,7 @@ namespace MovieMetadataEditor
                     {
                         var movieInformation = GetMovieInformation(commandOptions, inputFormat, inputFile);
 
-                        if (commandOptions.ClearAllMetadata || !(commandOptions.ClearChapterMetadata || commandOptions.ClearMetadata))
+                        if (commandOptions.MetadataToClear.IsAnyOf(MetadataType.None, MetadataType.All))
                         {
                             // (チャプタータイトルも含めた)メタデータをすべて残す、あるいはすべて消去する場合
 
@@ -575,9 +614,9 @@ namespace MovieMetadataEditor
                     stream.index,
                     isDefault = !commandOptions.ClearDisposition && stream.isDefault,
                     isForced = !commandOptions.ClearDisposition && stream.isForced,
-                    title = commandOptions.ClearAllMetadata ? null : stream.title,
-                    language = commandOptions.ClearAllMetadata ? null : stream.language,
-                    encoder = commandOptions.ClearAllMetadata ? null : stream.encoder,
+                    title = (commandOptions.MetadataToClear & MetadataType.MinimumMetadata) != MetadataType.None ? null : stream.title,
+                    language = (commandOptions.MetadataToClear & MetadataType.MinimumMetadata) != MetadataType.None ? null : stream.language,
+                    encoder = (commandOptions.MetadataToClear & MetadataType.MinimumMetadata) != MetadataType.None ? null : stream.encoder,
                 })
                 // 指定された情報を設定する
                 .Select(stream => new
@@ -591,46 +630,51 @@ namespace MovieMetadataEditor
                     stream.encoder,
                 });
 
-            var ffmpegCommandParameters =
-                new List<string>
-                {
-                    "-hide_banner"
-                };
-            if (doOverWrite)
-                ffmpegCommandParameters.Add("-y");
-            if (inputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {inputFormat.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add($"-i {inputFile.FullName.CommandLineArgumentEncode()}");
-            if (!commandOptions.ClearChapters)
-                ffmpegCommandParameters.Add("-f ffmetadata -i -");
-            ffmpegCommandParameters.Add("-c copy -map 0");
-            foreach (var stream in streams)
-            {
-                ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} title={(stream.title ?? "").CommandLineArgumentEncode()}");
-                ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} language={(stream.language ?? "").CommandLineArgumentEncode()}");
-                ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} ENCODER={(stream.encoder ?? "").CommandLineArgumentEncode()}");
-                ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {(stream.isDefault ? "+" : "-")}default{(stream.isForced ? "+" : "-")}forced");
-            }
-
-            if (commandOptions.ClearAllMetadata)
-                ffmpegCommandParameters.Add("-map_metadata -1");
-            if (commandOptions.ClearChapters)
-                ffmpegCommandParameters.Add("-map_chapters -1");
-            else
-                ffmpegCommandParameters.Add("-map_chapters 1");
-            if (outputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {outputFormat.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add($"{outputFile.FullName.CommandLineArgumentEncode()}");
-            var ffmpegCommandLineText = string.Join(" ", ffmpegCommandParameters);
-            if (commandOptions.Verbose)
-                PrintInformationMessage($"Execute: ffmpeg {ffmpegCommandLineText}");
-            var inMetadataReader = commandOptions.ClearChapters ? null : GetInputMetadataStream(commandOptions, movieInformation.Chapters);
+            var metadataFilePath = (string?)null;
             try
             {
+                var ffmpegCommandParameters =
+                    new List<string>
+                    {
+                    "-hide_banner"
+                    };
+                if (doOverWrite)
+                    ffmpegCommandParameters.Add("-y");
+                if (inputFormat is not null)
+                    ffmpegCommandParameters.Add($"-f {inputFormat.CommandLineArgumentEncode()}");
+                ffmpegCommandParameters.Add($"-i {inputFile.FullName.CommandLineArgumentEncode()}");
+                if (!commandOptions.ClearChapters)
+                {
+                    metadataFilePath = Path.GetTempFileName();
+                    File.WriteAllText(metadataFilePath, GetFfmetadataText(commandOptions, movieInformation.Chapters), Encoding.UTF8);
+                    ffmpegCommandParameters.Add($"-f ffmetadata -i {metadataFilePath.CommandLineArgumentEncode()}");
+                }
+
+                ffmpegCommandParameters.Add("-c copy -map 0");
+                foreach (var stream in streams)
+                {
+                    ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} title={(stream.title ?? "").CommandLineArgumentEncode()}");
+                    ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} language={(stream.language ?? "").CommandLineArgumentEncode()}");
+                    ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} ENCODER={(stream.encoder ?? "").CommandLineArgumentEncode()}");
+                    ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {(stream.isDefault ? "+" : "-")}default{(stream.isForced ? "+" : "-")}forced");
+                }
+
+                if ((commandOptions.MetadataToClear & MetadataType.All) == MetadataType.All)
+                    ffmpegCommandParameters.Add("-map_metadata -1");
+                if (commandOptions.ClearChapters)
+                    ffmpegCommandParameters.Add("-map_chapters -1");
+                else
+                    ffmpegCommandParameters.Add("-map_chapters 1");
+                if (outputFormat is not null)
+                    ffmpegCommandParameters.Add($"-f {outputFormat.CommandLineArgumentEncode()}");
+                ffmpegCommandParameters.Add($"{outputFile.FullName.CommandLineArgumentEncode()}");
+                var ffmpegCommandLineText = string.Join(" ", ffmpegCommandParameters);
+                if (commandOptions.Verbose)
+                    PrintInformationMessage($"Execute: ffmpeg {ffmpegCommandLineText}");
                 var exitCode =
                     Command.ExecuteFfmpeg(
                         ffmpegCommandLineText,
-                        inMetadataReader is not null ? Command.GetTextInputRedirector(inMetadataReader.ReadLine) : null,
+                        null,
                         null,
                         TinyConsole.Error.WriteLine,
                         (level, message) =>
@@ -654,30 +698,41 @@ namespace MovieMetadataEditor
             }
             finally
             {
-                inMetadataReader?.Dispose();
+                if (metadataFilePath is not null)
+                {
+                    try
+                    {
+                        File.Delete(metadataFilePath);
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
             }
         }
 
-        private static TextReader GetInputMetadataStream(CommandParameter commandParameters, IEnumerable<ChapterInfo> chapters)
+        private static string GetFfmetadataText(CommandParameter commandParameters, IEnumerable<ChapterInfo> chapters)
         {
             var filterParameter = new ChapterFilterParameter
             {
                 From = commandParameters.From,
                 KeepEmptyChapter = commandParameters.KeepEmptyChapter,
                 MinimumDuration = commandParameters.MinimumDuration,
-                Titles = commandParameters.ClearChapterMetadata ? chapters.Select((chapter, index) => index).ToDictionary(index => index, index => "") : commandParameters.ChapterTitles,
+                Titles =
+                    (commandParameters.MetadataToClear & MetadataType.ChapterMetadata) != MetadataType.None
+                    ? chapters.Select((chapter, index) => index).ToDictionary(index => index, index => "")
+                    : commandParameters.ChapterTitles,
                 To = commandParameters.To,
                 WarningMessageReporter = PrintWarningMessage,
             };
             return
-                new StringReader(
-                    (commandParameters.ChapterTimes is not null
-                        ? commandParameters.ChapterTimes
-                            .ToSimpleChapterElements(commandParameters.MaximumDuration, PrintWarningMessage)
-                            .ChapterFilter(filterParameter)
-                        : chapters
-                            .ChapterFilter(filterParameter))
-                    .ToMetadataString());
+                (commandParameters.ChapterTimes is not null
+                    ? commandParameters.ChapterTimes
+                        .ToSimpleChapterElements(commandParameters.MaximumDuration, PrintWarningMessage)
+                        .ChapterFilter(filterParameter)
+                    : chapters
+                        .ChapterFilter(filterParameter))
+                .ToMetadataString();
         }
 
         private static void CopyStream(Stream instream, Stream outstream)

@@ -413,8 +413,8 @@ namespace MovieMetadataEditor
                     OptionType.ClearChapterMetadata,
                      // エイリアスも含めたオプション名の配列
                     new string[]{ "-ccm", "--clear_chapter_metadata" },
-                    // メタデータ消去系またはチャプター消去系のオプションの重複のみ NG
-                    (option, otherOpton) => otherOpton.OptionType.IsNoneOf(OptionType.ClearAllMetadata, OptionType.ClearChapterMetadata, OptionType.ClearChapters, OptionType.ClearMetadata),
+                    // チャプターに影響のあるメタデータ消去系、またはチャプター消去系のオプションの重複のみ NG
+                    (option, otherOpton) => otherOpton.OptionType.IsNoneOf(OptionType.ClearAllMetadata, OptionType.ClearChapterMetadata, OptionType.ClearChapters),
                     // 常に OK (必須ではない)
                     (options) => null,
                     "--clear_chapter_metadata  or  -ccm",
@@ -443,8 +443,8 @@ namespace MovieMetadataEditor
                     OptionType.ClearMetadata,
                      // エイリアスも含めたオプション名の配列
                     new string[]{ "-c", "--clear_metadata" },
-                    // clear系のオプションの重複のみ NG
-                    (option, otherOpton) => otherOpton.OptionType.IsNoneOf(OptionType.ClearAllMetadata, OptionType.ClearChapterMetadata, OptionType.ClearMetadata),
+                    // クリア対象が重複するオプション重複のみ NG
+                    (option, otherOpton) => otherOpton.OptionType.IsNoneOf(OptionType.ClearAllMetadata, OptionType.ClearMetadata),
                     // 常に OK (必須ではない)
                     (options) => null,
                     "--clear_metadata  or  -c",
