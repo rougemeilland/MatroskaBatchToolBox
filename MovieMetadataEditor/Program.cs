@@ -665,7 +665,7 @@ namespace MovieMetadataEditor
                 From = commandParameters.From,
                 KeepEmptyChapter = commandParameters.KeepEmptyChapter,
                 MinimumDuration = commandParameters.MinimumDuration,
-                Titles = commandParameters.ClearChapterMetadata ? new Dictionary<int, string>() : commandParameters.ChapterTitles,
+                Titles = commandParameters.ClearChapterMetadata ? chapters.Select((chapter, index) => index).ToDictionary(index => index, index => "") : commandParameters.ChapterTitles,
                 To = commandParameters.To,
                 WarningMessageReporter = PrintWarningMessage,
             };
