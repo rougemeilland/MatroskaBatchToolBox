@@ -614,6 +614,7 @@ namespace AudioNormalizer
                 ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} language={(stream.language ?? "").CommandLineArgumentEncode()}");
                 ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} ENCODER={(stream.encoder ?? "").CommandLineArgumentEncode()}");
                 ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {(stream.isDefault ? "+" : "-")}default{(stream.isForced ? "+" : "-")}forced{(stream.isAttachedPic ? "+" : "-")}attached_pic");
+                metaeditCommandParameters.Add($"-d:{stream.streamType}:{stream.streamIndex} {string.Concat(dispositionsSpec)}");
             }
 
             ffmpegCommandParameters.Add("-map_chapters 1");
