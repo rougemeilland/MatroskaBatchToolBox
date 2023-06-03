@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Text;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
@@ -50,6 +50,18 @@ namespace MovieMetadataEditor
             All = MinimumMetadata | ChapterMetadata | OtherMetadata,
         }
 
+        private class StreamMetadataComparer
+            : IEqualityComparer<(string streamType, int streamIndex, string metadataName)>
+        {
+            bool IEqualityComparer<(string streamType, int streamIndex, string metadataName)>.Equals((string streamType, int streamIndex, string metadataName) x, (string streamType, int streamIndex, string metadataName) y)
+                => string.Equals(x.streamType, y.streamType, StringComparison.OrdinalIgnoreCase) &&
+                    x.streamIndex != y.streamIndex &&
+                    string.Equals(x.metadataName, y.metadataName, StringComparison.OrdinalIgnoreCase);
+
+            int IEqualityComparer<(string streamType, int streamIndex, string metadataName)>.GetHashCode((string streamType, int streamIndex, string metadataName) obj)
+                => HashCode.Combine(obj.streamIndex, obj.streamIndex, obj.metadataName);
+        }
+
         private class CommandParameter
         {
             private CommandParameter(IEnumerable<CommandOption<OptionType>> options)
@@ -61,7 +73,7 @@ namespace MovieMetadataEditor
                 IsForceMode = options.Any(option => option.OptionType == OptionType.Force);
                 ChapterTimes = options.SingleOrNone(option => option.OptionType == OptionType.ChapterTimes)?.OptionParameter[1] as IEnumerable<TimeSpan>;
                 ChapterTitles = options.Where(option => option.OptionType == OptionType.ChapterTitle).ToDictionary(option => (int)option.OptionParameter[1], option => (string)option.OptionParameter[2]);
-                StreamMetadata = options.Where(option => option.OptionType == OptionType.StreamMetadata).ToDictionary(option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2], metadataName: (string)option.OptionParameter[3]), option => (string)option.OptionParameter[4]);
+                StreamMetadata = options.Where(option => option.OptionType == OptionType.StreamMetadata).ToDictionary(option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2], metadataName: (string)option.OptionParameter[3]), option => (string)option.OptionParameter[4], new StreamMetadataComparer());
                 StreamDisposition = options.Where(option => option.OptionType == OptionType.StreamDisposition).ToDictionary(option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2], dispositionName: (string)option.OptionParameter[3]), option => (bool)option.OptionParameter[4]);
                 MetadataToClear = MetadataType.None;
                 if (options.Any(option => option.OptionType == OptionType.ClearMetadata))
@@ -134,7 +146,11 @@ namespace MovieMetadataEditor
             }
         }
 
+        private const string _metadataNameTitle = "TITLE";
+        private const string _metadataNameLanguage = "LANGUAGE";
+        private const string _metadataNameEncoder = "ENCODER";
         private static readonly string _thisProgramName;
+        private static readonly FileInfo _ffmpegCommandFile;
         private static readonly Regex _chapterTitleOptionNamePattern;
         private static readonly Regex _streamOptionNamePattern;
         private static readonly Regex _streamOptionValuePattern;
@@ -144,6 +160,7 @@ namespace MovieMetadataEditor
         static Program()
         {
             _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
+            _ffmpegCommandFile = new FileInfo(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException("ffmpeg command is not installed."));
             _chapterTitleOptionNamePattern = new Regex(@"^(-tt|--chapter_title):(?<chapterIndex>\d+)$", RegexOptions.Compiled);
             _streamOptionNamePattern = new Regex(@"^(-s|--stream_metadata):(?<streamType>[vasdt]):(?<streamIndex>\d+)$", RegexOptions.Compiled);
             _streamOptionValuePattern = new Regex(@"^(?<metadataName>[a-zA-Z0-9_]+)=(?<metadataValue>.*)$", RegexOptions.Compiled);
@@ -219,104 +236,34 @@ namespace MovieMetadataEditor
                     // 入力の準備をする (入力元が標準入力である場合は一時ファイルにコピーする)
                     var (inputFormat, inputFile, temporaryInputFile) = GetInputMovieFile(commandOptions);
 
-                    var temporaryIntermediateFile = (FileInfo?)null;
-
                     // 出力の準備をする (出力先が標準出力である場合は一時ファイルを作成する)
                     var (outputFormat, outputFile, temporaryOutputFile) = GetOutputMovieFile(commandOptions);
-
-                    if (commandOptions.Verbose)
-                    {
-                        if (temporaryInputFile is not null)
-                            PrintInformationMessage($"Temprary file is created.: \"{temporaryInputFile.FullName}\"");
-                        if (temporaryOutputFile is not null)
-                            PrintInformationMessage($"Temprary file is created.: \"{temporaryOutputFile.FullName}\"");
-                    }
 
                     try
                     {
                         var movieInformation = GetMovieInformation(commandOptions, inputFormat, inputFile);
 
-                        if (commandOptions.MetadataToClear.IsAnyOf(MetadataType.None, MetadataType.All))
+                        if (commandOptions.Verbose)
                         {
-                            // (チャプタータイトルも含めた)メタデータをすべて残す、あるいはすべて消去する場合
-
-                            if (commandOptions.Verbose)
-                            {
-                                PrintInformationMessage("Start movie conversion.");
-                                if (inputFormat is not null)
-                                    PrintInformationMessage($"  Input file format: {inputFormat}");
-                                PrintInformationMessage($"  Input file format: \"{inputFile.FullName}\"");
-                                if (outputFormat is not null)
-                                    PrintInformationMessage($"  Output file format: {outputFormat}");
-                                PrintInformationMessage($"  Output file format: \"{outputFile.FullName}\"");
-                            }
-
-                            ExecutePass2(
-                                commandOptions,
-                                movieInformation,
-                                inputFormat,
-                                inputFile,
-                                outputFormat,
-                                outputFile,
-                                commandOptions.IsForceMode || temporaryOutputFile is not null);
-
-                            if (commandOptions.Verbose)
-                                PrintInformationMessage("Movie conversion finished.");
+                            PrintInformationMessage("Start movie conversion.");
+                            PrintInformationMessage($"  Input file format: {inputFormat}");
+                            PrintInformationMessage($"  Input file format: \"{inputFile.FullName}\"");
+                            if (outputFormat is not null)
+                                PrintInformationMessage($"  Output file format: {outputFormat}");
+                            PrintInformationMessage($"  Output file format: \"{outputFile.FullName}\"");
                         }
-                        else
-                        {
-                            // (チャプタータイトルも含めた)メタデータを一部だけ残して消去する場合
 
-                            temporaryIntermediateFile = new FileInfo(Path.GetTempFileName());
-                            var temporaryIntermediateFileFormat = "matroska";
-                            if (commandOptions.Verbose)
-                                PrintInformationMessage($"Temprary file is created.: \"{temporaryIntermediateFile.FullName}\"");
+                        EditMetadata(
+                            commandOptions,
+                            movieInformation,
+                            inputFormat,
+                            inputFile,
+                            outputFormat,
+                            outputFile,
+                            commandOptions.IsForceMode || temporaryOutputFile is not null);
 
-                            // フェーズ1: メタデータをすべて消去する。
-                            if (commandOptions.Verbose)
-                            {
-                                PrintInformationMessage("Start movie conversion. (pass 1/2)");
-                                if (inputFormat is not null)
-                                    PrintInformationMessage($"  Input file format: {inputFormat}");
-                                PrintInformationMessage($"  Input file format: \"{inputFile.FullName}\"");
-                                PrintInformationMessage($"  Output file format: {temporaryIntermediateFileFormat}");
-                                PrintInformationMessage($"  Output file format: \"{temporaryIntermediateFile.FullName}\"");
-                            }
-
-                            ExecutePass1(
-                                inputFormat,
-                                inputFile,
-                                temporaryIntermediateFileFormat,
-                                temporaryIntermediateFile,
-                                commandOptions.Verbose,
-                                true);
-
-                            if (commandOptions.Verbose)
-                                PrintInformationMessage("Movie conversion finished. (pass 1/2)");
-
-                            // フェーズ2: 残すべきメタデータを再設定する。
-                            if (commandOptions.Verbose)
-                            {
-                                PrintInformationMessage("Start movie conversion. (pass 2/2)");
-                                PrintInformationMessage($"  Input file format: {temporaryIntermediateFileFormat}");
-                                PrintInformationMessage($"  Input file format: \"{temporaryIntermediateFile.FullName}\"");
-                                if (outputFormat is not null)
-                                    PrintInformationMessage($"  Output file format: {outputFormat}");
-                                PrintInformationMessage($"  Output file format: \"{outputFile.FullName}\"");
-                            }
-
-                            ExecutePass2(
-                                commandOptions,
-                                movieInformation,
-                                temporaryIntermediateFileFormat,
-                                temporaryIntermediateFile,
-                                outputFormat,
-                                outputFile,
-                                commandOptions.IsForceMode || temporaryOutputFile is not null);
-
-                            if (commandOptions.Verbose)
-                                PrintInformationMessage("Movie conversion finished. (pass 2/2)");
-                        }
+                        if (commandOptions.Verbose)
+                            PrintInformationMessage("Movie conversion finished.");
 
                         if (temporaryOutputFile is not null)
                         {
@@ -340,17 +287,8 @@ namespace MovieMetadataEditor
                             try
                             {
                                 File.Delete(temporaryInputFile.FullName);
-                            }
-                            catch (Exception)
-                            {
-                            }
-                        }
-
-                        if (temporaryIntermediateFile is not null)
-                        {
-                            try
-                            {
-                                File.Delete(temporaryIntermediateFile.FullName);
+                                if (commandOptions.Verbose)
+                                    PrintInformationMessage($"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                             }
                             catch (Exception)
                             {
@@ -362,6 +300,8 @@ namespace MovieMetadataEditor
                             try
                             {
                                 File.Delete(temporaryOutputFile.FullName);
+                                if (commandOptions.Verbose)
+                                    PrintInformationMessage($"Temporary file is deleted.: \"{temporaryOutputFile.FullName}\"");
                             }
                             catch (Exception)
                             {
@@ -434,6 +374,8 @@ namespace MovieMetadataEditor
                     try
                     {
                         File.Delete(temporaryInputFile.FullName);
+                        if (commandParameters.Verbose)
+                            PrintInformationMessage($"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                     }
                     catch (Exception)
                     {
@@ -476,7 +418,7 @@ namespace MovieMetadataEditor
                     Command.GetMovieInformation(
                         inputFormat,
                         inputFile,
-                        MovieInformationType.Chapters | MovieInformationType.Streams,
+                        MovieInformationType.Chapters | MovieInformationType.Streams | MovieInformationType.Format,
                         (level, message) =>
                         {
                             switch (level)
@@ -498,54 +440,7 @@ namespace MovieMetadataEditor
             }
         }
 
-        private static void ExecutePass1(string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile, bool verbose, bool doOverWrite)
-        {
-            var ffmpegCommandParameters =
-                new List<string>
-                {
-                    "-hide_banner"
-                };
-            if (doOverWrite)
-                ffmpegCommandParameters.Add("-y");
-            if (inputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {inputFormat.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add($"-i {inputFile.FullName.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add("-c copy -map 0");
-            ffmpegCommandParameters.Add("-map_metadata -1");
-            ffmpegCommandParameters.Add("-map_chapters -1");
-            if (outputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {outputFormat.CommandLineArgumentEncode()}");
-            ffmpegCommandParameters.Add($"{outputFile.FullName.CommandLineArgumentEncode()}");
-            var ffmpegCommandLineText = string.Join(" ", ffmpegCommandParameters);
-            if (verbose)
-                PrintInformationMessage($"Execute: ffmpeg {ffmpegCommandLineText}");
-            var exitCode =
-                Command.ExecuteFfmpeg(
-                    ffmpegCommandLineText,
-                    null,
-                    null,
-                    TinyConsole.Error.WriteLine,
-                    (level, message) =>
-                    {
-                        switch (level)
-                        {
-                            case "WARNING":
-                                PrintWarningMessage(message);
-                                break;
-                            case "ERROR":
-                                PrintErrorMessage(message);
-                                break;
-                            default:
-                                // NOP
-                                break;
-                        }
-                    },
-                    new Progress<double>(_ => { }));
-            if (exitCode != 0)
-                throw new Exception($"An error occurred in the \"ffmpeg\" command. : exit-code={exitCode}");
-        }
-
-        private static void ExecutePass2(CommandParameter commandOptions, MovieInformation movieInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile, bool doOverWrite)
+        private static void EditMetadata(CommandParameter commandOptions, MovieInformation movieInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile, bool doOverWrite)
         {
             var streams =
                 movieInformation.VideoStreams
@@ -555,9 +450,7 @@ namespace MovieMetadataEditor
                     index = stream.IndexWithinVideoStream,
                     isDefault = stream.Disposition.Default,
                     isForced = stream.Disposition.Forced,
-                    title = stream.Tags.Title,
-                    language = stream.Tags.Language,
-                    encoder = stream.Tags.Encoder,
+                    tags = stream.Tags,
                 })
                 .Concat(
                     movieInformation.AudioStreams
@@ -567,9 +460,7 @@ namespace MovieMetadataEditor
                         index = stream.IndexWithinAudioStream,
                         isDefault = stream.Disposition.Default,
                         isForced = stream.Disposition.Forced,
-                        title = stream.Tags.Title,
-                        language = stream.Tags.Language,
-                        encoder = stream.Tags.Encoder,
+                        tags = stream.Tags,
                     }))
                 .Concat(
                     movieInformation.SubtitleStreams
@@ -579,9 +470,7 @@ namespace MovieMetadataEditor
                         index = stream.IndexWithinSubtitleStream,
                         isDefault = stream.Disposition.Default,
                         isForced = stream.Disposition.Forced,
-                        title = stream.Tags.Title,
-                        language = stream.Tags.Language,
-                        encoder = stream.Tags.Encoder,
+                        tags = stream.Tags,
                     }))
                 .Concat(
                     movieInformation.DataStreams
@@ -591,9 +480,7 @@ namespace MovieMetadataEditor
                         index = stream.IndexWithinDataStream,
                         isDefault = stream.Disposition.Default,
                         isForced = stream.Disposition.Forced,
-                        title = stream.Tags.Title,
-                        language = stream.Tags.Language,
-                        encoder = stream.Tags.Encoder,
+                        tags = stream.Tags,
                     }))
                 .Concat(
                     movieInformation.AttachmentStreams
@@ -603,31 +490,36 @@ namespace MovieMetadataEditor
                         index = stream.IndexWithinAttachmentStream,
                         isDefault = stream.Disposition.Default,
                         isForced = stream.Disposition.Forced,
-                        title = stream.Tags.Title,
-                        language = stream.Tags.Language,
-                        encoder = stream.Tags.Encoder,
+                        tags = stream.Tags,
                     }))
-                // 不要な情報をクリアする
-                .Select(stream => new
+                .Select(stream =>
                 {
-                    stream.streamTypeSymbol,
-                    stream.index,
-                    isDefault = !commandOptions.ClearDisposition && stream.isDefault,
-                    isForced = !commandOptions.ClearDisposition && stream.isForced,
-                    title = (commandOptions.MetadataToClear & MetadataType.MinimumMetadata) != MetadataType.None ? null : stream.title,
-                    language = (commandOptions.MetadataToClear & MetadataType.MinimumMetadata) != MetadataType.None ? null : stream.language,
-                    encoder = (commandOptions.MetadataToClear & MetadataType.MinimumMetadata) != MetadataType.None ? null : stream.encoder,
-                })
-                // 指定された情報を設定する
-                .Select(stream => new
-                {
-                    stream.streamTypeSymbol,
-                    stream.index,
-                    isDefault = commandOptions.StreamDisposition.TryGetValue((stream.streamTypeSymbol, stream.index, "default"), out var defaultValue) ? defaultValue : stream.isDefault,
-                    isForced = commandOptions.StreamDisposition.TryGetValue((stream.streamTypeSymbol, stream.index, "forced"), out var forcedValue) ? forcedValue : stream.isForced,
-                    title = commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index, "title"), out var titleValue) ? titleValue : stream.title,
-                    language = commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index, "language"), out var languageValue) ? languageValue : stream.language,
-                    stream.encoder,
+                    var streamTags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var tagName in stream.tags.EnumerateTagNames())
+                    {
+                        streamTags[tagName] =
+                            tagName.ToUpperInvariant() switch
+                            {
+                                _metadataNameTitle or _metadataNameLanguage or _metadataNameEncoder => (commandOptions.MetadataToClear & MetadataType.MinimumMetadata) != MetadataType.None ? "" : (stream.tags[tagName] ?? ""),
+                                _ => (commandOptions.MetadataToClear & MetadataType.OtherMetadata) != MetadataType.None ? "" : (stream.tags[tagName] ?? ""),
+                            };
+                    }
+
+                    if (commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index, _metadataNameTitle), out var titleValue))
+                        streamTags[_metadataNameTitle] = titleValue;
+                    if (commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index, _metadataNameLanguage), out var languageValue))
+                        streamTags[_metadataNameLanguage] = languageValue;
+                    if (commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index, _metadataNameEncoder), out var encoderValue))
+                        streamTags[_metadataNameEncoder] = encoderValue;
+                    return new
+                    {
+                        stream.streamTypeSymbol,
+                        stream.index,
+                        tags = streamTags,
+                        disposition = (isDefault: !commandOptions.ClearDisposition && stream.isDefault, isForced: !commandOptions.ClearDisposition && stream.isForced),
+                        originalTags = stream.tags,
+                        originalDisPosition = (stream.isDefault, stream.isForced),
+                    };
                 });
 
             var metadataFilePath = (string?)null;
@@ -646,21 +538,39 @@ namespace MovieMetadataEditor
                 if (!commandOptions.ClearChapters)
                 {
                     metadataFilePath = Path.GetTempFileName();
+                    if (commandOptions.Verbose)
+                        PrintInformationMessage($"Temprary file is created.: \"{metadataFilePath}\"");
                     File.WriteAllText(metadataFilePath, GetFfmetadataText(commandOptions, movieInformation.Chapters), Encoding.UTF8);
                     ffmpegCommandParameters.Add($"-f ffmetadata -i {metadataFilePath.CommandLineArgumentEncode()}");
                 }
 
                 ffmpegCommandParameters.Add("-c copy -map 0");
-                foreach (var stream in streams)
+
+                var formatTags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var tagName in movieInformation.Format.Tags.EnumerateTagNames())
+                    formatTags[tagName] = (commandOptions.MetadataToClear & MetadataType.OtherMetadata) != MetadataType.None ? "" : movieInformation.Format.Tags[tagName] ?? "";
+                foreach (var tag in formatTags)
                 {
-                    ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} title={(stream.title ?? "").CommandLineArgumentEncode()}");
-                    ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} language={(stream.language ?? "").CommandLineArgumentEncode()}");
-                    ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} ENCODER={(stream.encoder ?? "").CommandLineArgumentEncode()}");
-                    ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {(stream.isDefault ? "+" : "-")}default{(stream.isForced ? "+" : "-")}forced");
+                    if (tag.Value != (movieInformation.Format.Tags[tag.Key] ?? ""))
+                        ffmpegCommandParameters.Add($"-metadata {tag.Key.CommandLineArgumentEncode()}={tag.Value.CommandLineArgumentEncode()}");
                 }
 
-                if ((commandOptions.MetadataToClear & MetadataType.All) == MetadataType.All)
-                    ffmpegCommandParameters.Add("-map_metadata -1");
+                foreach (var stream in streams)
+                {
+                    foreach (var tag in stream.tags)
+                    {
+                        if (tag.Value != (stream.originalTags[tag.Key] ?? ""))
+                            ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} {tag.Key.CommandLineArgumentEncode()}={tag.Value.CommandLineArgumentEncode()}");
+                    }
+
+                    if (stream.disposition != stream.originalDisPosition)
+                    {
+                        var defaultSpec = stream.disposition.isDefault != stream.originalDisPosition.isDefault ? $"{(stream.disposition.isDefault ? "+" : "-")}default" : "";
+                        var forcedSpec = stream.disposition.isForced != stream.originalDisPosition.isForced ? $"{(stream.disposition.isForced ? "+" : "-")}forced" : "";
+                        ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {defaultSpec}{forcedSpec}");
+                    }
+                }
+
                 if (commandOptions.ClearChapters)
                     ffmpegCommandParameters.Add("-map_chapters -1");
                 else
@@ -671,12 +581,15 @@ namespace MovieMetadataEditor
                 var ffmpegCommandLineText = string.Join(" ", ffmpegCommandParameters);
                 if (commandOptions.Verbose)
                     PrintInformationMessage($"Execute: ffmpeg {ffmpegCommandLineText}");
+
                 var exitCode =
-                    Command.ExecuteFfmpeg(
+                    Command.ExecuteCommand(
+                        _ffmpegCommandFile,
                         ffmpegCommandLineText,
+                        Encoding.UTF8,
                         null,
                         null,
-                        TinyConsole.Error.WriteLine,
+                        null,
                         (level, message) =>
                         {
                             switch (level)
@@ -692,7 +605,7 @@ namespace MovieMetadataEditor
                                     break;
                             }
                         },
-                        new Progress<double>(_ => { }));
+                        null);
                 if (exitCode != 0)
                     throw new Exception($"An error occurred in the \"ffmpeg\" command. : exit-code={exitCode}");
             }
@@ -703,6 +616,8 @@ namespace MovieMetadataEditor
                     try
                     {
                         File.Delete(metadataFilePath);
+                        if (commandOptions.Verbose)
+                            PrintInformationMessage($"Temporary file is deleted.: \"{metadataFilePath}\"");
                     }
                     catch (Exception)
                     {

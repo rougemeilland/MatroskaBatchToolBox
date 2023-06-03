@@ -304,7 +304,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 {
                     Arguments = args,
                     FileName = programFile.FullName,
-                    CreateNoWindow = true,
+                    CreateNoWindow = false,
                     RedirectStandardError = standardErrorRedirector is not null,
                     RedirectStandardInput = standardInputRedirector is not null,
                     RedirectStandardOutput = standardOutputRedirector is not null,
@@ -312,7 +312,6 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                     StandardInputEncoding = standardInputRedirector is not null ? intputOutputEncoding : null,
                     StandardOutputEncoding = standardOutputRedirector is not null ? intputOutputEncoding : null,
                     UseShellExecute = false,
-                    WindowStyle = ProcessWindowStyle.Hidden,
                 };
             var process =
                 Process.Start(processStartInfo)
@@ -320,7 +319,6 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             try
             {
                 logger("INFORMATION", $"Child process started.: id={process.Id} \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
-                process.PriorityClass = ProcessPriorityClass.BelowNormal;
                 var cancelled = false;
                 var cancellationWatcherTask =
                     Task.Run(() =>
