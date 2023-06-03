@@ -339,7 +339,7 @@ namespace MovieMetadataEditor
                                 {
                                     var dispositions =
                                         EnumerateDispositions(arg)
-                                        .Select(item => new Tuple<string, bool>(item.dispositionName, item.dispositionValue))
+                                        .Select(item => (name:item.dispositionName, value:item.dispositionValue))
                                         .ToList();
                                     return new object []{ dispositions };
                                 }

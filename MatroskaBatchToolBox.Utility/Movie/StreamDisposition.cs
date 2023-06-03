@@ -1,4 +1,6 @@
-﻿using MatroskaBatchToolBox.Utility.Models.Json;
+﻿using System;
+using System.Collections.Generic;
+using MatroskaBatchToolBox.Utility.Models.Json;
 
 namespace MatroskaBatchToolBox.Utility.Movie
 {
@@ -42,5 +44,49 @@ namespace MatroskaBatchToolBox.Utility.Movie
         public bool Still_image { get; }
         public bool TimedThumbnails { get; }
         public bool VisualImpaired { get; }
+
+        public bool? this[string dispositionName]
+            => dispositionName.ToUpperInvariant() switch
+            {
+                "ATTACHED_PIC" or "ATTACHEDPIC" => AttachedPic,
+                "CAPTIONS" => Captions,
+                "CLEAN_EFFECTS" or "CLEANEFFECTS" => CleanEffects,
+                "COMMENT" => Comment,
+                "DEFAULT" => Default,
+                "DEPENDENT" => Dependent,
+                "DESCRIPTIONS" => Descriptions,
+                "DUB" => Dub,
+                "FORCED" => Forced,
+                "HEARING_IMPAIRED" or "HEARINGIMPAIRED" => HearingImpaired,
+                "KARAOKE" => Karaoke,
+                "LYRICS" => Lyrics,
+                "METADATA" => Metadata,
+                "ORIGINAL" => Original,
+                "STILL_IMAGE" => Still_image,
+                "TIMED_THUMBNAILS" or "TIMEDTHUMBNAILS" => TimedThumbnails,
+                "VISUAL_IMPAIRED" or "VISUALIMPAIRED" => VisualImpaired,
+                _ => null,
+            };
+
+        public IEnumerable<(string dispositionName, bool dispositionValue)> EnumerateDispositions()
+        {
+            yield return ("attached_pic", AttachedPic);
+            yield return ("captions", Captions);
+            yield return ("clean_effects", CleanEffects);
+            yield return ("comment", Comment);
+            yield return ("default", Default);
+            yield return ("dependent", Dependent);
+            yield return ("descriptions", Descriptions);
+            yield return ("dub", Dub);
+            yield return ("forced", Forced);
+            yield return ("hearing_impaired", HearingImpaired);
+            yield return ("karaoke", Karaoke);
+            yield return ("lyrics", Lyrics);
+            yield return ("metadata", Metadata);
+            yield return ("original", Original);
+            yield return ("still_image", Still_image);
+            yield return ("timed_thumbnails", TimedThumbnails);
+            yield return ("visual_impaired", VisualImpaired);
+        }
     }
 }

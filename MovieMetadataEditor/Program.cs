@@ -50,16 +50,15 @@ namespace MovieMetadataEditor
             All = MinimumMetadata | ChapterMetadata | OtherMetadata,
         }
 
-        private class StreamMetadataComparer
-            : IEqualityComparer<(string streamType, int streamIndex, string metadataName)>
+        private class StreamComparer
+            : IEqualityComparer<(string streamType, int streamIndex)>
         {
-            bool IEqualityComparer<(string streamType, int streamIndex, string metadataName)>.Equals((string streamType, int streamIndex, string metadataName) x, (string streamType, int streamIndex, string metadataName) y)
+            bool IEqualityComparer<(string streamType, int streamIndex)>.Equals((string streamType, int streamIndex) x, (string streamType, int streamIndex) y)
                 => string.Equals(x.streamType, y.streamType, StringComparison.OrdinalIgnoreCase) &&
-                    x.streamIndex != y.streamIndex &&
-                    string.Equals(x.metadataName, y.metadataName, StringComparison.OrdinalIgnoreCase);
+                    x.streamIndex != y.streamIndex;
 
-            int IEqualityComparer<(string streamType, int streamIndex, string metadataName)>.GetHashCode((string streamType, int streamIndex, string metadataName) obj)
-                => HashCode.Combine(obj.streamIndex, obj.streamIndex, obj.metadataName);
+            int IEqualityComparer<(string streamType, int streamIndex)>.GetHashCode((string streamType, int streamIndex) obj)
+                => HashCode.Combine(obj.streamIndex, obj.streamIndex);
         }
 
         private class CommandParameter
@@ -73,8 +72,22 @@ namespace MovieMetadataEditor
                 IsForceMode = options.Any(option => option.OptionType == OptionType.Force);
                 ChapterTimes = options.SingleOrNone(option => option.OptionType == OptionType.ChapterTimes)?.OptionParameter[1] as IEnumerable<TimeSpan>;
                 ChapterTitles = options.Where(option => option.OptionType == OptionType.ChapterTitle).ToDictionary(option => (int)option.OptionParameter[1], option => (string)option.OptionParameter[2]);
-                StreamMetadata = options.Where(option => option.OptionType == OptionType.StreamMetadata).ToDictionary(option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2], metadataName: (string)option.OptionParameter[3]), option => (string)option.OptionParameter[4], new StreamMetadataComparer());
-                StreamDisposition = options.Where(option => option.OptionType == OptionType.StreamDisposition).ToDictionary(option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2], dispositionName: (string)option.OptionParameter[3]), option => (bool)option.OptionParameter[4]);
+                StreamMetadata =
+                    options
+                    .Where(option => option.OptionType == OptionType.StreamMetadata)
+                    .Select(option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2], metadataName: (string)option.OptionParameter[3], metadataValue: (string)option.OptionParameter[4]))
+                    .GroupBy(item => (item.streamType, item.streamIndex))
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(item => (item.metadataName, item.metadataValue)),
+                        new StreamComparer());
+                StreamDisposition =
+                    options
+                    .Where(option => option.OptionType == OptionType.StreamDisposition)
+                    .ToDictionary(
+                        option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2]),
+                        option => (IEnumerable<(string name, bool value)>)option.OptionParameter[3],
+                        new StreamComparer());
                 MetadataToClear = MetadataType.None;
                 if (options.Any(option => option.OptionType == OptionType.ClearMetadata))
                     MetadataToClear |= MetadataType.All & ~(MetadataType.MinimumMetadata | MetadataType.ChapterMetadata);
@@ -102,8 +115,8 @@ namespace MovieMetadataEditor
             public bool IsForceMode { get; }
             public IEnumerable<TimeSpan>? ChapterTimes { get; }
             public IDictionary<int, string> ChapterTitles { get; }
-            public IDictionary<(string streamType, int streamIndex, string metadataName), string> StreamMetadata { get; }
-            public IDictionary<(string streamType, int streamIndex, string dispositionName), bool> StreamDisposition { get; }
+            public IDictionary<(string streamType, int streamIndex), IEnumerable<(string metadataName, string metadataValue)>> StreamMetadata { get; }
+            public IDictionary<(string streamType, int streamIndex), IEnumerable<(string dispositionName, bool dispositionValue)>> StreamDisposition { get; }
             public MetadataType MetadataToClear { get; }
             public bool ClearDisposition { get; }
             public bool ClearChapters { get; }
@@ -149,6 +162,8 @@ namespace MovieMetadataEditor
         private const string _metadataNameTitle = "TITLE";
         private const string _metadataNameLanguage = "LANGUAGE";
         private const string _metadataNameEncoder = "ENCODER";
+        private const string _dispositionNameForced = "FORCED";
+        private const string _dispositionNameDefault = "DEFAULT";
         private static readonly string _thisProgramName;
         private static readonly FileInfo _ffmpegCommandFile;
         private static readonly Regex _chapterTitleOptionNamePattern;
@@ -448,9 +463,8 @@ namespace MovieMetadataEditor
                 {
                     streamTypeSymbol = "v",
                     index = stream.IndexWithinVideoStream,
-                    isDefault = stream.Disposition.Default,
-                    isForced = stream.Disposition.Forced,
                     tags = stream.Tags,
+                    disposition = stream.Disposition,
                 })
                 .Concat(
                     movieInformation.AudioStreams
@@ -458,9 +472,8 @@ namespace MovieMetadataEditor
                     {
                         streamTypeSymbol = "a",
                         index = stream.IndexWithinAudioStream,
-                        isDefault = stream.Disposition.Default,
-                        isForced = stream.Disposition.Forced,
                         tags = stream.Tags,
+                        disposition = stream.Disposition,
                     }))
                 .Concat(
                     movieInformation.SubtitleStreams
@@ -468,9 +481,8 @@ namespace MovieMetadataEditor
                     {
                         streamTypeSymbol = "s",
                         index = stream.IndexWithinSubtitleStream,
-                        isDefault = stream.Disposition.Default,
-                        isForced = stream.Disposition.Forced,
                         tags = stream.Tags,
+                        disposition = stream.Disposition,
                     }))
                 .Concat(
                     movieInformation.DataStreams
@@ -478,9 +490,8 @@ namespace MovieMetadataEditor
                     {
                         streamTypeSymbol = "d",
                         index = stream.IndexWithinDataStream,
-                        isDefault = stream.Disposition.Default,
-                        isForced = stream.Disposition.Forced,
                         tags = stream.Tags,
+                        disposition = stream.Disposition,
                     }))
                 .Concat(
                     movieInformation.AttachmentStreams
@@ -488,9 +499,8 @@ namespace MovieMetadataEditor
                     {
                         streamTypeSymbol = "t",
                         index = stream.IndexWithinAttachmentStream,
-                        isDefault = stream.Disposition.Default,
-                        isForced = stream.Disposition.Forced,
                         tags = stream.Tags,
+                        disposition = stream.Disposition,
                     }))
                 .Select(stream =>
                 {
@@ -505,20 +515,37 @@ namespace MovieMetadataEditor
                             };
                     }
 
-                    if (commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index, _metadataNameTitle), out var titleValue))
-                        streamTags[_metadataNameTitle] = titleValue;
-                    if (commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index, _metadataNameLanguage), out var languageValue))
-                        streamTags[_metadataNameLanguage] = languageValue;
-                    if (commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index, _metadataNameEncoder), out var encoderValue))
-                        streamTags[_metadataNameEncoder] = encoderValue;
+                    if (commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index), out var specifiedMetadataList))
+                    {
+                        foreach (var (metadataName, metadataValue) in specifiedMetadataList)
+                            streamTags[metadataName] = metadataValue;
+                    }
+
+                    var streamDispositions = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var (dispositionName, dispositionValue) in stream.disposition.EnumerateDispositions())
+                    {
+                        streamDispositions[dispositionName] =
+                            dispositionName.ToUpperInvariant() switch
+                            {
+                                _dispositionNameForced or _dispositionNameDefault => !commandOptions.ClearDisposition && dispositionValue,
+                                _ => dispositionValue,
+                            };
+                    }
+
+                    if (commandOptions.StreamDisposition.TryGetValue((stream.streamTypeSymbol, stream.index), out var specifiedDispositionList))
+                    {
+                        foreach (var (dispositionName, dispositionValue) in specifiedDispositionList)
+                            streamDispositions[dispositionName] = dispositionValue;
+                    }
+
                     return new
                     {
                         stream.streamTypeSymbol,
                         stream.index,
                         tags = streamTags,
-                        disposition = (isDefault: !commandOptions.ClearDisposition && stream.isDefault, isForced: !commandOptions.ClearDisposition && stream.isForced),
+                        disposition = streamDispositions,
                         originalTags = stream.tags,
-                        originalDisPosition = (stream.isDefault, stream.isForced),
+                        originalDisPosition = stream.disposition,
                     };
                 });
 
@@ -528,7 +555,7 @@ namespace MovieMetadataEditor
                 var ffmpegCommandParameters =
                     new List<string>
                     {
-                    "-hide_banner"
+                        "-hide_banner"
                     };
                 if (doOverWrite)
                     ffmpegCommandParameters.Add("-y");
@@ -563,12 +590,15 @@ namespace MovieMetadataEditor
                             ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} {tag.Key.CommandLineArgumentEncode()}={tag.Value.CommandLineArgumentEncode()}");
                     }
 
-                    if (stream.disposition != stream.originalDisPosition)
+                    var dispositionSpecs = new List<string>();
+                    foreach (var disposition in stream.disposition)
                     {
-                        var defaultSpec = stream.disposition.isDefault != stream.originalDisPosition.isDefault ? $"{(stream.disposition.isDefault ? "+" : "-")}default" : "";
-                        var forcedSpec = stream.disposition.isForced != stream.originalDisPosition.isForced ? $"{(stream.disposition.isForced ? "+" : "-")}forced" : "";
-                        ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {defaultSpec}{forcedSpec}");
+                        if (disposition.Value != stream.originalDisPosition[disposition.Key])
+                            dispositionSpecs.Add($"{(disposition.Value ? "+" : "-")}{disposition.Key.CommandLineArgumentEncode()}");
                     }
+
+                    if (dispositionSpecs.Any())
+                        ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {string.Concat(dispositionSpecs)}");
                 }
 
                 if (commandOptions.ClearChapters)

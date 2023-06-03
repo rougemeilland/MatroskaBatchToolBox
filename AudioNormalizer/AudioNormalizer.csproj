@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj" />
+    <ProjectReference Include="..\MovieMetadataEditor\MovieMetadataEditor.csproj" />
     <ProjectReference Include="..\Palmtree.Console\Palmtree.Console.csproj" />
     <ProjectReference Include="..\Palmtree.Core\Palmtree.Core.csproj" />
   </ItemGroup>
