@@ -663,21 +663,35 @@ namespace MovieMetadataEditor
                 From = commandParameters.From,
                 KeepEmptyChapter = commandParameters.KeepEmptyChapter,
                 MinimumDuration = commandParameters.MinimumDuration,
-                Titles =
-                    (commandParameters.MetadataToClear & MetadataType.ChapterMetadata) != MetadataType.None
-                    ? chapters.Select((chapter, index) => index).ToDictionary(index => index, index => "")
-                    : commandParameters.ChapterTitles,
+                Titles = commandParameters.ChapterTitles,
                 To = commandParameters.To,
                 WarningMessageReporter = PrintWarningMessage,
             };
-            return
-                (commandParameters.ChapterTimes is not null
-                    ? commandParameters.ChapterTimes
-                        .ToSimpleChapterElements(commandParameters.MaximumDuration, PrintWarningMessage)
-                        .ChapterFilter(filterParameter)
-                    : chapters
-                        .ChapterFilter(filterParameter))
-                .ToMetadataString();
+            if (commandParameters.ChapterTimes is not null)
+            {
+                // チャプターの時間が即値で指定されている場合
+                return
+                    commandParameters.ChapterTimes
+                    .ToSimpleChapterElements(commandParameters.MaximumDuration, PrintWarningMessage)
+                    .ChapterFilter(filterParameter)
+                    .ToMetadataString();
+            }
+            else if ((commandParameters.MetadataToClear & MetadataType.ChapterMetadata) != MetadataType.None)
+            {
+                // チャプターのメタデータ(タイトル)の消去の指定がされている場合
+                return
+                    chapters
+                    .Select(chapter => new SimpleChapterElement(chapter.StartTime, chapter.EndTime, ""))
+                    .ChapterFilter(filterParameter)
+                    .ToMetadataString();
+            }
+            else
+            {
+                return
+                    chapters
+                    .ChapterFilter(filterParameter)
+                    .ToMetadataString();
+            }
         }
 
         private static void CopyStream(Stream instream, Stream outstream)
