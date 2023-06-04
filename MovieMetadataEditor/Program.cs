@@ -162,6 +162,7 @@ namespace MovieMetadataEditor
         private const string _metadataNameTitle = "TITLE";
         private const string _metadataNameLanguage = "LANGUAGE";
         private const string _metadataNameEncoder = "ENCODER";
+        private const string _metadataNameDuration = "DURATION";
         private const string _dispositionNameForced = "FORCED";
         private const string _dispositionNameDefault = "DEFAULT";
         private static readonly string _thisProgramName;
@@ -510,7 +511,7 @@ namespace MovieMetadataEditor
                         streamTags[tagName] =
                             tagName.ToUpperInvariant() switch
                             {
-                                _metadataNameTitle or _metadataNameLanguage or _metadataNameEncoder => (commandOptions.MetadataToClear & MetadataType.MinimumMetadata) != MetadataType.None ? "" : (stream.tags[tagName] ?? ""),
+                                _metadataNameTitle or _metadataNameLanguage => (commandOptions.MetadataToClear & MetadataType.MinimumMetadata) != MetadataType.None ? "" : (stream.tags[tagName] ?? ""),
                                 _ => (commandOptions.MetadataToClear & MetadataType.OtherMetadata) != MetadataType.None ? "" : (stream.tags[tagName] ?? ""),
                             };
                     }
@@ -520,6 +521,10 @@ namespace MovieMetadataEditor
                         foreach (var (metadataName, metadataValue) in specifiedMetadataList)
                             streamTags[metadataName] = metadataValue;
                     }
+
+                    // encoder および duration のメタデータは ffmpeg により自動的に設定されるため、再設定対象から除外する。
+                    _ = streamTags.Remove(_metadataNameEncoder);
+                    _ = streamTags.Remove(_metadataNameDuration);
 
                     var streamDispositions = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
                     foreach (var (dispositionName, dispositionValue) in stream.disposition.EnumerateDispositions())
@@ -575,7 +580,18 @@ namespace MovieMetadataEditor
 
                 var formatTags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var tagName in movieInformation.Format.Tags.EnumerateTagNames())
-                    formatTags[tagName] = (commandOptions.MetadataToClear & MetadataType.OtherMetadata) != MetadataType.None ? "" : movieInformation.Format.Tags[tagName] ?? "";
+                {
+                    formatTags[tagName] =
+                        tagName.ToUpperInvariant() switch
+                        {
+                            _ => (commandOptions.MetadataToClear & MetadataType.OtherMetadata) != MetadataType.None ? "" : movieInformation.Format.Tags[tagName] ?? "",
+                        };
+                }
+
+                // これらのメタデータは ffmpeg により自動的に設定されるため、再設定対象から除外する。
+                _ = formatTags.Remove(_metadataNameEncoder);
+                _ = formatTags.Remove(_metadataNameDuration);
+
                 foreach (var tag in formatTags)
                 {
                     if (tag.Value != (movieInformation.Format.Tags[tag.Key] ?? ""))
