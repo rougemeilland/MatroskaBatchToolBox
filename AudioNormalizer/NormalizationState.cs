@@ -503,12 +503,21 @@ namespace AudioNormalizer
                 metaeditCommandParameters.Add($"-if {inputFormat.CommandLineArgumentEncode()}");
             metaeditCommandParameters.Add($"-i {inputFile.FullName.CommandLineArgumentEncode()}");
 
+            // 0秒間または非常に短いチャプターの削除を抑止する指定
+            // これらを指定しないとチャプタータイトルがずれてしまう可能性がある
+            metaeditCommandParameters.Add("--keep_empty_chapter");
+            metaeditCommandParameters.Add("--minimum_duration 0");
+
             // 消去対象の設定
             metaeditCommandParameters.Add("-c");
+            metaeditCommandParameters.Add("-ccm");
 
             // チャプタータイトルの指定
             foreach (var chapter in movieFileInformation.Chapters.Select((chapter, index) => (index, title: chapter.Title)))
-                metaeditCommandParameters.Add($"-tt:{chapter.index} {chapter.title.CommandLineArgumentEncode()}");
+            {
+                if (!string.IsNullOrEmpty(chapter.title))
+                    metaeditCommandParameters.Add($"-tt:{chapter.index} {chapter.title.CommandLineArgumentEncode()}");
+            }
 
             // ストリームのメタデータ/dispositionの指定
             var streamMetadataNames = new[] { "title", "language", "encoder" };
