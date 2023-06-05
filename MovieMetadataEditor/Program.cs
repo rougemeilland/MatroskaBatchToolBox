@@ -55,7 +55,7 @@ namespace MovieMetadataEditor
         {
             bool IEqualityComparer<(string streamType, int streamIndex)>.Equals((string streamType, int streamIndex) x, (string streamType, int streamIndex) y)
                 => string.Equals(x.streamType, y.streamType, StringComparison.OrdinalIgnoreCase) &&
-                    x.streamIndex != y.streamIndex;
+                    x.streamIndex == y.streamIndex;
 
             int IEqualityComparer<(string streamType, int streamIndex)>.GetHashCode((string streamType, int streamIndex) obj)
                 => HashCode.Combine(obj.streamIndex, obj.streamIndex);
@@ -552,7 +552,8 @@ namespace MovieMetadataEditor
                         originalTags = stream.tags,
                         originalDisPosition = stream.disposition,
                     };
-                });
+                })
+                .ToList();
 
             var metadataFilePath = (string?)null;
             try
@@ -609,7 +610,8 @@ namespace MovieMetadataEditor
                     var dispositionSpecs = new List<string>();
                     foreach (var disposition in stream.disposition)
                     {
-                        if (disposition.Value != stream.originalDisPosition[disposition.Key])
+                        // default だけは 明示的に設定しないと必ず true になってしまう模様であるため、必ず設定する。
+                        if (string.Equals(disposition.Key, _dispositionNameDefault, StringComparison.OrdinalIgnoreCase) || disposition.Value != stream.originalDisPosition[disposition.Key])
                             dispositionSpecs.Add($"{(disposition.Value ? "+" : "-")}{disposition.Key.CommandLineArgumentEncode()}");
                     }
 

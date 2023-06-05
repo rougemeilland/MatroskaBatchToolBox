@@ -489,7 +489,8 @@ namespace AudioNormalizer
                         index = stream.IndexWithinAttachmentStream,
                         streamDispositions = stream.Disposition,
                         streamTags = stream.Tags,
-                    }));
+                    }))
+                .ToList();
 
             var metaeditCommandParameters = new List<string>();
 
