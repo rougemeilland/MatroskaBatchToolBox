@@ -351,7 +351,7 @@ namespace AudioNormalizer
                 // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームが存在する場合
 
                 if (_verbose)
-                    _informationMessageReporter($"Normalize the audio stream and encode it with \"libovorbis\". Because some audio stream channel layouts are not supported by \"libopus\".: {string.Join(", ", audioStreamsNotSupportedByLibOpus.Select(stream => $"a:{stream.IndexWithinAudioStream}(\"{stream.ChannelLayout}\")"))}");
+                    _informationMessageReporter($"Normalize the audio stream and encode it with \"libvorbis\". Because some audio stream channel layouts are not supported by \"libopus\".: {string.Join(", ", audioStreamsNotSupportedByLibOpus.Select(stream => $"a:{stream.IndexWithinAudioStream}(\"{stream.ChannelLayout}\")"))}");
 
                 var audioEncoder = "libvorbis";
 
