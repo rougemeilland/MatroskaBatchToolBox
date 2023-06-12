@@ -130,7 +130,7 @@ namespace AudioNormalizer
             return _fileFormat switch
             {
                 null => throw new InvalidOperationException(),
-                "wav" => ("pcm_s16le", Array.Empty<string>()),
+                "wav" => (MapPcmEncoder(sourceAudioStream.SampleFormat, sourceAudioStream.BitsPerRawSample), MapPcmEncoderOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.BitsPerRawSample)),
                 "mp3" => ("libmp3lame", new[] { "-q:a 0" }),
                 _ => throw Validation.GetFailErrorException($"_format == \"{_fileFormat}\""),
             };
@@ -142,6 +142,26 @@ namespace AudioNormalizer
                 throw new InvalidOperationException();
 
             return _fileFormat ?? throw new InvalidOperationException();
+        }
+
+        private static string MapPcmEncoder(AudioSampleFormat sampleFormat, int? bitsPerRawSample)
+            => sampleFormat switch
+            {
+                AudioSampleFormat.U8 or AudioSampleFormat.U8P => "pcm_u8",
+                AudioSampleFormat.S16 or AudioSampleFormat.S16P => "pcm_s16le",
+                AudioSampleFormat.S32 or AudioSampleFormat.S32P => bitsPerRawSample is null or <= 24 ? "pcm_s24le" : "pcm_s32le",
+                AudioSampleFormat.S64 or AudioSampleFormat.S64P => "pcm_s64le",
+                AudioSampleFormat.FLT or AudioSampleFormat.FLTP => "pcm_f32le",
+                AudioSampleFormat.DBL or AudioSampleFormat.DBLP => "pcm_f64le",
+                _ => "pcm_f32le",
+            };
+
+        private static IEnumerable<string> MapPcmEncoderOptions(int index, int? bitsPerRawSample)
+        {
+            if (bitsPerRawSample is null)
+                return Array.Empty<string>();
+            else
+                return new[] { $"-bits_per_raw_sample:a:{index} {bitsPerRawSample.Value}" };
         }
     }
 }

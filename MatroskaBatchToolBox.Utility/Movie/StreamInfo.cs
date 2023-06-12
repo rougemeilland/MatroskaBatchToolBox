@@ -1,5 +1,6 @@
 ﻿using System;
 using MatroskaBatchToolBox.Utility.Models.Json;
+using Palmtree;
 
 namespace MatroskaBatchToolBox.Utility.Movie
 {
@@ -16,6 +17,8 @@ namespace MatroskaBatchToolBox.Utility.Movie
             CodecLongName =
                 stream.CodecLongName
                 ?? throw new Exception("The \"codec_long_name\" property of the stream information is undefined.");
+            BitsPerRawSample =
+                stream.BitsPerRawSample is not null && stream.BitsPerRawSample.TryParse(out int bitsPerRawSample) ? bitsPerRawSample : null;
             Disposition = new StreamDisposition(stream.Disposition);
             Tags = new StreamTags(stream.Tags);
         }
@@ -23,6 +26,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
         public int Index { get; }
         public string CodecName { get; }
         public string CodecLongName { get; }
+        public int? BitsPerRawSample { get; }
         public StreamDisposition Disposition { get; }
         public StreamTags Tags { get; }
     }

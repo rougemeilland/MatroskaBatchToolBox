@@ -21,6 +21,9 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
         [JsonPropertyName("codec_type")]
         public string? CodecType { get; set; }
 
+        [JsonPropertyName("bits_per_raw_sample")]
+        public string? BitsPerRawSample { get; set; }
+
         [JsonPropertyName("disposition")]
         public MovieStreamDispositionContainer Disposition { get; set; }
 

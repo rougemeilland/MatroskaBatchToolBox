@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
 
@@ -45,6 +46,7 @@ namespace AudioNormalizer
                     _fileFormat = null;
                 }
             }
+
             _direction = direction;
         }
 
@@ -125,7 +127,7 @@ namespace AudioNormalizer
             return _fileFormat switch
             {
                 null => throw new InvalidOperationException(),
-                "flac" => ("flac", new[] { "-compression_level 12" }),
+                "flac" => ("flac", new[] { $"-compression_level:a:{sourceAudioStream.IndexWithinAudioStream} 12" }.Concat(MapEncoderOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.SampleFormat, sourceAudioStream.BitsPerRawSample))),
                 _ => throw Validation.GetFailErrorException($"_format == \"{_fileFormat}\""),
             };
         }
@@ -136,6 +138,46 @@ namespace AudioNormalizer
                 throw new InvalidOperationException();
 
             return _fileFormat ?? throw new InvalidOperationException();
+        }
+
+        private static IEnumerable<string> MapEncoderOptions(int index, AudioSampleFormat sampleFormat, int? bitsPerRawSample)
+        {
+            if (sampleFormat is AudioSampleFormat.S64 or AudioSampleFormat.S64P or AudioSampleFormat.DBL or AudioSampleFormat.DBLP ||
+                bitsPerRawSample is not null and > 24)
+            {
+                yield return $"-strict:a:{index} experimental";
+            }
+
+            switch (sampleFormat)
+            {
+                case AudioSampleFormat.U8:
+                case AudioSampleFormat.U8P:
+                case AudioSampleFormat.S16:
+                case AudioSampleFormat.S16P:
+                    yield return $"-sample_fmt:a:{index} s16";
+                    break;
+                case AudioSampleFormat.S32:
+                case AudioSampleFormat.S32P:
+                case AudioSampleFormat.S64:
+                case AudioSampleFormat.S64P:
+                case AudioSampleFormat.FLT:
+                case AudioSampleFormat.FLTP:
+                case AudioSampleFormat.DBL:
+                case AudioSampleFormat.DBLP:
+                    yield return $"-sample_fmt:a:{index} s32";
+                    break;
+                default:
+                    if (bitsPerRawSample is null or > 16)
+                        yield return $"-sample_fmt:a:{index} s32";
+                    else
+                        yield return $"-sample_fmt:a:{index} s16";
+                    break;
+            }
+
+            if (sampleFormat is AudioSampleFormat.FLT or AudioSampleFormat.FLTP)
+                yield return $" -bits_per_raw_sample:a:{index} 24";
+            else if (bitsPerRawSample != null)
+                yield return $" -bits_per_raw_sample:a:{index} {bitsPerRawSample}";
         }
     }
 }
