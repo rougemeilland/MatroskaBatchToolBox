@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using MatroskaBatchToolBox.Utility.Movie;
+using Microsoft.VisualBasic;
 using Palmtree;
 
 namespace AudioNormalizer
@@ -182,13 +183,14 @@ namespace AudioNormalizer
             {
                 return
                     sourceStreamInfo.ChannelLayout.IsNoneOf("5.0(side)", "5.1(side)")
-                    ? ("libopus",new[] { $"-b:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateBitRateForOpus(sourceStreamInfo.Channels) / 1000:F0}k" }.AsEnumerable())
+                    ? ("libopus",new[] { $"-b:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateBitRateForOpus(sourceStreamInfo.Channels) / 1000:F0}k" }.Append(MapLibopusSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)))
                     : throw new NotSupportedException($"The input music file cannot be converted to opus format. Because opus does not support channel layout \"{sourceStreamInfo.ChannelLayout}\".");
             }
 
             static (string encoder, IEnumerable<string> encoderOptions) GetVorbisEncoder(AudioStreamInfo sourceStreamInfo)
             {
-                return ("libvirbis", new[] { $"-q:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateLibVorbisQualityByBitRate(sourceStreamInfo.Channels * _bitratePerChannelForLibVorbis):F1}" });
+                return
+                    ("libvirbis", new[] { $"-q:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateLibVorbisQualityByBitRate(sourceStreamInfo.Channels * _bitratePerChannelForLibVorbis):F1}" }.Append(MapLibvorbisSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)));
             }
         }
 
@@ -200,7 +202,20 @@ namespace AudioNormalizer
             return _fileFormat ?? throw new InvalidOperationException();
         }
 
-        static double CalculateLibVorbisQualityByBitRate(int bitRate)
+        private static string MapLibopusSampleFormatOptions(int index, AudioSampleFormat sampleFormat)
+            => sampleFormat switch
+            {
+                AudioSampleFormat.U8 or AudioSampleFormat.U8P or AudioSampleFormat.S16 or AudioSampleFormat.S16P => $"-sample_fmt:a:{index} s16",
+                _ => $"-sample_fmt:a:{index} flt",
+            };
+
+        private static string MapLibvorbisSampleFormatOptions(int index, AudioSampleFormat sampleFormat)
+            => sampleFormat switch
+            {
+                _ => $"-sample_fmt:a:{index} fltp",
+            };
+
+        private static double CalculateLibVorbisQualityByBitRate(int bitRate)
         {
             // -1 <= q <= 4 : 16k * (q + 4) bps  (48k <= bps <= 128k)
             // 4 < q < 8    : 32k * q bps        (128k < bps < 256k)    
