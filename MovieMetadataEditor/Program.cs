@@ -516,15 +516,15 @@ namespace MovieMetadataEditor
                             };
                     }
 
+                    // encoder および duration のメタデータは ffmpeg により自動的に設定されるため、再設定対象から除外する。
+                    _ = streamTags.Remove(_metadataNameEncoder);
+                    _ = streamTags.Remove(_metadataNameDuration);
+
                     if (commandOptions.StreamMetadata.TryGetValue((stream.streamTypeSymbol, stream.index), out var specifiedMetadataList))
                     {
                         foreach (var (metadataName, metadataValue) in specifiedMetadataList)
                             streamTags[metadataName] = metadataValue;
                     }
-
-                    // encoder および duration のメタデータは ffmpeg により自動的に設定されるため、再設定対象から除外する。
-                    _ = streamTags.Remove(_metadataNameEncoder);
-                    _ = streamTags.Remove(_metadataNameDuration);
 
                     var streamDispositions = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
                     foreach (var (dispositionName, dispositionValue) in stream.disposition.EnumerateDispositions())

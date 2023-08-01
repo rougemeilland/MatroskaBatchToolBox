@@ -143,33 +143,55 @@ namespace AudioNormalizer
                 _warningMessageReporter("The \"--video_disable\" option is ignored for movie file normalization.");
 
             // 中間一時ファイルを作成する
-            var temporaryIntermediateFile = new FileInfo(Path.GetTempFileName());
-            var temporaryIntermediateFileFormat = outputFormat ?? "matroska";
+            var temporaryIntermediateFile1 = new FileInfo(Path.GetTempFileName());
+            var temporaryIntermediateFileFormat1 = outputFormat ?? "matroska";
+            var temporaryIntermediateFile2 = new FileInfo(Path.GetTempFileName());
+            var temporaryIntermediateFileFormat2 = outputFormat ?? "matroska";
             if (_verbose)
             {
-                _informationMessageReporter($"Temprary file is created.: \"{temporaryIntermediateFile.FullName}\"");
+                _informationMessageReporter($"Temprary file is created.: \"{temporaryIntermediateFile2.FullName}\"");
             }
 
             try
             {
+                // 正規化の前に、動画ファイルのオーディオストリームの encoder タグを消去する
+                // ※正規化の際にオーディオストリームの encoder タグが上書きされないので、最終的に encoder タグの値が不適切な値になってしまうのを防ぐため。
+                if (_verbose)
+                {
+                    _informationMessageReporter("Remove audio stream tags.");
+                    if (inputFormat is not null)
+                        _informationMessageReporter($"  Input file format: {inputFormat}");
+                    _informationMessageReporter($"  Input file format: \"{inputFile.FullName}\"");
+                    if (temporaryIntermediateFileFormat2 is not null)
+                        _informationMessageReporter($"  Output file format: {temporaryIntermediateFileFormat1}");
+                    _informationMessageReporter($"  Output file format: \"{temporaryIntermediateFile1.FullName}\"");
+                }
+
+                RemoveMetadataOfMovieFile(
+                    movieInformation,
+                    inputFormat,
+                    inputFile,
+                    temporaryIntermediateFileFormat1,
+                    temporaryIntermediateFile1);
+
                 // 動画ファイルの音声を正規化して中間一時ファイルに保存する
                 if (_verbose)
                 {
                     _informationMessageReporter("Start audio normalization.");
-                    if (inputFormat is not null)
-                        _informationMessageReporter($"  Input file format: {inputFormat}");
-                    _informationMessageReporter($"  Input file format: \"{inputFile.FullName}\"");
-                    if (temporaryIntermediateFileFormat is not null)
-                        _informationMessageReporter($"  Output file format: {temporaryIntermediateFileFormat}");
-                    _informationMessageReporter($"  Output file format: \"{temporaryIntermediateFile.FullName}\"");
+                    if (temporaryIntermediateFileFormat1 is not null)
+                        _informationMessageReporter($"  Input file format: {temporaryIntermediateFileFormat1}");
+                    _informationMessageReporter($"  Input file format: \"{temporaryIntermediateFile1.FullName}\"");
+                    if (temporaryIntermediateFileFormat2 is not null)
+                        _informationMessageReporter($"  Output file format: {temporaryIntermediateFileFormat2}");
+                    _informationMessageReporter($"  Output file format: \"{temporaryIntermediateFile2.FullName}\"");
                 }
 
                 NormalizeAudioStreamOfMovieFile(
                     movieInformation,
-                    inputFormat,
-                    inputFile,
-                    temporaryIntermediateFileFormat,
-                    temporaryIntermediateFile);
+                    temporaryIntermediateFileFormat1,
+                    temporaryIntermediateFile1,
+                    temporaryIntermediateFileFormat2,
+                    temporaryIntermediateFile2);
 
                 if (_verbose)
                     _informationMessageReporter("Audio normalization finished.");
@@ -178,9 +200,9 @@ namespace AudioNormalizer
                 if (_verbose)
                 {
                     _informationMessageReporter("Start restoring metadata.");
-                    if (temporaryIntermediateFileFormat is not null)
-                        _informationMessageReporter($"  Input file format: {temporaryIntermediateFileFormat}");
-                    _informationMessageReporter($"  Input file format: \"{temporaryIntermediateFile.FullName}\"");
+                    if (temporaryIntermediateFileFormat2 is not null)
+                        _informationMessageReporter($"  Input file format: {temporaryIntermediateFileFormat2}");
+                    _informationMessageReporter($"  Input file format: \"{temporaryIntermediateFile2.FullName}\"");
                     if (outputFormat is not null)
                         _informationMessageReporter($"  Output file format: {outputFormat}");
                     _informationMessageReporter($"  Output file format: \"{outputFile.FullName}\"");
@@ -188,8 +210,8 @@ namespace AudioNormalizer
 
                 SetMetadataOfMovieFile(
                     movieInformation,
-                    temporaryIntermediateFileFormat,
-                    temporaryIntermediateFile,
+                    temporaryIntermediateFileFormat2,
+                    temporaryIntermediateFile2,
                     outputFormat,
                     outputFile);
 
@@ -198,16 +220,19 @@ namespace AudioNormalizer
             }
             finally
             {
-                if (temporaryIntermediateFile is not null)
+                foreach (var temporaryIntermediateFile in new[] { temporaryIntermediateFile1, temporaryIntermediateFile2 })
                 {
-                    try
+                    if (temporaryIntermediateFile is not null)
                     {
-                        File.Delete(temporaryIntermediateFile.FullName);
-                        if (_verbose)
-                            _informationMessageReporter($"Temporary file is deleted.: \"{temporaryIntermediateFile.FullName}\"");
-                    }
-                    catch (Exception)
-                    {
+                        try
+                        {
+                            File.Delete(temporaryIntermediateFile.FullName);
+                            if (_verbose)
+                                _informationMessageReporter($"Temporary file is deleted.: \"{temporaryIntermediateFile.FullName}\"");
+                        }
+                        catch (Exception)
+                        {
+                        }
                     }
                 }
             }
@@ -338,6 +363,65 @@ namespace AudioNormalizer
             }
         }
 
+        private void RemoveMetadataOfMovieFile(MovieInformation movieFileInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
+        {
+            var metaeditCommandParameters = new List<string>();
+
+            if (_verbose)
+                metaeditCommandParameters.Add("-v");
+            metaeditCommandParameters.Add("-f");
+
+            // 入力方法の指定
+            if (inputFormat is not null)
+                metaeditCommandParameters.Add($"-if {inputFormat.CommandLineArgumentEncode()}");
+            metaeditCommandParameters.Add($"-i {inputFile.FullName.CommandLineArgumentEncode()}");
+
+            // ストリームのメタデータの指定
+            foreach (var stream in movieFileInformation.AudioStreams)
+            {
+                // ストリームのメタデータの指定 (オーディオの正規化により変化するため、オーディオストリームの "encoder" メタデータは除く)
+                foreach (var metadataName in new[] { "encoder", "duration" })
+                {
+                    var metadataValue = stream.Tags[metadataName];
+                    if (metadataValue is not null)
+                        metaeditCommandParameters.Add($"-s:a:{stream.IndexWithinAudioStream} {metadataName.CommandLineArgumentEncode()}=");
+                }
+            }
+
+            // 出力方法の指定
+            if (outputFormat is not null)
+                metaeditCommandParameters.Add($"-of {outputFormat.CommandLineArgumentEncode()}");
+            metaeditCommandParameters.Add($"-o {outputFile.FullName.CommandLineArgumentEncode()}");
+
+            var metaeditCommandParameterText = string.Join(" ", metaeditCommandParameters);
+            var exitCode =
+                Command.ExecuteCommand(
+                    _metaeditCommandFile,
+                    metaeditCommandParameterText,
+                    Encoding.UTF8,
+                    null,
+                    null,
+                    null,
+                    (level, message) =>
+                    {
+                        switch (level)
+                        {
+                            case "WARNING":
+                                _warningMessageReporter(message);
+                                break;
+                            case "ERROR":
+                                _errorMessageReporter(message);
+                                break;
+                            default:
+                                // NOP
+                                break;
+                        }
+                    },
+                    null);
+            if (exitCode != 0)
+                throw new Exception($"An error occurred in the \"{Path.GetFileNameWithoutExtension(_metaeditCommandFile.Name)}\" command. : exit-code={exitCode}");
+        }
+
         private void NormalizeAudioStreamOfMovieFile(MovieInformation movieFileInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
         {
             // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームを抽出する
@@ -412,7 +496,7 @@ namespace AudioNormalizer
             normalizerCommandParameters.Add("-pr");
             normalizerCommandParameters.Add("--keep-loudness-range-target");
             if (inputFormat is not null)
-                normalizerCommandParameters.Add($"-ei={string.Join(" ", new[] { "-f", $"\"{inputFormat}\"" }).CommandLineArgumentEncode()}");
+                normalizerCommandParameters.Add($"-ei={string.Join(" ", new[] { "-f", $"{inputFormat.CommandLineArgumentEncode()}" }).CommandLineArgumentEncode()}");
             normalizerCommandParameters.Add(inputFile.FullName.CommandLineArgumentEncode());
             if (exceptVideoStream)
                 normalizerCommandParameters.Add("-vn");
@@ -490,6 +574,24 @@ namespace AudioNormalizer
                         streamDispositions = stream.Disposition,
                         streamTags = stream.Tags,
                     }))
+                .Select(stream =>
+                {
+                    // audio ストリームの encoder および duration タグはオーディオの正規化によって変化するため、復元対象から除外する。
+                    var newStreamTags = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var tagName in stream.streamTags.EnumerateTagNames())
+                    {
+                        if (!(stream.streamTypeSymbol == "a" && (string.Equals(tagName, "encoder", StringComparison.OrdinalIgnoreCase) || string.Equals(tagName, "duration", StringComparison.OrdinalIgnoreCase))))
+                            newStreamTags.Add(tagName, stream.streamTags[tagName]);
+                    }
+
+                    return new
+                    {
+                        stream.streamTypeSymbol,
+                        stream.index,
+                        stream.streamDispositions,
+                        streamTags = newStreamTags,
+                    };
+                })
                 .ToList();
 
             var metaeditCommandParameters = new List<string>();
@@ -527,8 +629,11 @@ namespace AudioNormalizer
                 // ストリームのメタデータの指定 (オーディオの正規化により変化するため、オーディオストリームの "encoder" メタデータは除く)
                 foreach (var metadataName in streamMetadataNames)
                 {
-                    if (!(stream.streamTypeSymbol == "a" && metadataName == "encoder"))
-                        metaeditCommandParameters.Add($"-s:{stream.streamTypeSymbol}:{stream.index} {metadataName.CommandLineArgumentEncode()}={(stream.streamTags[metadataName] ?? "").CommandLineArgumentEncode()}");
+                    if (stream.streamTags.TryGetValue(metadataName, out var metadataValue) &&
+                        !(stream.streamTypeSymbol == "a" && metadataName == "encoder"))
+                    {
+                        metaeditCommandParameters.Add($"-s:{stream.streamTypeSymbol}:{stream.index} {metadataName.CommandLineArgumentEncode()}={(metadataValue ?? "").CommandLineArgumentEncode()}");
+                    }
                 }
 
                 // ストリームの disposition の指定
@@ -620,7 +725,7 @@ namespace AudioNormalizer
                     ffmpegCommandParameters.Add($"-map 1:a:{stream.IndexWithinAudioStream}");
                     var tags =
                         stream.Tags.EnumerateTagNames()
-                        .ToDictionary(tagName => tagName, tagName => tagName == "encoder" ? stream.Tags[tagName] ?? "" : "");
+                        .ToDictionary(tagName => tagName, tagName => string.Equals(tagName, "encoder", StringComparison.OrdinalIgnoreCase) ? stream.Tags[tagName] ?? "" : "");
                     foreach ((var metadataName, var metadataValue) in _outputFlleProvider.GetStreamMetadata(metadata))
                         tags[metadataName] = metadataValue;
                     foreach (var tag in tags)
@@ -635,7 +740,7 @@ namespace AudioNormalizer
                         ffmpegCommandParameters.Add($"-disposition:v:{stream.IndexWithinVideoStream} +attached_pic");
                         var tags =
                             stream.Tags.EnumerateTagNames()
-                            .ToDictionary(tagName => tagName, tagName => tagName == "encoder" ? stream.Tags[tagName] ?? "" : "");
+                            .ToDictionary(tagName => tagName, tagName => string.Equals(tagName, "encoder", StringComparison.OrdinalIgnoreCase) ? stream.Tags[tagName] ?? "" : "");
                         tags["comment"] = "Cover (front)";
                         foreach (var tag in tags)
                             ffmpegCommandParameters.Add($"-metadata:s:v:{stream.IndexWithinVideoStream} {tag.Key}={tag.Value.CommandLineArgumentEncode()}");
