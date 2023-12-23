@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using MatroskaBatchToolBox.Utility;
-using Palmtree;
+using Palmtree.Numerics;
 
 namespace ChapterConverter
 {

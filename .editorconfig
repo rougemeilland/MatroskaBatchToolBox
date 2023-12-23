@@ -51,13 +51,13 @@ dotnet_style_object_initializer = true:warning
 dotnet_style_operator_placement_when_wrapping = beginning_of_line
 dotnet_style_prefer_auto_properties = true:suggestion
 dotnet_style_prefer_compound_assignment = true
-dotnet_style_prefer_conditional_expression_over_assignment = true
+dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
 dotnet_style_prefer_conditional_expression_over_return = true
 dotnet_style_prefer_foreach_explicit_cast_in_source = when_strongly_typed
 dotnet_style_prefer_inferred_anonymous_type_member_names = true
 dotnet_style_prefer_inferred_tuple_names = true
-dotnet_style_prefer_is_null_check_over_reference_equality_method = true
-dotnet_style_prefer_simplified_boolean_expressions = false
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+dotnet_style_prefer_simplified_boolean_expressions = true:warning
 dotnet_style_prefer_simplified_interpolation = true
 
 # フィールド設定
@@ -70,7 +70,7 @@ dotnet_code_quality_unused_parameters = all
 dotnet_remove_unnecessary_suppression_exclusions = none
 
 # 改行設定
-dotnet_style_allow_multiple_blank_lines_experimental = false:suggestion
+dotnet_style_allow_multiple_blank_lines_experimental = false:warning
 dotnet_style_allow_statement_immediately_after_block_experimental = false:suggestion
 
 #### C# コーディング規則 ####
@@ -81,11 +81,11 @@ csharp_style_var_for_built_in_types = true
 csharp_style_var_when_type_is_apparent = true
 
 # 式のようなメンバー
-csharp_style_expression_bodied_accessors = true:suggestion
-csharp_style_expression_bodied_constructors = true:suggestion
-csharp_style_expression_bodied_indexers = true:suggestion
+csharp_style_expression_bodied_accessors = when_on_single_line:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+csharp_style_expression_bodied_indexers = when_on_single_line:suggestion
 csharp_style_expression_bodied_lambdas = true:suggestion
-csharp_style_expression_bodied_local_functions = false:suggestion
+csharp_style_expression_bodied_local_functions = when_on_single_line:suggestion
 csharp_style_expression_bodied_methods = true:suggestion
 csharp_style_expression_bodied_operators = true:suggestion
 csharp_style_expression_bodied_properties = true:suggestion
@@ -105,12 +105,14 @@ csharp_style_conditional_delegate_call = true
 csharp_prefer_static_local_function = true
 csharp_preferred_modifier_order = public,private,protected,internal,file,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,required,volatile,async
 csharp_style_prefer_readonly_struct = true
+csharp_style_prefer_readonly_struct_member = true
 
 # コード ブロックの設定
-csharp_prefer_braces = when_multiline:suggestion
+csharp_prefer_braces = when_multiline:warning
 csharp_prefer_simple_using_statement = true
 csharp_style_namespace_declarations = block_scoped:warning
-csharp_style_prefer_method_group_conversion = true:suggestion
+csharp_style_prefer_method_group_conversion = false:warning
+csharp_style_prefer_primary_constructors = true
 csharp_style_prefer_top_level_statements = false:warning
 
 # 式レベルの設定
@@ -120,13 +122,13 @@ csharp_style_implicit_object_creation_when_type_is_apparent = true
 csharp_style_inlined_variable_declaration = true
 csharp_style_prefer_index_operator = true
 csharp_style_prefer_local_over_anonymous_function = true
-csharp_style_prefer_null_check_over_type_check = true
+csharp_style_prefer_null_check_over_type_check = true:warning
 csharp_style_prefer_range_operator = true
 csharp_style_prefer_tuple_swap = true:warning
 csharp_style_prefer_utf8_string_literals = true
 csharp_style_throw_expression = true
-csharp_style_unused_value_assignment_preference = discard_variable:warning
-csharp_style_unused_value_expression_statement_preference = discard_variable:warning
+csharp_style_unused_value_assignment_preference = discard_variable
+csharp_style_unused_value_expression_statement_preference = discard_variable:suggestion
 
 # 'using' ディレクティブの基本設定
 csharp_using_directive_placement = outside_namespace:warning

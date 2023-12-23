@@ -4,11 +4,16 @@ using System.Linq;
 using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using Palmtree;
+using Palmtree.Linq;
+using Palmtree.Numerics;
 
 namespace MovieMetadataEditor
 {
     partial class Program
     {
+        private static readonly char[] anyOfPlusOrMinus = new[] { '+', '-' };
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1861:引数として定数配列を使用しない", Justification = "<保留中>")]
         private static CommandOptionDefinition<OptionType>[] GetOptionDefinitions()
             => new CommandOptionDefinition<OptionType>[]
             {
@@ -165,7 +170,7 @@ namespace MovieMetadataEditor
                             {
                                 try
                                 {
-                                    return new object[] { arg.ParseAsChapterStartTimes().ToReadOnlyArray() };
+                                    return new object[] { arg.ParseAsChapterStartTimes().ToArray().AsEnumerable() };
                                 }
                                 catch (Exception ex)
                                 {
@@ -234,7 +239,7 @@ namespace MovieMetadataEditor
                     },
                     // 同一オプションかつ同一インデックスの重複のみ NG
                     (option, otherOpton) =>
-                        !(option.OptionType == otherOpton.OptionType && option.OptionParameter[1].Equals(otherOpton.OptionParameter[1])),
+                        !(option.OptionType == otherOpton.OptionType && option.OptionParameter.Span[1].Equals(otherOpton.OptionParameter.Span[1])),
                     // 常に OK (必須ではない)
                     (options) => null,
                     "--chapter_title:<chapter number> <chapter title>  or  -tt:<chapter number> <chapter title>",
@@ -290,7 +295,7 @@ namespace MovieMetadataEditor
                     },
                     // 同一オプションかつ同一タイプかつ同一インデックスかつ同一メタデータ名の重複のみ NG
                     (option, otherOpton) =>
-                        !(option.OptionType == otherOpton.OptionType && option.OptionParameter[1].Equals(otherOpton.OptionParameter[1]) && option.OptionParameter[2].Equals(otherOpton.OptionParameter[2]) && option.OptionParameter[3].Equals(otherOpton.OptionParameter[3])),
+                        !(option.OptionType == otherOpton.OptionType && option.OptionParameter.Span[1].Equals(otherOpton.OptionParameter.Span[1]) && option.OptionParameter.Span[2].Equals(otherOpton.OptionParameter.Span[2]) && option.OptionParameter.Span[3].Equals(otherOpton.OptionParameter.Span[3])),
                     // 常に OK (必須ではない)
                     (options) => null,
                     "--stream_metadata:<stream type>:<stream index> <metadata name>=<metadata value>  or  -s:<stream type>:<stream index> <metadata name>=<metadata value>",
@@ -355,7 +360,7 @@ namespace MovieMetadataEditor
                     },
                     // 同一オプションかつ同一タイプかつ同一インデックスの重複のみ NG
                     (option, otherOpton) =>
-                        !(option.OptionType == otherOpton.OptionType && option.OptionParameter[1].Equals(otherOpton.OptionParameter[1]) && option.OptionParameter[2].Equals(otherOpton.OptionParameter[2])),
+                        !(option.OptionType == otherOpton.OptionType && option.OptionParameter.Span[1].Equals(otherOpton.OptionParameter.Span[1]) && option.OptionParameter.Span[2].Equals(otherOpton.OptionParameter.Span[2])),
                     // 常に OK (必須ではない)
                     (options) => null,
                     "--stream_disposition:<stream type>:<stream index> <disposition spec>  or  -d:<stream type>:<stream index> <disposition spec>",
@@ -704,7 +709,7 @@ namespace MovieMetadataEditor
                     throw new Exception();
                 var value = sourceStr[index] == '+';
                 ++index;
-                var nextIndex = sourceStr.IndexOfAny(new[] { '+', '-' }, index);
+                var nextIndex = sourceStr.IndexOfAny(anyOfPlusOrMinus, index);
                 if (nextIndex < 0)
                     nextIndex = sourceStr.Length;
                 var name = sourceStr[index..nextIndex];

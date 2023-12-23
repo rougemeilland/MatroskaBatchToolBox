@@ -7,6 +7,9 @@ using System.Text.RegularExpressions;
 using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.Numerics;
+using Palmtree.IO;
+using Palmtree.IO.Console;
 
 namespace ChapterConverter
 {
@@ -393,8 +396,8 @@ namespace ChapterConverter
                 {
                     using var reader =
                         inputFilePath is null
-                        ? new StreamReader(TinyConsole.OpenStandardInput(), Encoding.UTF8)
-                        : new StreamReader(inputFilePath, Encoding.UTF8);
+                        ? TinyConsole.OpenStandardInput().AsTextReader(Encoding.UTF8)
+                        : new FilePath(inputFilePath).OpenRead().AsTextReader(Encoding.UTF8);
                     return reader.ReadToEnd();
                 }
             }
@@ -412,8 +415,10 @@ namespace ChapterConverter
                 var utf8EncodingWithoutBOM = new UTF8Encoding(false);
                 using var writer =
                     outputFilePath is null
-                    ? new StreamWriter(TinyConsole.OpenStandardOutput(), utf8EncodingWithoutBOM)
-                    : new StreamWriter(new FileStream(outputFilePath, force ? FileMode.Create : FileMode.CreateNew, FileAccess.Write, FileShare.None), utf8EncodingWithoutBOM);
+                    ? TinyConsole.OpenStandardOutput().AsTextWriter(utf8EncodingWithoutBOM)
+                    : force
+                    ? new FilePath(outputFilePath).CreateText(utf8EncodingWithoutBOM)
+                    : new FilePath(outputFilePath).CreateNewText(utf8EncodingWithoutBOM);
                 writer.Write(outputRawText);
                 return true;
             }

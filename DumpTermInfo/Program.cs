@@ -1,5 +1,5 @@
 ﻿using System;
-using Palmtree.Terminal;
+using Palmtree.IO.Console;
 
 namespace DumpTermInfo
 {

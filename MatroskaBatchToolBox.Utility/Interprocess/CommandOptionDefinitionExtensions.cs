@@ -26,7 +26,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         /// コマンドラインの構文に誤りがあった場合にスローされます。
         /// この例外のメッセージを適切な方法で利用者に通知してください。
         /// </exception>
-        public static IEnumerable<CommandOption<COMMAND_OPTION_TYPE_T>> ParseCommandArguments<COMMAND_OPTION_TYPE_T>(this IEnumerable<CommandOptionDefinition<COMMAND_OPTION_TYPE_T>> definitions, IReadOnlyArray<string> args)
+        public static IEnumerable<CommandOption<COMMAND_OPTION_TYPE_T>> ParseCommandArguments<COMMAND_OPTION_TYPE_T>(this IEnumerable<CommandOptionDefinition<COMMAND_OPTION_TYPE_T>> definitions, ReadOnlyMemory<string> args)
             where COMMAND_OPTION_TYPE_T : Enum
         {
             var indexedDefinitions = definitions.ToDictionary(definition => definition.OptionType, definition => definition);
@@ -54,22 +54,22 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             return options;
         }
 
-        private static IEnumerable<CommandOption<COMMAND_OPTION_TYPE_T>> EnumerateOptions<COMMAND_OPTION_TYPE_T>(this IEnumerable<CommandOptionDefinition<COMMAND_OPTION_TYPE_T>> definitions, IReadOnlyArray<string> args)
+        private static IEnumerable<CommandOption<COMMAND_OPTION_TYPE_T>> EnumerateOptions<COMMAND_OPTION_TYPE_T>(this IEnumerable<CommandOptionDefinition<COMMAND_OPTION_TYPE_T>> definitions, ReadOnlyMemory<string> args)
             where COMMAND_OPTION_TYPE_T : Enum
         {
             for (var index = 0; index < args.Length; ++index)
             {
-                var matchedDefinitions = definitions.Where(definition => definition.IsMatch(args[index])).ToArray();
+                var matchedDefinitions = definitions.Where(definition => definition.IsMatch(args.Span[index])).ToArray();
                 if (matchedDefinitions.Length <= 0)
-                    throw new InvalidCommandOptionException($"Unsupported argument: \"{args[index]}\"");
+                    throw new InvalidCommandOptionException($"Unsupported argument: \"{args.Span[index]}\"");
                 Validation.Assert(matchedDefinitions.Length <= 1, "matchedDefinitions.Length <= 1");
                 var matchedDefinition = matchedDefinitions[0];
                 yield return
                     index + matchedDefinition.OptionParameters < args.Length
                     ? matchedDefinition.ParseArguments(
-                        args[index],
-                        args.AsMemory(index + 1, matchedDefinition.OptionParameters))
-                    : throw new InvalidCommandOptionException($"Not enough arguments.: [{string.Join(", ", args.Skip(index).Select(arg => $"\"{arg.Replace(@"\", @"\\").Replace(@"""", @"\""")}\""))}]");
+                        args.Span[index],
+                        args.Slice(index + 1, matchedDefinition.OptionParameters))
+                    : throw new InvalidCommandOptionException($"Not enough arguments.: [{string.Join(", ", args.Slice(index, args.Length - 1).GetSequence().Select(arg => $"\"{arg.Replace(@"\", @"\\").Replace(@"""", @"\""")}\""))}]");
                 index += matchedDefinition.OptionParameters;
             }
         }

@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Palmtree;
+using System.Linq;
 
 namespace MatroskaBatchToolBox.Utility.Interprocess
 {
@@ -17,7 +17,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         {
             OptionType = optionType;
             OptionName = optionName;
-            OptionParameter = optionParameter.ToReadOnlyArray();
+            OptionParameter = optionParameter.ToArray();
         }
 
         /// <summary>
@@ -33,6 +33,6 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         /// <summary>
         /// オプションの追加パラメタです。
         /// </summary>
-        public IReadOnlyArray<object> OptionParameter { get; }
+        public ReadOnlyMemory<object> OptionParameter { get; }
     }
 }

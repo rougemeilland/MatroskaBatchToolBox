@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MatroskaBatchToolBox.Properties;
 using Palmtree;
+using Palmtree.IO.Console;
 
 namespace MatroskaBatchToolBox
 {

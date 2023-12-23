@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using MatroskaBatchToolBox.Utility.Movie;
-using Microsoft.VisualBasic;
 using Palmtree;
+using Palmtree.Linq;
 
 namespace AudioNormalizer
 {
@@ -182,8 +182,8 @@ namespace AudioNormalizer
             static (string encoder, IEnumerable<string> encoderOptions) GetOpusEncoder(AudioStreamInfo sourceStreamInfo)
             {
                 return
-                    sourceStreamInfo.ChannelLayout.IsNoneOf("5.0(side)", "5.1(side)")
-                    ? ("libopus",new[] { $"-b:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateBitRateForOpus(sourceStreamInfo.Channels) / 1000:F0}k" }.Append(MapLibopusSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)))
+                    sourceStreamInfo.ChannelLayout is null || sourceStreamInfo.ChannelLayout.IsNoneOf("5.0(side)", "5.1(side)")
+                    ? ("libopus", new[] { $"-b:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateBitRateForOpus(sourceStreamInfo.Channels) / 1000:F0}k" }.Append(MapLibopusSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)))
                     : throw new NotSupportedException($"The input music file cannot be converted to opus format. Because opus does not support channel layout \"{sourceStreamInfo.ChannelLayout}\".");
             }
 

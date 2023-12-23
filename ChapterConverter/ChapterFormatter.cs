@@ -49,7 +49,7 @@ namespace ChapterConverter
 
         IEnumerable<SimpleChapterElement> IChapterFormatter.Parse(string rawText)
         {
-            var chapters = Parse(rawText).ToReadOnlyArray();
+            var chapters = Parse(rawText).ToArray();
 
             if (chapters.Length > 0 && chapters[0].StartTime != TimeSpan.Zero)
                 Parameter.ReportWarningMessage($"The time of the first chapter in the input data is not zero.: start-time=\"{chapters[0].StartTime.TotalSeconds:F6}\"");

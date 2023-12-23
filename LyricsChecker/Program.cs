@@ -9,6 +9,8 @@ using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.IO.Console;
+using Palmtree.Numerics;
 
 namespace LyricsChecker
 {
@@ -231,7 +233,7 @@ namespace LyricsChecker
                         if (string.IsNullOrEmpty(previousLyricsText))
                             TinyConsole.Out.WriteLine($"Consecutive lines with no lyrics found.: \"{lyricsFile.FullName}\"");
                         previousLyricsText = "";
-                            ok = false;
+                        ok = false;
                     }
                     else
                     {

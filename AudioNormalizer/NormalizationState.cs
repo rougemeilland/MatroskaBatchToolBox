@@ -7,14 +7,16 @@ using System.Text;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.Linq;
+using Palmtree.IO;
 
 namespace AudioNormalizer
 {
     internal class NormalizationState
     {
         private const string _ffmpegPathEnvironmentVariableName = "FFMPEG_PATH";
-        private static readonly FileInfo _ffmpegCommandFile;
-        private static readonly FileInfo _metaeditCommandFile;
+        private static readonly FilePath _ffmpegCommandFile;
+        private static readonly FilePath _metaeditCommandFile;
         private readonly IMusicFileMetadataProvider? _inputFlleProvider;
         private readonly IMusicFileMetadataProvider? _outputFlleProvider;
         private readonly string? _musicFileEncoder;
@@ -22,7 +24,7 @@ namespace AudioNormalizer
         private readonly bool _doOverwrite;
         private readonly bool _verbose;
         private readonly bool _disableVideoStream;
-        private readonly Action<Stream, Stream, long> _streamCopier;
+        private readonly Action<ISequentialInputByteStream, ISequentialOutputByteStream, ulong> _streamCopier;
         private readonly Action<string> _informationMessageReporter;
         private readonly Action<string> _warningMessageReporter;
         private readonly Action<string, string> _warningMessageReporter2;
@@ -31,9 +33,9 @@ namespace AudioNormalizer
 
         static NormalizationState()
         {
-            _ffmpegCommandFile = new FileInfo(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException($"ffmpeg is not installed."));
+            _ffmpegCommandFile = new FilePath(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException($"ffmpeg is not installed."));
             var metaeditCommandName = Path.GetFileNameWithoutExtension(typeof(MovieMetadataEditor.Program).Assembly.Location);
-            _metaeditCommandFile = new FileInfo(ProcessUtility.WhereIs(metaeditCommandName) ?? throw new FileNotFoundException($"{metaeditCommandName} is not installed."));
+            _metaeditCommandFile = new FilePath(ProcessUtility.WhereIs(metaeditCommandName) ?? throw new FileNotFoundException($"{metaeditCommandName} is not installed."));
         }
 
         public NormalizationState(
@@ -44,7 +46,7 @@ namespace AudioNormalizer
             bool doOverwrite,
             bool verbose,
             bool disableVideoStream,
-            Action<Stream, Stream, long> streamCopier,
+            Action<ISequentialInputByteStream, ISequentialOutputByteStream, ulong> streamCopier,
             Action<string> informationMessageReporter,
             Action<string> warningMessageReporter,
             Action<string, string> warningMessageReporter2,
@@ -66,7 +68,7 @@ namespace AudioNormalizer
             _musicFileEncoderOption = musicFileEncoderOption;
         }
 
-        public void NormalizeFile(string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
+        public void NormalizeFile(string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
         {
             // 入力動画ファイルの情報を取得する
             var movieInformation = GetMovieInformation(inputFormat, inputFile);
@@ -97,7 +99,7 @@ namespace AudioNormalizer
             }
         }
 
-        private void CopyFile(string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
+        private void CopyFile(string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
         {
             // 出力先に単純コピーする
 
@@ -125,7 +127,7 @@ namespace AudioNormalizer
                 _informationMessageReporter("Copy finished.");
         }
 
-        private void NormalizeMovieFile(MovieInformation movieInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
+        private void NormalizeMovieFile(MovieInformation movieInformation, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
         {
             // 入力ファイルが動画ファイルであると判断し、オーディオストリームの正規化と共に以下の処理を行う。
             // - オーディオストリームのコーデックを opus/vorbis に変更する
@@ -143,9 +145,9 @@ namespace AudioNormalizer
                 _warningMessageReporter("The \"--video_disable\" option is ignored for movie file normalization.");
 
             // 中間一時ファイルを作成する
-            var temporaryIntermediateFile1 = new FileInfo(Path.GetTempFileName());
+            var temporaryIntermediateFile1 = new FilePath(Path.GetTempFileName());
             var temporaryIntermediateFileFormat1 = outputFormat ?? "matroska";
-            var temporaryIntermediateFile2 = new FileInfo(Path.GetTempFileName());
+            var temporaryIntermediateFile2 = new FilePath(Path.GetTempFileName());
             var temporaryIntermediateFileFormat2 = outputFormat ?? "matroska";
             if (_verbose)
             {
@@ -238,7 +240,7 @@ namespace AudioNormalizer
             }
         }
 
-        private void NormalizeMusicFile(MovieInformation musicFileInfo, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
+        private void NormalizeMusicFile(MovieInformation musicFileInfo, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
         {
             // 入力ファイルが音楽ファイルであると判断し、オーディオストリームの正規化と共に以下の処理を行う。
             // - オーディオストリームのコーデックを出力先フォーマットに応じて変更する
@@ -255,7 +257,7 @@ namespace AudioNormalizer
                 throw new Exception("Output file format is unknown.");
 
             // 中間一時ファイルを作成する
-            var temporaryIntermediateFile = new FileInfo(Path.GetTempFileName());
+            var temporaryIntermediateFile = new FilePath(Path.GetTempFileName());
             var temporaryIntermediateFileFormat = outputFormat ?? _outputFlleProvider.GuessFileFormat();
             if (_verbose)
             {
@@ -331,7 +333,7 @@ namespace AudioNormalizer
             }
         }
 
-        private MovieInformation GetMovieInformation(string? inputFormat, FileInfo inputFile)
+        private MovieInformation GetMovieInformation(string? inputFormat, FilePath inputFile)
         {
             if (_verbose)
                 _informationMessageReporter($"Probe movie information.: \"{inputFile.FullName}\"");
@@ -363,7 +365,7 @@ namespace AudioNormalizer
             }
         }
 
-        private void RemoveMetadataOfMovieFile(MovieInformation movieFileInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
+        private void RemoveMetadataOfMovieFile(MovieInformation movieFileInformation, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
         {
             var metaeditCommandParameters = new List<string>();
 
@@ -422,12 +424,12 @@ namespace AudioNormalizer
                 throw new Exception($"An error occurred in the \"{Path.GetFileNameWithoutExtension(_metaeditCommandFile.Name)}\" command. : exit-code={exitCode}");
         }
 
-        private void NormalizeAudioStreamOfMovieFile(MovieInformation movieFileInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
+        private void NormalizeAudioStreamOfMovieFile(MovieInformation movieFileInformation, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
         {
             // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームを抽出する
             var audioStreamsNotSupportedByLibOpus =
                 movieFileInformation.AudioStreams
-                .Where(stream => stream.ChannelLayout.IsAnyOf("5.0(side)", "5.1(side)"))
+                .Where(stream => stream.ChannelLayout is not null && stream.ChannelLayout.IsAnyOf("5.0(side)", "5.1(side)"))
                 .ToList();
 
             if (audioStreamsNotSupportedByLibOpus.Any())
@@ -467,7 +469,7 @@ namespace AudioNormalizer
             }
         }
 
-        private void NormalizeAudioStreamOfMusicFile(MovieInformation musicFileInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
+        private void NormalizeAudioStreamOfMusicFile(MovieInformation musicFileInformation, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
         {
             Validation.Assert(_inputFlleProvider is not null, "_inputFlleProvider is not null");
             Validation.Assert(_outputFlleProvider is not null, "_outputFlleProvider is not null");
@@ -480,7 +482,7 @@ namespace AudioNormalizer
             ExecuteFfpegNormaize(inputFormat, inputFile, outputFormat, outputFile, encoder, encoderOptions, true);
         }
 
-        private void ExecuteFfpegNormaize(string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile, string audioEncoder, IEnumerable<string> audioEncoderOptions, bool exceptVideoStream)
+        private void ExecuteFfpegNormaize(string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile, string audioEncoder, IEnumerable<string> audioEncoderOptions, bool exceptVideoStream)
         {
             var ffmpegCommandFilePath =
                 ProcessUtility.WhereIs("ffmpeg")
@@ -527,7 +529,7 @@ namespace AudioNormalizer
                 _informationMessageReporter($"Audio streams normalization is complete.");
         }
 
-        private void SetMetadataOfMovieFile(MovieInformation movieFileInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile)
+        private void SetMetadataOfMovieFile(MovieInformation movieFileInformation, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
         {
             var streams =
                 movieFileInformation.VideoStreams
@@ -677,7 +679,7 @@ namespace AudioNormalizer
                 throw new Exception($"An error occurred in the \"{Path.GetFileNameWithoutExtension(_metaeditCommandFile.Name)}\" command. : exit-code={exitCode}");
         }
 
-        private void SetMetadataOfMusicFile(MovieInformation musicFileInfo, MovieInformation normalizedMusicFileInfo, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile, MusicFileMetadata metadata)
+        private void SetMetadataOfMusicFile(MovieInformation musicFileInfo, MovieInformation normalizedMusicFileInfo, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile, MusicFileMetadata metadata)
         {
             Validation.Assert(_inputFlleProvider is not null, "_inputFlleProvider is not null");
             Validation.Assert(_outputFlleProvider is not null, "_outputFlleProvider is not null");

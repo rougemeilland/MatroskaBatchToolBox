@@ -6,6 +6,7 @@ using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox
 {
@@ -746,7 +747,7 @@ namespace MatroskaBatchToolBox
                 // 解像度指定で終わっている、または次がコメントである場合
 
                 // 解像度から整数比を求めてそれをアスペクト比とする。
-                var gcd = Numerics.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
+                var gcd = resolutionWidth.GreatestCommonDivisor(resolutionHeight);
                 var aspectRatioWidth = resolutionWidth / gcd;
                 var aspectRatioHeight = resolutionHeight / gcd;
                 return (true, $"{resolutionWidth}x{resolutionHeight}", $"{aspectRatioWidth}:{aspectRatioHeight}", null);

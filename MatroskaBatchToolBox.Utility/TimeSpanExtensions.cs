@@ -1,7 +1,7 @@
 ﻿#define NEED_HIGH_PRECISION_FOR_TIME
 using System;
 using System.Text.RegularExpressions;
-using Palmtree;
+using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox.Utility
 {
@@ -241,9 +241,9 @@ namespace MatroskaBatchToolBox.Utility
 
 #if NEED_HIGH_PRECISION_FOR_TIME
             var ticksPerSeconds = TimeSpan.TicksPerSecond;
-            (ticksPerSeconds, timeBaseDenominator) = Numerics.Reduce(ticksPerSeconds, timeBaseDenominator);
-            (timeValue, timeBaseDenominator) = Numerics.Reduce(timeValue, timeBaseDenominator);
-            (timeBaseNumerator, timeBaseDenominator) = Numerics.Reduce(timeBaseNumerator, timeBaseDenominator);
+            (ticksPerSeconds, timeBaseDenominator) = ticksPerSeconds.Reduce(timeBaseDenominator);
+            (timeValue, timeBaseDenominator) = timeValue.Reduce(timeBaseDenominator);
+            (timeBaseNumerator, timeBaseDenominator) = timeBaseNumerator.Reduce(timeBaseDenominator);
             return TimeSpan.FromTicks(checked(ticksPerSeconds * timeValue * timeBaseNumerator / timeBaseDenominator));
 #else
             return TimeSpan.FromSeconds((double)timeValue * timeBaseNumerator / timeBaseDenominator);
@@ -258,10 +258,10 @@ namespace MatroskaBatchToolBox.Utility
 #if NEED_HIGH_PRECISION_FOR_TIME
             var ticks = time.Ticks;
             var ticksPerSeconds = TimeSpan.TicksPerSecond;
-            (ticks, timeBaseNumerator) = Numerics.Reduce(ticks, timeBaseNumerator);
-            (ticks, ticksPerSeconds) = Numerics.Reduce(ticks, ticksPerSeconds);
-            (timeBaseDenominator, timeBaseNumerator) = Numerics.Reduce(timeBaseDenominator, timeBaseNumerator);
-            (timeBaseDenominator, ticksPerSeconds) = Numerics.Reduce(timeBaseDenominator, ticksPerSeconds);
+            (ticks, timeBaseNumerator) = ticks.Reduce(timeBaseNumerator);
+            (ticks, ticksPerSeconds) = ticks.Reduce(ticksPerSeconds);
+            (timeBaseDenominator, timeBaseNumerator) = timeBaseDenominator.Reduce(timeBaseNumerator);
+            (timeBaseDenominator, ticksPerSeconds) = timeBaseDenominator.Reduce(ticksPerSeconds);
             return checked(ticks * timeBaseDenominator / timeBaseNumerator / ticksPerSeconds);
 #else
             return Convert.ToInt64(time.TotalSeconds * timeBaseDenominator / timeBaseNumerator);

@@ -1,8 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net7.0;net60</TargetFrameworks>
+    <TargetFrameworks>net8.0;net7.0</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>pffmpeg</AssemblyName>
@@ -17,7 +17,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Palmtree.Console\Palmtree.Console.csproj" />
+    <PackageReference Include="Palmtree.Core" Version="1.0.0-alpha" />
+    <PackageReference Include="Palmtree.IO.Console" Version="1.0.0-alpha" />
+    <PackageReference Include="Palmtree.Numerics" Version="1.0.0-alpha" />
   </ItemGroup>
 
   <ItemGroup>

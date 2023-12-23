@@ -4,7 +4,7 @@ using System.Data;
 using System.Linq;
 using MatroskaBatchToolBox.Utility;
 using Palmtree;
-using Palmtree.Serialization;
+using Palmtree.IO.Serialization;
 
 namespace ChapterConverter
 {
@@ -22,7 +22,7 @@ namespace ChapterConverter
                 CsvSerializer.Deserialize(rawText, new CsvSerializerOption { ColumnDelimiterChar = '\t' })
                 .Select(row => row.ToArray())
                 .Select((row, index) =>
-                    row.Length.IsInClosedInterval(1, 2)
+                    row.Length.IsBetween(1, 2)
                     ? (new
                     {
                         startTime = row[0].TryParse(TimeParsingMode.LazyMode, out TimeSpan time) ? time : throw new Exception($"Invalid row format in input data.: {row[0]}"),

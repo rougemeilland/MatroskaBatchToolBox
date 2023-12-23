@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net7.0;net60</TargetFrameworks>
+    <TargetFrameworks>net8.0;net7.0</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>chapconv</AssemblyName>
@@ -11,12 +11,12 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net7.0|AnyCPU'">
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
-    <NoWarn>1701;1702;SYSLIB1045</NoWarn>
+    <NoWarn>1701;1702;SYSLIB1045;IDE0290;IDE0300;CA1859</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net7.0|AnyCPU'">
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
-    <NoWarn>1701;1702;SYSLIB1045</NoWarn>
+    <NoWarn>1701;1702;SYSLIB1045;IDE0290;IDE0300;CA1859</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net60|AnyCPU'">
@@ -29,9 +29,22 @@
     <NoWarn>1701;1702;SYSLIB1045</NoWarn>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0|AnyCPU'">
+    <NoWarn>1701;1702;SYSLIB1045;IDE0290;IDE0300;CA1859</NoWarn>
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0|AnyCPU'">
+    <NoWarn>1701;1702;SYSLIB1045;IDE0290;IDE0300;CA1859</NoWarn>
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Palmtree.IO" Version="1.1.0-alpha" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj" />
-    <ProjectReference Include="..\Palmtree.Console\Palmtree.Console.csproj" />
   </ItemGroup>
 
   <ItemGroup>

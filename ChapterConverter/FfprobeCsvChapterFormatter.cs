@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using MatroskaBatchToolBox.Utility;
 using Palmtree;
-using Palmtree.Serialization;
+using Palmtree.IO.Serialization;
+using Palmtree.Numerics;
 
 namespace ChapterConverter
 {
@@ -27,7 +28,7 @@ namespace ChapterConverter
                     .Where(row => row.Length > 0 && row[0] == _firstColumnValue)
                     .Select((row, rowIndex) =>
                     {
-                        if (row.Length.IsOutOfClosedInterval(7, 8))
+                        if (!row.Length.IsBetween(7, 8))
                             throw new Exception("The format of the input CSV data is invalid. (Invalid number of columns in row)");
                         var header = row[0];
                         var id = row[1];

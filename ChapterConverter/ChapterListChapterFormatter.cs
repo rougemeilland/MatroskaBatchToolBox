@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using MatroskaBatchToolBox.Utility;
-using Palmtree;
+using Palmtree.Numerics;
 
 namespace ChapterConverter
 {
@@ -11,9 +11,12 @@ namespace ChapterConverter
         : ChapterFormatter
     {
         private static readonly Regex _chapterPattern;
+        internal static readonly char[] _carriageReturnOrNewLine = new[] { '\r', '\n' };
 
         static ChapterListChapterFormatter()
-            => _chapterPattern = new Regex(@"^(CHAPTER(?<timeIndex>\d+)=(?<time>[\d\.:]+))|(CHAPTER(?<nameIndex>\d+)NAME=(?<name>.*))$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        {
+            _chapterPattern = new Regex(@"^(CHAPTER(?<timeIndex>\d+)=(?<time>[\d\.:]+))|(CHAPTER(?<nameIndex>\d+)NAME=(?<name>.*))$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        }
 
         public ChapterListChapterFormatter(ChapterFormatterParameter parameter)
             : base(parameter)
@@ -24,7 +27,7 @@ namespace ChapterConverter
         {
             var times = new Dictionary<int, (TimeSpan time, string lineText)>();
             var names = new Dictionary<int, (string name, string lineText)>();
-            foreach (var currentLineText in rawText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            foreach (var currentLineText in rawText.Split(_carriageReturnOrNewLine, StringSplitOptions.RemoveEmptyEntries))
             {
                 var match = _chapterPattern.Match(currentLineText);
                 if (!match.Success)
@@ -56,7 +59,7 @@ namespace ChapterConverter
                 }
             }
 
-            var indexFormat = $"D{(times.Any() ? times.Keys.Max() : 0).ToString().Length}";
+            var indexFormat = $"D{(times.Count > 0 ? times.Keys.Max() : 0).ToString().Length}";
 
             foreach (var index in names.Keys)
             {

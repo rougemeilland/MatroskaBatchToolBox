@@ -10,6 +10,8 @@ using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.IO.Console;
+using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox
 {
@@ -528,7 +530,7 @@ namespace MatroskaBatchToolBox
                     if (vmafSoreMatch.Success)
                     {
                         if (vmafSoreMatch.Groups["vmafScoreValue"].Value.TryParse(out double vmafScoreValue) &&
-                            vmafScoreValue.IsInClosedInterval(0.0, 100.0))
+                            vmafScoreValue.IsBetween(0.0, 100.0))
                         {
                             vmafCalculationResult = vmafScoreValue;
                         }

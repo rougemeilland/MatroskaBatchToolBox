@@ -8,7 +8,10 @@ using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.Numerics;
+using Palmtree.Linq;
 using Palmtree.IO;
+using Palmtree.IO.Console;
 
 namespace MovieMetadataEditor
 {
@@ -65,17 +68,17 @@ namespace MovieMetadataEditor
         {
             private CommandParameter(IEnumerable<CommandOption<OptionType>> options)
             {
-                InputFormat = options.SingleOrNone(option => option.OptionType == OptionType.InputFormat)?.OptionParameter[1] as string;
-                Input = options.SingleOrNone(option => option.OptionType == OptionType.Input)?.OptionParameter[1] as string;
-                OutputFormat = options.SingleOrNone(option => option.OptionType == OptionType.OutputFormat)?.OptionParameter[1] as string;
-                Output = options.SingleOrNone(option => option.OptionType == OptionType.Output)?.OptionParameter[1] as string;
+                InputFormat = options.SingleOrNone(option => option.OptionType == OptionType.InputFormat)?.OptionParameter.Span[1] as string;
+                Input = options.SingleOrNone(option => option.OptionType == OptionType.Input)?.OptionParameter.Span[1] as string;
+                OutputFormat = options.SingleOrNone(option => option.OptionType == OptionType.OutputFormat)?.OptionParameter.Span[1] as string;
+                Output = options.SingleOrNone(option => option.OptionType == OptionType.Output)?.OptionParameter.Span[1] as string;
                 IsForceMode = options.Any(option => option.OptionType == OptionType.Force);
-                ChapterTimes = options.SingleOrNone(option => option.OptionType == OptionType.ChapterTimes)?.OptionParameter[1] as IEnumerable<TimeSpan>;
-                ChapterTitles = options.Where(option => option.OptionType == OptionType.ChapterTitle).ToDictionary(option => (int)option.OptionParameter[1], option => (string)option.OptionParameter[2]);
+                ChapterTimes = options.SingleOrNone(option => option.OptionType == OptionType.ChapterTimes)?.OptionParameter.Span[1] as IEnumerable<TimeSpan>;
+                ChapterTitles = options.Where(option => option.OptionType == OptionType.ChapterTitle).ToDictionary(option => (int)option.OptionParameter.Span[1], option => (string)option.OptionParameter.Span[2]);
                 StreamMetadata =
                     options
                     .Where(option => option.OptionType == OptionType.StreamMetadata)
-                    .Select(option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2], metadataName: (string)option.OptionParameter[3], metadataValue: (string)option.OptionParameter[4]))
+                    .Select(option => (streamType: (string)option.OptionParameter.Span[1], streamIndex: (int)option.OptionParameter.Span[2], metadataName: (string)option.OptionParameter.Span[3], metadataValue: (string)option.OptionParameter.Span[4]))
                     .GroupBy(item => (item.streamType, item.streamIndex))
                     .ToDictionary(
                         g => g.Key,
@@ -85,8 +88,8 @@ namespace MovieMetadataEditor
                     options
                     .Where(option => option.OptionType == OptionType.StreamDisposition)
                     .ToDictionary(
-                        option => (streamType: (string)option.OptionParameter[1], streamIndex: (int)option.OptionParameter[2]),
-                        option => (IEnumerable<(string name, bool value)>)option.OptionParameter[3],
+                        option => (streamType: (string)option.OptionParameter.Span[1], streamIndex: (int)option.OptionParameter.Span[2]),
+                        option => (IEnumerable<(string name, bool value)>)option.OptionParameter.Span[3],
                         new StreamComparer());
                 MetadataToClear = MetadataType.None;
                 if (options.Any(option => option.OptionType == OptionType.ClearMetadata))
@@ -97,12 +100,12 @@ namespace MovieMetadataEditor
                     MetadataToClear |= MetadataType.All;
                 ClearDisposition = options.Any(option => option.OptionType == OptionType.ClearDisposition);
                 ClearChapters = options.Any(option => option.OptionType == OptionType.ClearChapters);
-                MaximumDuration = options.SingleOrNone(option => option.OptionType == OptionType.MaximumDuration)?.OptionParameter[1] as TimeSpan? ?? SimpleChapterElement.DefaultMaximumDuration;
-                MinimumDuration = options.SingleOrNone(option => option.OptionType == OptionType.MinimumDuration)?.OptionParameter[1] as TimeSpan? ?? SimpleChapterElement.DefaultMinimumDuration;
+                MaximumDuration = options.SingleOrNone(option => option.OptionType == OptionType.MaximumDuration)?.OptionParameter.Span[1] as TimeSpan? ?? SimpleChapterElement.DefaultMaximumDuration;
+                MinimumDuration = options.SingleOrNone(option => option.OptionType == OptionType.MinimumDuration)?.OptionParameter.Span[1] as TimeSpan? ?? SimpleChapterElement.DefaultMinimumDuration;
                 (From, To) = GetTrimmingRange(
-                    options.SingleOrNone(option => option.OptionType == OptionType.FromForTrimming)?.OptionParameter[1] as TimeSpan?,
-                    options.SingleOrNone(option => option.OptionType == OptionType.ToForTrimming)?.OptionParameter[1] as TimeSpan?,
-                    options.SingleOrNone(option => option.OptionType == OptionType.DurationForTrimming)?.OptionParameter[1] as TimeSpan?);
+                    options.SingleOrNone(option => option.OptionType == OptionType.FromForTrimming)?.OptionParameter.Span[1] as TimeSpan?,
+                    options.SingleOrNone(option => option.OptionType == OptionType.ToForTrimming)?.OptionParameter.Span[1] as TimeSpan?,
+                    options.SingleOrNone(option => option.OptionType == OptionType.DurationForTrimming)?.OptionParameter.Span[1] as TimeSpan?);
                 KeepEmptyChapter = options.Any(option => option.OptionType == OptionType.KeepEemptyChapter);
                 Verbose = options.Any(option => option.OptionType == OptionType.Verbose);
                 IsHelpMode = options.Any(option => option.OptionType == OptionType.Help);
@@ -129,7 +132,7 @@ namespace MovieMetadataEditor
             public bool IsHelpMode { get; }
 
             public static CommandParameter Parse(IEnumerable<CommandOptionDefinition<OptionType>> optionDefinitions, string[] args)
-                => new(optionDefinitions.ParseCommandArguments(args.AsReadOnlyArray()));
+                => new(optionDefinitions.ParseCommandArguments(args));
 
             private static (TimeSpan from, TimeSpan to) GetTrimmingRange(TimeSpan? ssValue, TimeSpan? toValue, TimeSpan? tValue)
             {
@@ -166,7 +169,7 @@ namespace MovieMetadataEditor
         private const string _dispositionNameForced = "FORCED";
         private const string _dispositionNameDefault = "DEFAULT";
         private static readonly string _thisProgramName;
-        private static readonly FileInfo _ffmpegCommandFile;
+        private static readonly FilePath _ffmpegCommandFile;
         private static readonly Regex _chapterTitleOptionNamePattern;
         private static readonly Regex _streamOptionNamePattern;
         private static readonly Regex _streamOptionValuePattern;
@@ -176,7 +179,7 @@ namespace MovieMetadataEditor
         static Program()
         {
             _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
-            _ffmpegCommandFile = new FileInfo(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException("ffmpeg command is not installed."));
+            _ffmpegCommandFile = new FilePath(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException("ffmpeg command is not installed."));
             _chapterTitleOptionNamePattern = new Regex(@"^(-tt|--chapter_title):(?<chapterIndex>\d+)$", RegexOptions.Compiled);
             _streamOptionNamePattern = new Regex(@"^(-s|--stream_metadata):(?<streamType>[vasdt]):(?<streamIndex>\d+)$", RegexOptions.Compiled);
             _streamOptionValuePattern = new Regex(@"^(?<metadataName>[a-zA-Z0-9_]+)=(?<metadataValue>.*)$", RegexOptions.Compiled);
@@ -217,7 +220,7 @@ namespace MovieMetadataEditor
                 {
                     try
                     {
-                        var outputFile = new FileInfo(commandOptions.Output);
+                        var outputFile = new FilePath(commandOptions.Output);
                         var parentDirectory = outputFile.Directory;
                         if (parentDirectory is null || !parentDirectory.Exists)
                         {
@@ -283,8 +286,8 @@ namespace MovieMetadataEditor
 
                         if (temporaryOutputFile is not null)
                         {
-                            using var inStream = new FileStream(temporaryOutputFile.FullName, FileMode.Open, FileAccess.Read, FileShare.None);
-                            using var outStream = Console.OpenStandardOutput();
+                            using var inStream = temporaryOutputFile.OpenRead();
+                            using var outStream = TinyConsole.OpenStandardOutput();
                             if (commandOptions.Verbose)
                                 PrintInformationMessage($"Copying from temporary file to standard output.: \"{temporaryOutputFile.FullName}\"");
 
@@ -351,18 +354,18 @@ namespace MovieMetadataEditor
             }
         }
 
-        private static (string? inputFormat, FileInfo inputFile, FileInfo? inputTemporaryFile) GetInputMovieFile(CommandParameter commandParameters)
+        private static (string? inputFormat, FilePath inputFile, FilePath? inputTemporaryFile) GetInputMovieFile(CommandParameter commandParameters)
         {
 
             if (commandParameters.Input is not null)
             {
                 if (commandParameters.Verbose)
                     PrintInformationMessage($"Input file path: \"{commandParameters.Input}\"");
-                return (commandParameters.InputFormat, new FileInfo(commandParameters.Input), null);
+                return (commandParameters.InputFormat, new FilePath(commandParameters.Input), null);
             }
             else
             {
-                var temporaryInputFile = new FileInfo(Path.GetTempFileName());
+                var temporaryInputFile = new FilePath(Path.GetTempFileName());
                 if (commandParameters.Verbose)
                 {
                     PrintInformationMessage("Read from standard input.");
@@ -372,7 +375,7 @@ namespace MovieMetadataEditor
                 try
                 {
                     using var inputStream = TinyConsole.OpenStandardInput();
-                    using var outputStream = new FileStream(temporaryInputFile.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
+                    using var outputStream = temporaryInputFile.Create();
                     {
                         if (commandParameters.Verbose)
                             PrintInformationMessage($"Copying from standard input to temporary file.: \"{temporaryInputFile.FullName}\"");
@@ -402,18 +405,18 @@ namespace MovieMetadataEditor
             }
         }
 
-        private static (string? outputFormat, FileInfo outputFile, FileInfo? outputTemporaryFile) GetOutputMovieFile(CommandParameter commandParameters)
+        private static (string? outputFormat, FilePath outputFile, FilePath? outputTemporaryFile) GetOutputMovieFile(CommandParameter commandParameters)
         {
 
             if (commandParameters.Output is not null)
             {
                 if (commandParameters.Verbose)
                     PrintInformationMessage($"Output file path: \"{commandParameters.Output}\"");
-                return (commandParameters.OutputFormat, new FileInfo(commandParameters.Output), null);
+                return (commandParameters.OutputFormat, new FilePath(commandParameters.Output), null);
             }
             else
             {
-                var temporaryOutputFile = new FileInfo(Path.GetTempFileName());
+                var temporaryOutputFile = new FilePath(Path.GetTempFileName());
                 if (commandParameters.Verbose)
                 {
                     PrintInformationMessage("Write to standard output.");
@@ -424,7 +427,7 @@ namespace MovieMetadataEditor
             }
         }
 
-        private static MovieInformation GetMovieInformation(CommandParameter commandParameters, string? inputFormat, FileInfo inputFile)
+        private static MovieInformation GetMovieInformation(CommandParameter commandParameters, string? inputFormat, FilePath inputFile)
         {
             if (commandParameters.Verbose)
                 PrintInformationMessage($"Probe movie information.: \"{inputFile.FullName}\"");
@@ -456,7 +459,7 @@ namespace MovieMetadataEditor
             }
         }
 
-        private static void EditMetadata(CommandParameter commandOptions, MovieInformation movieInformation, string? inputFormat, FileInfo inputFile, string? outputFormat, FileInfo outputFile, bool doOverWrite)
+        private static void EditMetadata(CommandParameter commandOptions, MovieInformation movieInformation, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile, bool doOverWrite)
         {
             var streams =
                 movieInformation.VideoStreams
@@ -712,7 +715,7 @@ namespace MovieMetadataEditor
             }
         }
 
-        private static void CopyStream(Stream instream, Stream outstream)
+        private static void CopyStream(ISequentialInputByteStream instream, ISequentialOutputByteStream outstream)
         {
             try
             {
@@ -720,7 +723,7 @@ namespace MovieMetadataEditor
                 TinyConsole.CursorVisible = ConsoleCursorVisiblity.Invisible;
                 instream.CopyTo(
                     outstream,
-                    new Progress<long>(CopiedLength =>
+                    new Progress<ulong>(CopiedLength =>
                     {
                         var stateSymbol =
                             state switch
@@ -758,14 +761,14 @@ namespace MovieMetadataEditor
             }
         }
 
-        private static void CopyStream(Stream instream, Stream outstream, long copyLength)
+        private static void CopyStream(ISequentialInputByteStream instream, ISequentialOutputByteStream outstream, ulong copyLength)
         {
             try
             {
                 TinyConsole.CursorVisible = ConsoleCursorVisiblity.Invisible;
                 instream.CopyTo(
                     outstream,
-                    new Progress<long>(CopiedLength =>
+                    new Progress<ulong>(CopiedLength =>
                     {
                         var progress = (double)CopiedLength / copyLength;
                         TinyConsole.Error.Write($"Copying... {progress * 100:F2}%");

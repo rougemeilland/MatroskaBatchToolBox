@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Runtime.Serialization;
 
 namespace MatroskaBatchToolBox.Utility.Interprocess
 {
-    [Serializable]
     public class InvalidCommandOptionException
         : Exception
     {
@@ -14,11 +12,6 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
 
         public InvalidCommandOptionException(string message, Exception inner)
             : base(message, inner)
-        {
-        }
-
-        protected InvalidCommandOptionException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
         {
         }
     }

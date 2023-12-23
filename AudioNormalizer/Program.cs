@@ -6,6 +6,8 @@ using System.Text;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using Palmtree;
 using Palmtree.IO;
+using Palmtree.IO.Console;
+using Palmtree.Linq;
 
 namespace AudioNormalizer
 {
@@ -15,12 +17,12 @@ namespace AudioNormalizer
         {
             private CommandParameter(IEnumerable<CommandOption<OptionType>> options)
             {
-                InputFormat = options.SingleOrNone(option => option.OptionType == OptionType.InputFormat)?.OptionParameter[1] as string;
-                Input = options.SingleOrNone(option => option.OptionType == OptionType.Input)?.OptionParameter[1] as string;
-                OutputFormat = options.SingleOrNone(option => option.OptionType == OptionType.OutputFormat)?.OptionParameter[1] as string;
-                Output = options.SingleOrNone(option => option.OptionType == OptionType.Output)?.OptionParameter[1] as string;
-                MusicFileEncoder = options.SingleOrNone(option => option.OptionType == OptionType.Encoder)?.OptionParameter[1] as string;
-                MusicFileEncoderOption = options.SingleOrNone(option => option.OptionType == OptionType.EncoderOption)?.OptionParameter[1] as string;
+                InputFormat = options.SingleOrNone(option => option.OptionType == OptionType.InputFormat)?.OptionParameter.Span[1] as string;
+                Input = options.SingleOrNone(option => option.OptionType == OptionType.Input)?.OptionParameter.Span[1] as string;
+                OutputFormat = options.SingleOrNone(option => option.OptionType == OptionType.OutputFormat)?.OptionParameter.Span[1] as string;
+                Output = options.SingleOrNone(option => option.OptionType == OptionType.Output)?.OptionParameter.Span[1] as string;
+                MusicFileEncoder = options.SingleOrNone(option => option.OptionType == OptionType.Encoder)?.OptionParameter.Span[1] as string;
+                MusicFileEncoderOption = options.SingleOrNone(option => option.OptionType == OptionType.EncoderOption)?.OptionParameter.Span[1] as string;
                 IsForceMode = options.Any(option => option.OptionType == OptionType.Force);
                 Verbose = options.Any(option => option.OptionType == OptionType.Verbose);
                 DisableVideoStream = options.Any(option => option.OptionType == OptionType.DisableVideoStream);
@@ -39,7 +41,7 @@ namespace AudioNormalizer
             public bool IsHelpMode { get; }
 
             public static CommandParameter Parse(IEnumerable<CommandOptionDefinition<OptionType>> optionDefinitions, string[] args)
-                => new(optionDefinitions.ParseCommandArguments(args.AsReadOnlyArray()));
+                => new(optionDefinitions.ParseCommandArguments(args));
         }
 
         private static readonly string _thisProgramName;
@@ -91,7 +93,7 @@ namespace AudioNormalizer
                 {
                     try
                     {
-                        var outputFile = new FileInfo(commandOptions.Output);
+                        var outputFile = new FilePath(commandOptions.Output);
                         var parentDirectory = outputFile.Directory;
                         if (parentDirectory is null || !parentDirectory.Exists)
                         {
@@ -248,7 +250,7 @@ namespace AudioNormalizer
             }
         }
 
-        private static (string? inputFormat, FileInfo inputFilePath, FileInfo? inputTemporaryFilePath) GetInputMovieFile(CommandParameter commandParameters)
+        private static (string? inputFormat, FilePath inputFilePath, FilePath? inputTemporaryFilePath) GetInputMovieFile(CommandParameter commandParameters)
         {
             if (commandParameters.Input is not null)
             {
@@ -256,13 +258,13 @@ namespace AudioNormalizer
 
                 if (commandParameters.Verbose)
                     PrintInformationMessage($"Input file path: \"{commandParameters.Input}\"");
-                return (commandParameters.InputFormat, new FileInfo(commandParameters.Input), null);
+                return (commandParameters.InputFormat, new FilePath(commandParameters.Input), null);
             }
             else
             {
                 // -i オプションが指定されていない場合 (入力元が標準入力である場合)
 
-                var temporaryInputFile = new FileInfo(Path.GetTempFileName());
+                var temporaryInputFile = new FilePath(Path.GetTempFileName());
                 if (commandParameters.Verbose)
                 {
                     PrintInformationMessage("Read from standard input.");
@@ -303,7 +305,7 @@ namespace AudioNormalizer
             }
         }
 
-        private static (string? outputFormat, FileInfo outputFilePath, FileInfo? outputTemporaryFilePath) GetOutputMovieFile(CommandParameter commandParameters)
+        private static (string? outputFormat, FilePath outputFilePath, FilePath? outputTemporaryFilePath) GetOutputMovieFile(CommandParameter commandParameters)
         {
             if (commandParameters.Output is not null)
             {
@@ -311,13 +313,13 @@ namespace AudioNormalizer
 
                 if (commandParameters.Verbose)
                     PrintInformationMessage($"Output file path: \"{commandParameters.Output}\"");
-                return (commandParameters.OutputFormat, new FileInfo(commandParameters.Output), null);
+                return (commandParameters.OutputFormat, new FilePath(commandParameters.Output), null);
             }
             else
             {
                 // -o オプションが指定されていない場合 (出力先が標準出力である場合)
 
-                var temporaryOutputFile = new FileInfo(Path.GetTempFileName());
+                var temporaryOutputFile = new FilePath(Path.GetTempFileName());
                 if (commandParameters.Verbose)
                 {
                     PrintInformationMessage("Write to standard output.");
@@ -328,7 +330,7 @@ namespace AudioNormalizer
             }
         }
 
-        private static void CopyStream(Stream instream, Stream outstream)
+        private static void CopyStream(ISequentialInputByteStream instream, ISequentialOutputByteStream outstream)
         {
             try
             {
@@ -336,7 +338,7 @@ namespace AudioNormalizer
                 TinyConsole.CursorVisible = ConsoleCursorVisiblity.Invisible;
                 instream.CopyTo(
                     outstream,
-                    new Progress<long>(CopiedLength =>
+                    new Progress<ulong>(CopiedLength =>
                     {
                         var stateSymbol =
                             state switch
@@ -374,14 +376,14 @@ namespace AudioNormalizer
             }
         }
 
-        private static void CopyStream(Stream instream, Stream outstream, long copyLength)
+        private static void CopyStream(ISequentialInputByteStream instream, ISequentialOutputByteStream outstream, ulong copyLength)
         {
             try
             {
                 TinyConsole.CursorVisible = ConsoleCursorVisiblity.Invisible;
                 instream.CopyTo(
                     outstream,
-                    new Progress<long>(CopiedLength =>
+                    new Progress<ulong>(CopiedLength =>
                     {
                         var progress = (double)CopiedLength / copyLength;
                         TinyConsole.Error.Write($"Copying... {progress * 100:F2}%");

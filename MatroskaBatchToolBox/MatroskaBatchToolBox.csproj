@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net7.0;net60</TargetFrameworks>
+    <TargetFrameworks>net8.0;net7.0</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageProjectUrl>https://github.com/rougemeilland/MatroskaBatchToolBox</PackageProjectUrl>
@@ -39,8 +39,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Palmtree.IO.Console" Version="1.0.0-alpha" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj" />
-    <ProjectReference Include="..\Palmtree.Console\Palmtree.Console.csproj" />
   </ItemGroup>
 
   <ItemGroup>

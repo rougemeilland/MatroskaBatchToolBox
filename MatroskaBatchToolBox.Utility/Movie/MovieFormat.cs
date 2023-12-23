@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 using MatroskaBatchToolBox.Utility.Models.Json;
-using Palmtree;
+using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox.Utility.Movie
 {

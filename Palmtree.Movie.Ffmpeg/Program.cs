@@ -4,6 +4,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Palmtree;
+using Palmtree.IO;
+using Palmtree.IO.Console;
+using Palmtree.Linq;
 
 // fffmpeg コマンドとの違い
 // + 常に -nostdin が指定される。
@@ -33,7 +37,7 @@ namespace Palmtree.Movie.Ffmpeg
                 var exitCode = ExecuteFfpegCommand(newArgs, tempFilePath is not null);
                 if (exitCode == 0 && tempFilePath is not null)
                 {
-                    using var inStream = new FileStream(tempFilePath, FileMode.Open, FileAccess.Read, FileShare.None);
+                    using var inStream = new FilePath(tempFilePath).OpenRead();
                     using var outStream = TinyConsole.OpenStandardOutput();
                     inStream.CopyTo(outStream);
                 }

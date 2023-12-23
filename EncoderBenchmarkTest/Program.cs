@@ -6,7 +6,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using MatroskaBatchToolBox.Utility;
-using Palmtree;
+using Palmtree.IO.Console;
+using Palmtree.Numerics;
 
 namespace EncoderBenchmarkTest
 {
@@ -88,7 +89,7 @@ namespace EncoderBenchmarkTest
                                 }
                                 else
                                 {
-                                    var gcd = Numerics.GreatestCommonDivisor(resolutionWidth, resolutionHeight);
+                                    var gcd = resolutionWidth.GreatestCommonDivisor(resolutionHeight);
                                     aspectRatioWidth = resolutionWidth / gcd;
                                     aspectRatioHeight = resolutionHeight / gcd;
                                 }

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text.RegularExpressions;
 using MatroskaBatchToolBox.Utility.Models.Json;
-using Palmtree;
+using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox.Utility.Movie
 {

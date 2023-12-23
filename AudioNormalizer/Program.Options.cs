@@ -1,6 +1,6 @@
 ﻿using System.Linq;
 using MatroskaBatchToolBox.Utility.Interprocess;
-using Palmtree;
+using Palmtree.Linq;
 
 namespace AudioNormalizer
 {

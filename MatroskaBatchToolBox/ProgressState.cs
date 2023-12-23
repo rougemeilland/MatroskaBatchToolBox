@@ -117,7 +117,7 @@ namespace MatroskaBatchToolBox
 
         public void UpdateProgress(int sourceFieId, double progress)
         {
-            if (!progress.IsInClosedInterval(0, 1))
+            if (!progress.IsBetween(0.0, 1.0))
                 throw new Exception($"Invalid {nameof(progress)} value: {nameof(progress)} = {progress}");
 
             lock (this)

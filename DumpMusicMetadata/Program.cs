@@ -4,8 +4,8 @@ using System.IO;
 using System.Linq;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
-using Palmtree;
-using Palmtree.Serialization;
+using Palmtree.IO.Console;
+using Palmtree.IO.Serialization;
 
 namespace DumpMusicMetadata
 {

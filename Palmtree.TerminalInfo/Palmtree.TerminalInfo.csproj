@@ -29,8 +29,4 @@
     <NoWarn>1701;1702;SYSLIB1045</NoWarn>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Palmtree.Core\Palmtree.Core.csproj" />
-  </ItemGroup>
-
 </Project>
