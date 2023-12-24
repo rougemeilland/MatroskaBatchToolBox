@@ -95,7 +95,9 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             string syntaxTextForHelp,
             IEnumerable<string> descriptionTextLinesForHelp)
             : base(optionType, optionParameters, argumentConverter, exclusiveOptionChecker, requiredOptionChecker, syntaxTextForHelp, descriptionTextLinesForHelp)
-            => _optionNamePattern = optionNamePattern;
+        {
+            _optionNamePattern = optionNamePattern;
+        }
 
         /// <summary>
         /// 与えられた引数の文字列がオプションの名前とマッチするかどうかを調べます。

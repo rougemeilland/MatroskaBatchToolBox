@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using MatroskaBatchToolBox.Properties;
 using Palmtree;
+using Palmtree.IO;
+using Palmtree.Linq;
 
 namespace MatroskaBatchToolBox
 {
@@ -12,7 +14,7 @@ namespace MatroskaBatchToolBox
     {
         private class SourceFileInfo
         {
-            public SourceFileInfo(int uniqueId, FileInfo file, long fileLength)
+            public SourceFileInfo(int uniqueId, FilePath file, ulong fileLength)
             {
                 UniqueId = uniqueId;
                 File = file;
@@ -22,8 +24,8 @@ namespace MatroskaBatchToolBox
 
             public int UniqueId { get; }
 
-            public FileInfo File { get; }
-            public long FileLength { get; }
+            public FilePath File { get; }
+            public ulong FileLength { get; }
             public double Progress { get; set; }
         }
 
@@ -65,8 +67,8 @@ namespace MatroskaBatchToolBox
         private readonly IDictionary<ActionResult, ICollection<SourceFileInfo>> _processedSourceFiles;
         private readonly DateTime _firstDateTime;
         private readonly LinkedList<ProgressHistoryElement> _progressHistory;
-        private long _totalLengthOfUnprocessedSourceFiles;
-        private long _totalLengthOfProcessedSourceFiles;
+        private ulong _totalLengthOfUnprocessedSourceFiles;
+        private ulong _totalLengthOfProcessedSourceFiles;
 
         static ProgressState()
         {
@@ -74,7 +76,7 @@ namespace MatroskaBatchToolBox
             _minimumHistoryIntervalForFinishTimeCalculation = TimeSpan.FromMinutes(1);
         }
 
-        public ProgressState(IEnumerable<FileInfo> sourceFiles)
+        public ProgressState(IEnumerable<FilePath> sourceFiles)
         {
             _unprocessedSourceFiles = new Queue<SourceFileInfo>(EnumerateSourceFileInfo(sourceFiles));
             _totalLengthOfUnprocessedSourceFiles = _unprocessedSourceFiles.Sum(sourceFile => sourceFile.FileLength);
@@ -92,7 +94,7 @@ namespace MatroskaBatchToolBox
             _progressHistory.AddLast(new LinkedListNode<ProgressHistoryElement>(new ProgressHistoryElement(_firstDateTime, 0.0)));
         }
 
-        public bool TryGetNextSourceFile(out int sourceFieId, [NotNullWhen(true)] out FileInfo? sourceFile)
+        public bool TryGetNextSourceFile(out int sourceFieId, [NotNullWhen(true)] out FilePath? sourceFile)
         {
             lock (this)
             {
@@ -103,7 +105,11 @@ namespace MatroskaBatchToolBox
                     _processingSourceFiles.Add(item.UniqueId, item);
                     sourceFieId = item.UniqueId;
                     sourceFile = item.File;
-                    _totalLengthOfUnprocessedSourceFiles -= item.FileLength;
+                    checked
+                    {
+                        _totalLengthOfUnprocessedSourceFiles -= item.FileLength;
+                    }
+
                     return true;
                 }
                 else
@@ -158,7 +164,11 @@ namespace MatroskaBatchToolBox
                 {
                     case ActionResult.Success:
                     case ActionResult.Failed:
-                        _totalLengthOfProcessedSourceFiles += item.FileLength;
+                        checked
+                        {
+                            _totalLengthOfProcessedSourceFiles += item.FileLength;
+                        }
+
                         break;
                     case ActionResult.Skipped:
                     case ActionResult.Cancelled:
@@ -214,14 +224,14 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static IEnumerable<SourceFileInfo> EnumerateSourceFileInfo(IEnumerable<FileInfo> sourceFiles)
+        private static IEnumerable<SourceFileInfo> EnumerateSourceFileInfo(IEnumerable<FilePath> sourceFiles)
         {
             // Lengthプロパティの参照で例外が発生した場合は、そのファイルは結果のリストからは除く
             foreach (var item in sourceFiles.Select((sourceFile, index) => new { index, sourceFile }))
             {
-                FileInfo? sourceFile = null;
+                FilePath? sourceFile = null;
                 int? index = null;
-                long? sourceFileLength = null;
+                ulong? sourceFileLength = null;
                 try
                 {
                     if (item.sourceFile.Exists)
@@ -250,9 +260,10 @@ namespace MatroskaBatchToolBox
         private double GetProgressValue()
         {
             var totalOfSourceFileLength =
-                _totalLengthOfUnprocessedSourceFiles +
-                _processingSourceFiles.Values.Sum(sourceFile => sourceFile.FileLength) +
-                _totalLengthOfProcessedSourceFiles;
+                checked(
+                    _totalLengthOfUnprocessedSourceFiles +
+                    _processingSourceFiles.Values.Sum(sourceFile => sourceFile.FileLength) +
+                    _totalLengthOfProcessedSourceFiles);
 
             if (totalOfSourceFileLength <= 0)
                 return 0;

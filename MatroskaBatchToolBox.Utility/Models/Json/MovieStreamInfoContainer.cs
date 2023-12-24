@@ -7,7 +7,9 @@ namespace MatroskaBatchToolBox.Utility.Models.Json
     public class MovieStreamInfoContainer
     {
         public MovieStreamInfoContainer()
-            => Disposition = new MovieStreamDispositionContainer();
+        {
+            Disposition = new MovieStreamDispositionContainer();
+        }
 
         [JsonPropertyName("index")]
         public int? Index { get; set; }

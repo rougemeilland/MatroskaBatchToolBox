@@ -7,9 +7,9 @@ using System.Text.RegularExpressions;
 using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
-using Palmtree.Numerics;
 using Palmtree.IO;
 using Palmtree.IO.Console;
+using Palmtree.Numerics;
 
 namespace ChapterConverter
 {

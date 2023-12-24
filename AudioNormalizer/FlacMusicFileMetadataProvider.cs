@@ -15,39 +15,12 @@ namespace AudioNormalizer
         public FlacMusicFileMetadataProvider(TransferDirection direction, string? fileFormat, string? fileExtension)
         {
             _direction = direction;
-            if (fileFormat is not null)
-            {
-                if (fileExtension is not null)
-                {
-                    if (fileFormat == "flac" && fileExtension == ".flac")
-                        _fileFormat = "flac";
-                    else
-                        _fileFormat = null;
-                }
-                else
-                {
-                    if (fileFormat == "flac")
-                        _fileFormat = "flac";
-                    else
-                        _fileFormat = null;
-                }
-            }
-            else
-            {
-                if (fileExtension is not null)
-                {
-                    if (fileExtension == ".flac")
-                        _fileFormat = "flac";
-                    else
-                        _fileFormat = null;
-                }
-                else
-                {
-                    _fileFormat = null;
-                }
-            }
-
-            _direction = direction;
+            _fileFormat =
+                fileFormat is null && fileExtension is null
+                ? null
+                : fileFormat is null or "flac" && fileExtension is null or ".flac"
+                ? "flac"
+                : null;
         }
 
         public override bool Supported

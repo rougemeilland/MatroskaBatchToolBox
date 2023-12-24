@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
+using Palmtree.IO;
 
 namespace ChapterConverter
 {
@@ -17,7 +17,7 @@ namespace ChapterConverter
 
         protected override IEnumerable<InternalChapterElement> Parse(string inputFilePath)
         {
-            var inputFile = new FileInfo(inputFilePath);
+            var inputFile = new FilePath(inputFilePath);
             var movieInfo =
                 Command.GetMovieInformation(
                     null,

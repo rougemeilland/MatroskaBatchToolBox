@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using System.IO;
+using Palmtree.IO;
 
 namespace MatroskaBatchToolBox
 {
@@ -8,9 +8,11 @@ namespace MatroskaBatchToolBox
         private readonly IDictionary<string, Settings> _cache;
 
         public LocalSettingsCache()
-            => _cache = new Dictionary<string, Settings>();
+        {
+            _cache = new Dictionary<string, Settings>();
+        }
 
-        public Settings this[DirectoryInfo? sourceFileDirectory]
+        public Settings this[DirectoryPath? sourceFileDirectory]
         {
             get
             {
@@ -21,7 +23,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private Settings GetSettings(DirectoryInfo? directory)
+        private Settings GetSettings(DirectoryPath? directory)
         {
             // 対象ディレクトリが null ならグローバル設定を返す。
             if (directory is null)

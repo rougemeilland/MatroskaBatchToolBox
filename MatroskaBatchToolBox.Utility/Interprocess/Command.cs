@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.IO;
 
 namespace MatroskaBatchToolBox.Utility.Interprocess
 {
@@ -17,7 +18,10 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         {
             private readonly Func<ReadOnlyMemory<byte>> _binaryWriter;
 
-            public BinaryInputRedirector(Func<ReadOnlyMemory<byte>> binaryWriter) => _binaryWriter = binaryWriter;
+            public BinaryInputRedirector(Func<ReadOnlyMemory<byte>> binaryWriter)
+            {
+                _binaryWriter = binaryWriter;
+            }
 
             Action IChildProcessInputRedirectable.GetInputRedirector(StreamWriter writer)
                 => () =>
@@ -40,7 +44,10 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         {
             private readonly Func<string?> _textWriter;
 
-            public TextInputRedirector(Func<string?> textWriter) => _textWriter = textWriter;
+            public TextInputRedirector(Func<string?> textWriter)
+            {
+                _textWriter = textWriter;
+            }
 
             Action IChildProcessInputRedirectable.GetInputRedirector(StreamWriter writer)
                 => () =>
@@ -74,7 +81,10 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         {
             private readonly Action<ReadOnlyMemory<byte>> _binaryReader;
 
-            public BinaryOutputRedirector(Action<ReadOnlyMemory<byte>> binaryReader) => _binaryReader = binaryReader;
+            public BinaryOutputRedirector(Action<ReadOnlyMemory<byte>> binaryReader)
+            {
+                _binaryReader = binaryReader;
+            }
 
             Action IChildProcessOutputRedirectable.GetOutputRedirector(StreamReader reader)
                 => () =>
@@ -95,7 +105,10 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         {
             private readonly Action<string> _textReader;
 
-            public TextOutputRedirector(Action<string> textReader) => _textReader = textReader;
+            public TextOutputRedirector(Action<string> textReader)
+            {
+                _textReader = textReader;
+            }
 
             Action IChildProcessOutputRedirectable.GetOutputRedirector(StreamReader reader)
                 => () =>
@@ -115,7 +128,10 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         {
             private readonly Action<Process> _canceller;
 
-            public ChildProcessCanceller(Action<Process> canceller) => _canceller = canceller;
+            public ChildProcessCanceller(Action<Process> canceller)
+            {
+                _canceller = canceller;
+            }
 
             void IChildProcessCancellable.CancelChildProcess(Process process) => _canceller(process);
         }
@@ -151,12 +167,12 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
 
         public static MovieInformation GetMovieInformation(
             string? inFileFormat,
-            FileInfo inFile,
+            FilePath inFile,
             MovieInformationType requestedInfo,
             Action<string, string> logger)
         {
             var ffprobeCommandFile =
-                new FileInfo(
+                new FilePath(
                     ProcessUtility.WhereIs("ffprobe")
                     ?? throw new Exception("ffprobe command is not installed."));
 
@@ -211,7 +227,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             IProgress<double> progressReporter)
         {
             var ffmpegCommandFile =
-                new FileInfo(
+                new FilePath(
                     ProcessUtility.WhereIs("pffmpeg")
                     ?? throw new Exception("ffmpeg command is not installed."));
 
@@ -290,7 +306,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         }
 
         public static int ExecuteCommand(
-            FileInfo programFile,
+            FilePath programFile,
             string args,
             Encoding intputOutputEncoding,
             IChildProcessInputRedirectable? standardInputRedirector,

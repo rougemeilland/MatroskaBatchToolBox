@@ -188,10 +188,7 @@ namespace AudioNormalizer
             }
 
             static (string encoder, IEnumerable<string> encoderOptions) GetVorbisEncoder(AudioStreamInfo sourceStreamInfo)
-            {
-                return
-                    ("libvirbis", new[] { $"-q:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateLibVorbisQualityByBitRate(sourceStreamInfo.Channels * _bitratePerChannelForLibVorbis):F1}" }.Append(MapLibvorbisSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)));
-            }
+                => ("libvirbis", new[] { $"-q:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateLibVorbisQualityByBitRate(sourceStreamInfo.Channels * _bitratePerChannelForLibVorbis):F1}" }.Append(MapLibvorbisSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)));
         }
 
         public override string GuessFileFormat()

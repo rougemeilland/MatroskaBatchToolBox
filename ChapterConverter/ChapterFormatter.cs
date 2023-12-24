@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using MatroskaBatchToolBox.Utility;
-using Palmtree;
 
 namespace ChapterConverter
 {
@@ -42,7 +41,9 @@ namespace ChapterConverter
         protected readonly ChapterFormatterParameter Parameter;
 
         protected ChapterFormatter(ChapterFormatterParameter parameter)
-            => Parameter = parameter;
+        {
+            Parameter = parameter;
+        }
 
         protected abstract IEnumerable<InternalChapterElement> Parse(string rawText);
         protected abstract string Render(IEnumerable<InternalChapterElement> chapters);

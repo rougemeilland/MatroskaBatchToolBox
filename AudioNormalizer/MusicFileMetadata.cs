@@ -2,7 +2,7 @@
 {
     internal class MusicFileMetadata
     {
-        public  string? Album { get; set; }
+        public string? Album { get; set; }
         public string? AlbumArtist { get; set; }
         public string? Artist { get; set; }
         public string? Comment { get; set; }

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
+using Palmtree.IO;
 using Palmtree.IO.Console;
 using Palmtree.IO.Serialization;
 
@@ -14,7 +15,9 @@ namespace DumpMusicMetadata
         private static readonly string _thisProgramName;
 
         static Program()
-            => _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
+        {
+            _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
+        }
 
         private static int Main(string[] args)
         {
@@ -69,11 +72,11 @@ namespace DumpMusicMetadata
             }
         }
 
-        private static FileInfo GetFileInfo(string sourceFilePathName)
+        private static FilePath GetFileInfo(string sourceFilePathName)
         {
             try
             {
-                var fileInfo = new FileInfo(sourceFilePathName);
+                var fileInfo = new FilePath(sourceFilePathName);
                 if (!fileInfo.Exists)
                     throw new Exception($"File does not exist.: \"{sourceFilePathName}\"");
                 return fileInfo;
@@ -84,7 +87,7 @@ namespace DumpMusicMetadata
             }
         }
 
-        private static MovieInformation GetMovieInformation(string? inputFormat, FileInfo inputFile)
+        private static MovieInformation GetMovieInformation(string? inputFormat, FilePath inputFile)
         {
             try
             {

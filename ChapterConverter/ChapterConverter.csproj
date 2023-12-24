@@ -40,7 +40,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Palmtree.IO" Version="1.1.0-alpha" />
+    <PackageReference Include="Palmtree.IO" Version="1.2.1-alpha" />
   </ItemGroup>
 
   <ItemGroup>

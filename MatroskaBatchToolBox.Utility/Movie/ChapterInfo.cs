@@ -10,7 +10,9 @@ namespace MatroskaBatchToolBox.Utility.Movie
         private static readonly Regex _uselessChapterTitlePattern;
 
         static ChapterInfo()
-            => _uselessChapterTitlePattern = new Regex(@"^\s*((\d+)|(\d+:\d+:\d+\.\d+)|(chapter\.?\s*\d+)|(チャプター\s*\d+)|(Р“Р»Р°РІР°\s*\d+))\s*$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        {
+            _uselessChapterTitlePattern = new Regex(@"^\s*((\d+)|(\d+:\d+:\d+\.\d+)|(chapter\.?\s*\d+)|(チャプター\s*\d+)|(Р“Р»Р°РІР°\s*\d+))\s*$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        }
 
         public ChapterInfo(MovieChapterContainer chapter)
         {

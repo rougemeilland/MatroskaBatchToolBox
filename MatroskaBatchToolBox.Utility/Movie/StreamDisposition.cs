@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using MatroskaBatchToolBox.Utility.Models.Json;
 
 namespace MatroskaBatchToolBox.Utility.Movie

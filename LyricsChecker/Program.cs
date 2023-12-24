@@ -9,6 +9,7 @@ using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.IO;
 using Palmtree.IO.Console;
 using Palmtree.Numerics;
 
@@ -48,7 +49,7 @@ namespace LyricsChecker
             var index = 0;
             for (; index < args.Length; ++index)
             {
-                if (args[index].StartsWith("-", StringComparison.Ordinal))
+                if (args[index].StartsWith('-'))
                     options.Add(args[index]);
                 else
                     break;
@@ -138,7 +139,7 @@ namespace LyricsChecker
 
         private static bool CheckMusicFile(string musicFilePath)
         {
-            var musicFile = new FileInfo(musicFilePath);
+            var musicFile = new FilePath(musicFilePath);
             if (!musicFile.Exists)
             {
                 TinyConsole.Out.WriteLine($"The specified music file does not exist.: \"{musicFile.FullName}\"");
@@ -178,14 +179,14 @@ namespace LyricsChecker
 
         private static bool CheckLyricsFile(string musicFilePath, string lyricsFilePath)
         {
-            var lyricsFile = new FileInfo(lyricsFilePath);
+            var lyricsFile = new FilePath(lyricsFilePath);
             if (!lyricsFile.Exists)
             {
                 TinyConsole.Out.WriteLine($"The specified lyrics file does not exist.: \"{lyricsFile.FullName}\"");
                 return false;
             }
 
-            var musicFile = new FileInfo(musicFilePath);
+            var musicFile = new FilePath(musicFilePath);
             if (!musicFile.Exists)
             {
                 TinyConsole.Out.WriteLine($"The specified music file does not exist.: \"{musicFile.FullName}\"");
@@ -266,8 +267,8 @@ namespace LyricsChecker
 
         private static bool ModifyLyricsFile(string musicFilePath, string lyricsFilePath)
         {
-            var lyricsFile = new FileInfo(lyricsFilePath);
-            var musicFile = new FileInfo(musicFilePath);
+            var lyricsFile = new FilePath(lyricsFilePath);
+            var musicFile = new FilePath(musicFilePath);
             if (!musicFile.Exists)
             {
                 TinyConsole.Out.WriteLine($"The specified music file does not exist.: \"{musicFile.FullName}\"");
@@ -316,7 +317,7 @@ namespace LyricsChecker
                 else
                 {
                     var (timeStamp, text) = NormalizeLyricsText(lyricsText);
-                    if (string.IsNullOrEmpty(timeStamp) && !text.StartsWith("[", StringComparison.Ordinal))
+                    if (string.IsNullOrEmpty(timeStamp) && !text.StartsWith('['))
                     {
                         timeStamp = "[00:00.00]";
                         modified = true;
@@ -333,7 +334,7 @@ namespace LyricsChecker
                 }
             }
 
-            if (newLyricsTexts.Any() && !newLyricsTexts.First().StartsWith("[00:00.00]"))
+            if (newLyricsTexts.Count > 0 && !newLyricsTexts.First().StartsWith("[00:00.00]"))
             {
                 // 最初の歌詞行がタイムスタンプ [00:00.00] で始まっていない場合
 
@@ -358,7 +359,7 @@ namespace LyricsChecker
             return modified;
         }
 
-        private static void SaveNewLyricsFile(FileInfo lyricsFile, LyricsContainer lyricsData)
+        private static void SaveNewLyricsFile(FilePath lyricsFile, LyricsContainer lyricsData)
         {
             var tempFilePath = Path.GetTempFileName();
             try
@@ -414,7 +415,7 @@ namespace LyricsChecker
             }
         }
 
-        private static bool CheckFileNameStrictly(MovieInformation musicFileInfo, FileInfo musicFile)
+        private static bool CheckFileNameStrictly(MovieInformation musicFileInfo, FilePath musicFile)
         {
             var ok = true;
             var musicTracktext = GetTagValue(musicFileInfo, _metadataNameTrack);
@@ -430,7 +431,7 @@ namespace LyricsChecker
             return ok;
         }
 
-        private static bool CheckFileNameStrictly(MovieInformation musicFileInfo, FileInfo musicFile, FileInfo lyricsFile)
+        private static bool CheckFileNameStrictly(MovieInformation musicFileInfo, FilePath musicFile, FilePath lyricsFile)
         {
             var ok = true;
             var musicTracktext = GetTagValue(musicFileInfo, _metadataNameTrack);
@@ -447,7 +448,7 @@ namespace LyricsChecker
             return ok;
         }
 
-        private static bool CheckMusicFilePath(MovieInformation musicFileInfo, FileInfo musicFile)
+        private static bool CheckMusicFilePath(MovieInformation musicFileInfo, FilePath musicFile)
         {
             var albumArtist = GetTagValue(musicFileInfo, _metadataMameAlbumArtist);
             var album = GetTagValue(musicFileInfo, _metadataNameAlbum);
@@ -465,22 +466,22 @@ namespace LyricsChecker
             if (baseDirectory is null)
                 return true;
 
-            var actualAlbumArtistDirectory = baseDirectory.EnumerateDirectories(albumArtistDirectory.Name).FirstOrDefault();
-            Validation.Assert(actualAlbumArtistDirectory is not null, "actualAlbumArtistDirectory is not null");
+            var actualAlbumArtistDirectory = baseDirectory.GetSubDirectory(albumArtistDirectory.Name);
+            Validation.Assert(actualAlbumArtistDirectory.Exists, "actualAlbumArtistDirectory.Exists");
 
-            var actualAlbumDirectory = albumArtistDirectory.EnumerateDirectories(albumDirectory.Name).FirstOrDefault();
-            Validation.Assert(actualAlbumDirectory is not null, "actualAlbumDirectory is not null");
+            var actualAlbumDirectory = albumArtistDirectory.GetSubDirectory(albumDirectory.Name);
+            Validation.Assert(actualAlbumDirectory.Exists, "actualAlbumDirectory.Exists");
 
             var desiredAlbumArtistDirectoryName = albumArtist.WindowsFileNameEncoding();
 
             // いくつかのプレイヤーソフトでは "." で始まるディレクトリ/ファイル名を無視するため、置き換える。
-            if (desiredAlbumArtistDirectoryName.StartsWith(".", StringComparison.Ordinal))
+            if (desiredAlbumArtistDirectoryName.StartsWith('.'))
                 desiredAlbumArtistDirectoryName = $"．{desiredAlbumArtistDirectoryName[1..]}";
 
             var desiredAlbumDirectoryName = $"{album} - {date}年".WindowsFileNameEncoding();
 
             // いくつかのプレイヤーソフトでは "." で始まるディレクトリ/ファイル名を無視するため、置き換える。
-            if (desiredAlbumDirectoryName.StartsWith(".", StringComparison.Ordinal))
+            if (desiredAlbumDirectoryName.StartsWith('.'))
                 desiredAlbumDirectoryName = $"．{desiredAlbumDirectoryName[1..]}";
 
             if (actualAlbumArtistDirectory.Name != desiredAlbumArtistDirectoryName ||
@@ -493,7 +494,7 @@ namespace LyricsChecker
             return true;
         }
 
-        private static bool CheclLyricsFile(FileInfo lyricsFile)
+        private static bool CheclLyricsFile(FilePath lyricsFile)
         {
             var ok = true;
             var text = File.ReadAllText(lyricsFile.FullName);
@@ -507,7 +508,7 @@ namespace LyricsChecker
             return ok;
         }
 
-        private static bool ModifyLyricsFile(FileInfo lyricsFile)
+        private static bool ModifyLyricsFile(FilePath lyricsFile)
         {
             var modified = false;
             var text = File.ReadAllText(lyricsFile.FullName);
@@ -521,7 +522,7 @@ namespace LyricsChecker
             return modified;
         }
 
-        private static LyricsContainer ReadLyricsFile(FileInfo lyricsFile)
+        private static LyricsContainer ReadLyricsFile(FilePath lyricsFile)
         {
             var lyricsData = new LyricsContainer();
             using var lyricsReader = new StreamReader(lyricsFile.FullName, new UTF8Encoding(false, true));
@@ -640,7 +641,7 @@ namespace LyricsChecker
 
         // 将来の拡張性のために残してある未使用のパラメタへのコンパイラの警告を抑止する。
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:未使用のパラメーターを削除します", Justification = "<保留中>")]
-        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<string?> musicTagValueGetter, FileInfo musicFile)
+        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<string?> musicTagValueGetter, FilePath musicFile)
         {
             var ok = true;
             var musicTagValue = musicTagValueGetter();
@@ -653,7 +654,7 @@ namespace LyricsChecker
             return ok;
         }
 
-        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<string?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
+        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<string?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FilePath lyricsFile)
         {
             var ok = true;
             var musicTagValue = musicTagValueGetter();
@@ -675,9 +676,9 @@ namespace LyricsChecker
 
         // 将来の拡張性のために残してある未使用のパラメタへのコンパイラの警告を抑止する。
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:未使用のパラメーターを削除します", Justification = "<保留中>")]
-        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<TimeSpan?> musicTagValueGetter, FileInfo musicFile) => true;
+        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<TimeSpan?> musicTagValueGetter, FilePath musicFile) => true;
 
-        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<TimeSpan?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
+        private static bool CheckTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<TimeSpan?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FilePath lyricsFile)
         {
             var musicTagValue = musicTagValueGetter();
             var lyricsTagValue = lyricsTags.TryGetValue(lyricsFileTagName, out var tagValue) ? tagValue : null;
@@ -723,7 +724,7 @@ namespace LyricsChecker
             }
         }
 
-        private static bool ModifyTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<string?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
+        private static bool ModifyTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<string?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FilePath lyricsFile)
         {
             var musicTagValue = musicTagValueGetter();
             if (lyricsTags.TryGetValue(lyricsFileTagName, out var lyricsTagValue))
@@ -763,7 +764,7 @@ namespace LyricsChecker
             }
         }
 
-        private static bool ModifyTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<TimeSpan?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FileInfo lyricsFile)
+        private static bool ModifyTag(string lyricsFileFriendlyTagName, string lyricsFileTagName, Func<TimeSpan?> musicTagValueGetter, IDictionary<string, string> lyricsTags, FilePath lyricsFile)
         {
             var musicTagValue = musicTagValueGetter();
             if (lyricsTags.TryGetValue(lyricsFileTagName, out var lyricsTagValue))
@@ -813,12 +814,12 @@ namespace LyricsChecker
             }
         }
 
-        private static bool CheckFileName(FileInfo file, string fileName)
+        private static bool CheckFileName(FilePath file, string fileName)
         {
             var ok = true;
             var parentDirectory = file.Directory;
             Validation.Assert(parentDirectory is not null, "parentDirectory is not null");
-            var actualFiles = parentDirectory.EnumerateFiles(file.Name).ToList();
+            var actualFiles = parentDirectory.EnumerateFiles().Where(f => string.Equals(f.Name, file.Name, StringComparison.OrdinalIgnoreCase)).ToList();
             Validation.Assert(actualFiles.Count > 0, "actualFiles.Count > 0");
             if (actualFiles.Count > 1)
             {

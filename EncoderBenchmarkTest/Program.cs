@@ -6,6 +6,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using MatroskaBatchToolBox.Utility;
+using Palmtree;
+using Palmtree.IO;
 using Palmtree.IO.Console;
 using Palmtree.Numerics;
 
@@ -22,6 +24,7 @@ namespace EncoderBenchmarkTest
             _vmafScorePattern = new Regex(@"VMAF score\s*:\s*(?<vmafScore>\d+(\.\d+)?)", RegexOptions.Compiled);
             _resolutionSpecInFileNamePattern = new Regex(@"\[(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)( (?<aspectRatioWidth>\d+)(to|：)(?<aspectRatioHeight>\d+))?\]", RegexOptions.Compiled);
         }
+
         public static void Main(string[] args)
         {
             // 第1パラメタはffmpegの実行ファイルのフルパス
@@ -58,12 +61,12 @@ namespace EncoderBenchmarkTest
                 {
                     foreach (var sourceFilePath in args.Skip(1).OrderBy(arg => Path.GetFileName(arg)))
                     {
-                        var sourceFile = new FileInfo(sourceFilePath);
+                        var sourceFile = new FilePath(sourceFilePath);
                         if (sourceFile.Exists)
                         {
                             var sourceFileLength = sourceFile.Length;
-                            var encodedFile = new FileInfo(Path.GetTempFileName());
-                            encodedFile.MoveTo(Path.Combine(encodedFile.DirectoryName ?? ".", Path.GetFileNameWithoutExtension(encodedFile.Name) + ".mkv"));
+                            var encodedFile = new FilePath(Path.GetTempFileName());
+                            encodedFile.MoveTo(encodedFile.Directory.GetFile(Path.GetFileNameWithoutExtension(encodedFile.Name) + ".mkv"));
                             try
                             {
                                 var match = _resolutionSpecInFileNamePattern.Match(sourceFile.Name);
@@ -123,7 +126,7 @@ namespace EncoderBenchmarkTest
             _ = TinyConsole.ReadLine();
         }
 
-        private static (TimeSpan cpuTime, long encodedFileLength, string commandLine) ConvertMovieFile(string ffmpegCommandPath, FileInfo sourceFile, FileInfo encodedFile, int resolutionWidth, int resolutionHeight, int aspectRatioWidth, int aspectRatioHeight, string encoder, string encoderDependentParameters)
+        private static (TimeSpan cpuTime, ulong encodedFileLength, string commandLine) ConvertMovieFile(string ffmpegCommandPath, FilePath sourceFile, FilePath encodedFile, int resolutionWidth, int resolutionHeight, int aspectRatioWidth, int aspectRatioHeight, string encoder, string encoderDependentParameters)
         {
             var commandParameter = new StringBuilder();
             _ = commandParameter.Append("-hide_banner");
@@ -145,7 +148,7 @@ namespace EncoderBenchmarkTest
             return (totalProcessorTime, encodedFileLength, summaryOfCommandLine);
         }
 
-        private static double CalculateVmaf(string ffmpegCommandPath, FileInfo sourceFile, FileInfo encodedFile, int resolutionWidth, int resolutionHeight)
+        private static double CalculateVmaf(string ffmpegCommandPath, FilePath sourceFile, FilePath encodedFile, int resolutionWidth, int resolutionHeight)
         {
             var commandParameter = new StringBuilder();
             _ = commandParameter.Append("-hide_banner");

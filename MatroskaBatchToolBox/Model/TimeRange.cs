@@ -7,7 +7,9 @@ namespace MatroskaBatchToolBox.Model
     internal class TimeRange
     {
         static TimeRange()
-            => DefaultValue = new TimeRange("", null, "", null);
+        {
+            DefaultValue = new TimeRange("", null, "", null);
+        }
 
         private TimeRange(string start, TimeSpan? startTime, string end, TimeSpan? endTime)
         {

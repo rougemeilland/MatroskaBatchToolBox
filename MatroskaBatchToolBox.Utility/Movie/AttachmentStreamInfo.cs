@@ -7,7 +7,9 @@ namespace MatroskaBatchToolBox.Utility.Movie
     {
         internal AttachmentStreamInfo(MovieStreamInfoContainer stream, int indexWithinAttachmentStream)
             : base(stream)
-            => IndexWithinAttachmentStream = indexWithinAttachmentStream;
+        {
+            IndexWithinAttachmentStream = indexWithinAttachmentStream;
+        }
 
         public int IndexWithinAttachmentStream { get; }
     }

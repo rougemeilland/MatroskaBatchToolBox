@@ -7,7 +7,9 @@ namespace MatroskaBatchToolBox.Utility.Movie
     {
         internal SubtitleStreamInfo(MovieStreamInfoContainer stream, int indexWithinSubtitleStream)
             : base(stream)
-            => IndexWithinSubtitleStream = indexWithinSubtitleStream;
+        {
+            IndexWithinSubtitleStream = indexWithinSubtitleStream;
+        }
 
         public int IndexWithinSubtitleStream { get; }
     }

@@ -14,43 +14,14 @@ namespace AudioNormalizer
         public ID3MusicFileMetadataProvider(TransferDirection direction, string? fileFormat, string? fileExtension)
         {
             _direction = direction;
-            if (fileFormat is not null)
-            {
-                if (fileExtension is not null)
-                {
-                    if (fileFormat == "wav" && fileExtension == ".wav")
-                        _fileFormat = "wav";
-                    else if (fileFormat == "mp3" && fileExtension == ".mp3")
-                        _fileFormat = "mp3";
-                    else
-                        _fileFormat = null;
-                }
-                else
-                {
-                    if (fileFormat == "wav")
-                        _fileFormat = "wav";
-                    else if (fileFormat == "mp3")
-                        _fileFormat = "mp3";
-                    else
-                        _fileFormat = null;
-                }
-            }
-            else
-            {
-                if (fileExtension is not null)
-                {
-                    if (fileExtension == ".wav")
-                        _fileFormat = "wav";
-                    else if (fileExtension == ".mp3")
-                        _fileFormat = "mp3";
-                    else
-                        _fileFormat = null;
-                }
-                else
-                {
-                    _fileFormat = null;
-                }
-            }
+            _fileFormat =
+                fileFormat is null && fileExtension is null
+                ? null
+                : (fileFormat is null || fileFormat == "wav") && (fileExtension is null || fileExtension == ".wav")
+                ? "wav"
+                : (fileFormat is null || fileFormat == "mp3") && (fileExtension is null || fileExtension == ".mp3")
+                ? "mp3"
+                : null;
         }
 
         public override bool Supported
@@ -156,7 +127,7 @@ namespace AudioNormalizer
                 _ => "pcm_f32le",
             };
 
-        private static IEnumerable<string> MapPcmEncoderOptions(int index, int? bitsPerRawSample)
+        private static string[] MapPcmEncoderOptions(int index, int? bitsPerRawSample)
         {
             if (bitsPerRawSample is null)
                 return Array.Empty<string>();

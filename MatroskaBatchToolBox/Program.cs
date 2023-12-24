@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MatroskaBatchToolBox.Properties;
 using Palmtree;
+using Palmtree.IO;
 using Palmtree.IO.Console;
 
 namespace MatroskaBatchToolBox
@@ -158,7 +159,7 @@ namespace MatroskaBatchToolBox
 
                 void worker()
                 {
-                    while (progressState.TryGetNextSourceFile(out int sourceFileId, out FileInfo? sourceFile))
+                    while (progressState.TryGetNextSourceFile(out int sourceFileId, out FilePath? sourceFile))
                     {
                         if (_cancelRequested)
                             break;
@@ -226,7 +227,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static IEnumerable<FileInfo> CreateSourceFileList(string[] args, ActionMode actionMode)
+        private static IEnumerable<FilePath> CreateSourceFileList(string[] args, ActionMode actionMode)
         {
             var sourceFileList =
                 EnumerateSourceFile(args.Where(arg => !arg.StartsWith("--", StringComparison.Ordinal)))
@@ -240,8 +241,8 @@ namespace MatroskaBatchToolBox
             // そのため、"--convert-video" モードでは「サイズ変更対象になりそうなソースファイル」と「単純変換対象になりそうなファイル」がそれぞれ大量に連続して処理されにくいように
             // 適当に処理順序を変えた sourceFileList を再作成する。
 
-            var sourceQueueWithSimpleConversion = new Queue<FileInfo>();
-            var sourceQueueWithComplexConversion = new Queue<FileInfo>();
+            var sourceQueueWithSimpleConversion = new Queue<FilePath>();
+            var sourceQueueWithComplexConversion = new Queue<FilePath>();
             foreach (var sourceFile in sourceFileList)
             {
                 var sourceFileDirectoryName = Path.GetFileName(Path.GetDirectoryName(sourceFile.FullName) ?? ".");
@@ -253,7 +254,7 @@ namespace MatroskaBatchToolBox
 
             var totalCountOfSourceFilesWithSimpleConversion = sourceQueueWithSimpleConversion.Count;
             var totalCountOfSourceFilesWithComplexConversion = sourceQueueWithComplexConversion.Count;
-            var modifiedSourceFileList = new List<FileInfo>();
+            var modifiedSourceFileList = new List<FilePath>();
             while (sourceQueueWithSimpleConversion.Count > 0 && sourceQueueWithComplexConversion.Count > 0)
             {
                 if (sourceQueueWithSimpleConversion.Count * totalCountOfSourceFilesWithComplexConversion > sourceQueueWithComplexConversion.Count * totalCountOfSourceFilesWithSimpleConversion)
@@ -269,60 +270,20 @@ namespace MatroskaBatchToolBox
             return modifiedSourceFileList;
         }
 
-        private static IEnumerable<FileInfo> EnumerateSourceFile(IEnumerable<string> args)
+        private static IEnumerable<FilePath> EnumerateSourceFile(IEnumerable<string> args)
         {
-            foreach (var arg in args)
+            foreach (var file in args.EnumerateFilesFromArgument(true))
             {
                 if (_cancelRequested)
                     break;
-
-                FileInfo? file;
-                try
-                {
-                    file = new FileInfo(arg);
-                    if (!IsSourceFile(arg) || !file.Exists || file.Length <= 0)
-                        file = null;
-
-                }
-                catch (Exception)
-                {
-                    file = null;
-                }
-
-                if (file is not null)
+                if (IsSourceFile(file.FullName) && file.Length > 0)
                     yield return file;
-
-                DirectoryInfo? directoryInfo;
-                try
-                {
-                    directoryInfo = new DirectoryInfo(arg);
-                    if (!directoryInfo.Exists)
-                        directoryInfo = null;
-                }
-                catch (Exception)
-                {
-                    directoryInfo = null;
-                }
-
-                if (directoryInfo is not null)
-                {
-                    foreach (var childFile in directoryInfo.EnumerateFiles("*.*", SearchOption.AllDirectories))
-                    {
-                        if (childFile is not null && IsSourceFile(childFile.FullName) && childFile.Length > 0)
-                        {
-                            if (_cancelRequested)
-                                break;
-
-                            yield return childFile;
-                        }
-                    }
-                }
             }
         }
 
         private static bool IsSourceFile(string sourceFilePath)
-            => !(Path.GetFileName(sourceFilePath) ?? ".").StartsWith(".", StringComparison.Ordinal) &&
-                Path.GetExtension(sourceFilePath).ToUpperInvariant().IsAnyOf(".MKV", ".MP4", ".WMV", ".AVI");
+            => !Path.GetFileName(sourceFilePath).StartsWith('.')
+                && Path.GetExtension(sourceFilePath).ToUpperInvariant().IsAnyOf(".MKV", ".MP4", ".WMV", ".AVI");
 
         private static bool IsRequestedCancellation()
         {

@@ -6,6 +6,7 @@ namespace AudioNormalizer
 {
     partial class Program
     {
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1861:引数として定数配列を使用しない", Justification = "<保留中>")]
         private static CommandOptionDefinition<OptionType>[] GetOptionDefinitions()
             => new CommandOptionDefinition<OptionType>[]
             {

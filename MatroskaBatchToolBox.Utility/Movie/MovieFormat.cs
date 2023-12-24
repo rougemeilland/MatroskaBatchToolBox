@@ -1,6 +1,6 @@
 ﻿using System;
-using System.IO;
 using MatroskaBatchToolBox.Utility.Models.Json;
+using Palmtree.IO;
 using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox.Utility.Movie
@@ -9,7 +9,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
     {
         internal MovieFormat(MovieFormatContainer format)
         {
-            File = new FileInfo(format.FilePath);
+            File = new FilePath(format.FilePath);
             StreamsCount = format.StreamsCount;
             ProgramsCount = format.ProgramsCount;
             FormatName = format.FormatName;
@@ -22,7 +22,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
             Tags = new MovieFormatTags(format.Tags);
         }
 
-        public FileInfo File { get; }
+        public FilePath File { get; }
         public int StreamsCount { get; }
         public int ProgramsCount { get; }
         public string FormatName { get; }

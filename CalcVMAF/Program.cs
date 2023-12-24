@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Palmtree.IO;
 using Palmtree.IO.Console;
 
 namespace CalcVmaf
@@ -16,6 +17,8 @@ namespace CalcVmaf
         {
             public bool? Log { get; set; }
         }
+
+        private static readonly char[] _anyOfCarrigeReturnOrNewLine = new[] { '\r', '\n' };
 
         public static int Main(string[] args)
         {
@@ -38,8 +41,9 @@ namespace CalcVmaf
             var (originalMovieFile, encodedMovieFile, option) = ParseArguments(args);
             if (originalMovieFile is null || encodedMovieFile is null || option is null)
                 return 1;
-            foreach (var oldLogFilePath in Directory.EnumerateFiles(encodedMovieFile.DirectoryName ?? ".", $"{encodedMovieFile.Name}.vmaf-*.log"))
-                File.Delete(oldLogFilePath);
+            var logFilePattern = new Regex($"^{encodedMovieFile.Name}\\.vmaf-.*\\.log$", RegexOptions.IgnoreCase);
+            foreach (var oldLogFilePath in encodedMovieFile.Directory.EnumerateFiles().Where(f => logFilePattern.IsMatch(f.Name)))
+                oldLogFilePath.Delete();
             var logFilePath = $"{encodedMovieFile.FullName}.vmaf.log";
             var logWriter = option.Log ?? false ? new StreamWriter(logFilePath) : null;
             try
@@ -129,7 +133,7 @@ namespace CalcVmaf
                                     TinyConsole.Out.WriteLine(vmafScore);
                             }
 
-                            var indexOfLastNewLine = cache.LastIndexOfAny(new[] { '\r', '\n' });
+                            var indexOfLastNewLine = cache.LastIndexOfAny(_anyOfCarrigeReturnOrNewLine);
                             if (indexOfLastNewLine >= 0)
                                 cache = cache[(indexOfLastNewLine + 1)..];
                         }
@@ -185,10 +189,10 @@ namespace CalcVmaf
             }
         }
 
-        private static (FileInfo? originalMovieFilePath, FileInfo? encodedMovieFilePath, ProgramOption? option) ParseArguments(string[] args)
+        private static (FilePath? originalMovieFilePath, FilePath? encodedMovieFilePath, ProgramOption? option) ParseArguments(string[] args)
         {
-            FileInfo? originalMovieFile = null;
-            FileInfo? encodedMovieFile = null;
+            FilePath? originalMovieFile = null;
+            FilePath? encodedMovieFile = null;
             var option = new ProgramOption();
 
             for (var index = 0; index < args.Length; ++index)
@@ -203,7 +207,7 @@ namespace CalcVmaf
 
                     option.Log = true;
                 }
-                else if (args[index].StartsWith("-", StringComparison.Ordinal) ||
+                else if (args[index].StartsWith('-') ||
                          args[index].StartsWith("--", StringComparison.Ordinal))
                 {
                     TinyConsole.Error.WriteLine($"An unsupported option was specified.: \"{args[index]}\"");
@@ -211,10 +215,10 @@ namespace CalcVmaf
                 }
                 else if (originalMovieFile is null)
                 {
-                    FileInfo file;
+                    FilePath file;
                     try
                     {
-                        file = new FileInfo(args[index]);
+                        file = new FilePath(args[index]);
                         if (!file.Exists)
                         {
                             TinyConsole.Error.WriteLine($"Original movie file does not exist.: \"{args[index]}\"");
@@ -231,10 +235,10 @@ namespace CalcVmaf
                 }
                 else if (encodedMovieFile is null)
                 {
-                    FileInfo file;
+                    FilePath file;
                     try
                     {
-                        file = new FileInfo(args[index]);
+                        file = new FilePath(args[index]);
                         if (!file.Exists)
                         {
                             TinyConsole.Error.WriteLine($"Encoded movie file does not exist.: \"{args[index]}\"");

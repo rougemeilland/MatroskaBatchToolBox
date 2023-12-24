@@ -7,8 +7,8 @@ using System.Text;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
-using Palmtree.Linq;
 using Palmtree.IO;
+using Palmtree.Linq;
 
 namespace AudioNormalizer
 {
@@ -432,7 +432,7 @@ namespace AudioNormalizer
                 .Where(stream => stream.ChannelLayout is not null && stream.ChannelLayout.IsAnyOf("5.0(side)", "5.1(side)"))
                 .ToList();
 
-            if (audioStreamsNotSupportedByLibOpus.Any())
+            if (audioStreamsNotSupportedByLibOpus.Count > 0)
             {
                 // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームが存在する場合
 

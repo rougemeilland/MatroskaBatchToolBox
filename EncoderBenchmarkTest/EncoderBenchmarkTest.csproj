@@ -19,6 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Palmtree.IO" Version="1.2.1-alpha" />
     <PackageReference Include="Palmtree.IO.Console" Version="1.0.0-alpha" />
     <PackageReference Include="Palmtree.Numerics" Version="1.0.0-alpha" />
   </ItemGroup>

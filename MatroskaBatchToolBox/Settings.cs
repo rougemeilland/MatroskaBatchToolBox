@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using MatroskaBatchToolBox.Model;
 using MatroskaBatchToolBox.Model.Json;
+using Palmtree.IO;
 using Palmtree.IO.Console;
 
 namespace MatroskaBatchToolBox
@@ -10,21 +11,21 @@ namespace MatroskaBatchToolBox
     internal class Settings
     {
         private const string _localSettingFileName = $".{nameof(MatroskaBatchToolBox)}.setting.json";
+        private static readonly JsonSerializerOptions _jsonSerializerOptions;
 
         static Settings()
         {
+            _jsonSerializerOptions = new JsonSerializerOptions { AllowTrailingCommas = true, PropertyNameCaseInsensitive = true };
             var baseDirectoryPath =
                 Path.GetDirectoryName(typeof(Settings).Assembly.Location)
                 ?? throw new Exception("'settings.json' is not found.");
             var settingsFilePath = Path.Combine(baseDirectoryPath, "settings.json");
             var settingsText = File.ReadAllText(settingsFilePath);
             var settings =
-                JsonSerializer.Deserialize<GlobalSettingsContainer>(
-                    settingsText,
-                    new JsonSerializerOptions { AllowTrailingCommas = true, PropertyNameCaseInsensitive = true })
+                JsonSerializer.Deserialize<GlobalSettingsContainer>(settingsText, _jsonSerializerOptions)
                 ?? throw new Exception("Failed to parse 'settings.json'.");
 
-            FileInfo? ffmpegNormalizeCommandFile;
+            FilePath? ffmpegNormalizeCommandFile;
             if (string.IsNullOrEmpty(settings.FfmpegNormalizeCommandFilePath))
             {
                 var message = $"'{nameof(settings.FfmpegNormalizeCommandFilePath)}' is not set in 'settings.json'.";
@@ -34,7 +35,7 @@ namespace MatroskaBatchToolBox
 
             try
             {
-                ffmpegNormalizeCommandFile = new FileInfo(settings.FfmpegNormalizeCommandFilePath);
+                ffmpegNormalizeCommandFile = new FilePath(settings.FfmpegNormalizeCommandFilePath);
                 if (!ffmpegNormalizeCommandFile.Exists)
                     ffmpegNormalizeCommandFile = null;
             }
@@ -122,7 +123,7 @@ namespace MatroskaBatchToolBox
         }
 
         private Settings(
-            FileInfo ffmpegNormalizeCommandFile,
+            FilePath ffmpegNormalizeCommandFile,
             VideoEncoderType ffmpegVideoEncoder,
             string ffmpegLibx264EncoderOption,
             string ffmpegLibx265EncoderOption,
@@ -169,7 +170,7 @@ namespace MatroskaBatchToolBox
             ResetDefaultStream = resetDefaultStream;
         }
 
-        public FileInfo FfmpegNormalizeCommandFile { get; }
+        public FilePath FfmpegNormalizeCommandFile { get; }
         public VideoEncoderType FfmpegVideoEncoder { get; }
         public string FfmpegLibx264EncoderOption { get; }
         public string FfmpegLibx265EncoderOption { get; }
@@ -193,7 +194,7 @@ namespace MatroskaBatchToolBox
         public int DegreeOfParallelism { get; }
         public static Settings GlobalSettings { get; }
 
-        public Settings GetLocalSettings(DirectoryInfo movieFileDirectory)
+        public Settings GetLocalSettings(DirectoryPath movieFileDirectory)
         {
             try
             {
@@ -201,10 +202,7 @@ namespace MatroskaBatchToolBox
                 if (!File.Exists(localSettingFilePath))
                     return this;
                 var settingsText = File.ReadAllText(localSettingFilePath);
-                var localSettings =
-                    JsonSerializer.Deserialize<LocalSettingsContainer>(
-                        settingsText,
-                        new JsonSerializerOptions { AllowTrailingCommas = true, PropertyNameCaseInsensitive = true });
+                var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText, _jsonSerializerOptions);
                 if (localSettings is null)
                     return this;
                 return

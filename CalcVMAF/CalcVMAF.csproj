@@ -10,15 +10,16 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
-    <NoWarn>1701;1702;SYSLIB1045</NoWarn>
+    <NoWarn>1701;1702;SYSLIB1045;IDE0300</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
-    <NoWarn>1701;1702;SYSLIB1045</NoWarn>
+    <NoWarn>1701;1702;SYSLIB1045;IDE0300</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Palmtree.IO" Version="1.2.1-alpha" />
     <PackageReference Include="Palmtree.IO.Console" Version="1.0.0-alpha" />
   </ItemGroup>
 

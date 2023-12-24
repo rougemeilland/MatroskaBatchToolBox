@@ -6,6 +6,7 @@ using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.IO;
 using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox
@@ -45,9 +46,9 @@ namespace MatroskaBatchToolBox
                     RegexOptions.Compiled);
         }
 
-        public static ActionResult NormalizeMovieFile(Settings localSettings, FileInfo sourceFile, IProgress<double> progressReporter)
+        public static ActionResult NormalizeMovieFile(Settings localSettings, FilePath sourceFile, IProgress<double> progressReporter)
         {
-            var logFile = new FileInfo(sourceFile.FullName + ".log");
+            var logFile = new FilePath(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
             var destinationFileEncodedByOpus = MakeDestinationFilePath(sourceFile, AudioEncoderType.Libopus);
             var destinationFileEncodedByVorbis = MakeDestinationFilePath(sourceFile, AudioEncoderType.Libvorbis);
@@ -75,25 +76,16 @@ namespace MatroskaBatchToolBox
 
             return !audioCodecIsNotSupported ? actionResult : ActionResult.Failed;
 
-            static FileInfo MakeDestinationFilePath(FileInfo sourceFile, AudioEncoderType audioEncoder)
-            {
-                return
-                    new FileInfo(
-                        Path.Combine(
-                            sourceFile.DirectoryName ?? ".",
-                            $"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{audioEncoder.ToFormatName()} audio-normalized].mkv"));
-            }
+            static FilePath MakeDestinationFilePath(FilePath sourceFile, AudioEncoderType audioEncoder)
+                => sourceFile.Directory.GetFile($"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{audioEncoder.ToFormatName()} audio-normalized].mkv");
         }
 
-        private static (ActionResult actionResult, bool audioCodecIsNotSupported) NormalizeMovieFile(FileInfo sourceFile, FileInfo logFile, AudioEncoderType audioEncoder, FileInfo destinationFile, IProgress<double> progressReporter)
+        private static (ActionResult actionResult, bool audioCodecIsNotSupported) NormalizeMovieFile(FilePath sourceFile, FilePath logFile, AudioEncoderType audioEncoder, FilePath destinationFile, IProgress<double> progressReporter)
         {
-            var workingFile =
-                new FileInfo(
-                    Path.Combine(sourceFile.DirectoryName ?? ".",
-                    $".work.audio-normalize.{sourceFile.Name}.mkv"));
+            var workingFile = sourceFile.Directory.GetFile($".work.audio-normalize.{sourceFile.Name}.mkv");
             DeleteFileSafety(workingFile);
             var actionResult = ActionResult.Failed;
-            FileInfo? actualDestinationFilePath = null;
+            FilePath? actualDestinationFilePath = null;
             try
             {
                 if (_normalizedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
@@ -182,7 +174,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static ActionResult ResizeMovieFile(Settings localSettings, FileInfo sourceFile, IProgress<double> progressReporter)
+        public static ActionResult ResizeMovieFile(Settings localSettings, FilePath sourceFile, IProgress<double> progressReporter)
         {
             var sourceFileDirectory = sourceFile.Directory;
             if (sourceFileDirectory is null)
@@ -207,32 +199,24 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static ActionResult ContertMovieFileToMatroska(Settings localSettings, FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
+        private static ActionResult ContertMovieFileToMatroska(Settings localSettings, FilePath sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
-            var logFile = new FileInfo(sourceFile.FullName + ".log");
+            var logFile = new FilePath(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
             var (isParsedSuccessfully, resolutionSpec, aspectRatioSpec, aspectRatioSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
             if (!isParsedSuccessfully)
                 return ActionResult.Skipped;
             var destinationFile =
-                new FileInfo(
-                    Path.Combine(
-                        sourceFile.DirectoryName ?? ".",
-                        resolutionSpec is null
-                            ? $"{Path.GetFileNameWithoutExtension(sourceFile.Name)}.mkv"
-                            : ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRatioSpecOnFileSystem, null)));
-            var workingFile1 =
-                new FileInfo(
-                    Path.Combine(sourceFile.DirectoryName ?? ".",
-                    $".work.resize-resolution-1.{sourceFile.Name}.mkv"));
-            var workingFile2 =
-                new FileInfo(
-                    Path.Combine(sourceFile.DirectoryName ?? ".",
-                    $".work.resize-resolution-2.{sourceFile.Name}.mkv"));
+                sourceFile.Directory.GetFile(
+                    resolutionSpec is null
+                        ? $"{Path.GetFileNameWithoutExtension(sourceFile.Name)}.mkv"
+                        : ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRatioSpecOnFileSystem, null));
+            var workingFile1 = sourceFile.Directory.GetFile($".work.resize-resolution-1.{sourceFile.Name}.mkv");
+            var workingFile2 = sourceFile.Directory.GetFile($".work.resize-resolution-2.{sourceFile.Name}.mkv");
             DeleteFileSafety(workingFile1);
             DeleteFileSafety(workingFile2);
             var actionResult = ActionResult.Failed;
-            FileInfo? actualDestinationFilePath = null;
+            FilePath? actualDestinationFilePath = null;
             try
             {
                 if (sourceFile.Name == destinationFile.Name)
@@ -270,7 +254,7 @@ namespace MatroskaBatchToolBox
                         movieInfo.VideoStreams
                         .Where(stream => !stream.IsImageVideoStream && stream.Resolution != resolutionSpec)
                         .ToList();
-                    if (invalidStreams.Any())
+                    if (invalidStreams.Count > 0)
                     {
                         ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Simple conversion is not possible because the movie file resolution ({string.Join(", ", invalidStreams.Select(stream => stream.Resolution))}) is different from the destination resolution ({resolutionSpec}).: \"{sourceFile.FullName}\"", });
                         return actionResult = ActionResult.Failed;
@@ -407,10 +391,10 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static ActionResult ChangeResolutionOfMovieFile(Settings localSettings, FileInfo sourceFile, string conversionSpec, IProgress<double> progressReporter)
+        private static ActionResult ChangeResolutionOfMovieFile(Settings localSettings, FilePath sourceFile, string conversionSpec, IProgress<double> progressReporter)
         {
             var videoEncoder = localSettings.FfmpegVideoEncoder;
-            var logFile = new FileInfo(sourceFile.FullName + ".log");
+            var logFile = new FilePath(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
             var calculateVmafScore = localSettings.CalculateVmafScore;
             if (calculateVmafScore && (localSettings.Cropping is not null || localSettings.Trimming is not null))
@@ -427,19 +411,13 @@ namespace MatroskaBatchToolBox
             }
 
             var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRatioSpecOnFileSystem, $"{videoEncoder.ToFormatName()} CRF");
-            var destinationFile = new FileInfo(Path.Combine(sourceFile.DirectoryName ?? ".", destinationFileName));
-            var workingFile1 =
-                new FileInfo(
-                    Path.Combine(sourceFile.DirectoryName ?? ".",
-                    $".work.resize-resolution-1.{sourceFile.Name}.mkv"));
-            var workingFile2 =
-                new FileInfo(
-                    Path.Combine(sourceFile.DirectoryName ?? ".",
-                    $".work.resize-resolution-2.{sourceFile.Name}.mkv"));
+            var destinationFile = sourceFile.Directory.GetFile(destinationFileName);
+            var workingFile1 = sourceFile.Directory.GetFile($".work.resize-resolution-1.{sourceFile.Name}.mkv");
+            var workingFile2 = sourceFile.Directory.GetFile($".work.resize-resolution-2.{sourceFile.Name}.mkv");
             DeleteFileSafety(workingFile1);
             DeleteFileSafety(workingFile2);
             var actionResult = ActionResult.Failed;
-            FileInfo? actualDestinationFilePath = null;
+            FilePath? actualDestinationFilePath = null;
             try
             {
                 if (_encodedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
@@ -895,9 +873,8 @@ namespace MatroskaBatchToolBox
                 localSettings.KeepChapterTitles &&
                 movieInfo.Chapters.Any(chapter => chapter.HasUniqueChapterTitle);
 
-        private static FileInfo MoveToDestinationFile(FileInfo sourceFile, FileInfo destinationFile)
+        private static FilePath MoveToDestinationFile(FilePath sourceFile, FilePath destinationFile)
         {
-            var destinationFileDirectoryPath = destinationFile.DirectoryName ?? ".";
             var destinationFileNameWithoutExtension = Path.GetFileNameWithoutExtension(destinationFile.Name);
             var destinationFileExtension = Path.GetExtension(destinationFile.Name);
             var count = 1;
@@ -905,16 +882,12 @@ namespace MatroskaBatchToolBox
             {
                 try
                 {
-                    var actualDestinationFilePath
-                        = Path.Combine(
-                            destinationFileDirectoryPath,
-                            $"{destinationFileNameWithoutExtension}{(count <= 1 ? "" : $" ({count})")}{destinationFileExtension}");
-                    if (!File.Exists(actualDestinationFilePath))
+                    var actualDestinationFile
+                        = destinationFile.Directory.GetFile($"{destinationFileNameWithoutExtension}{(count <= 1 ? "" : $" ({count})")}{destinationFileExtension}");
+                    if (actualDestinationFile.Exists)
                     {
-                        // targetFile.MoveTo() を使用しない理由:
-                        //   targetFile.MoveTo() を発行すると、targetFile が指すパス名が MoveTo で指定した移動先ファイルパス名に改変されてしまうため。
-                        File.Move(sourceFile.FullName, actualDestinationFilePath);
-                        return new FileInfo(actualDestinationFilePath);
+                        sourceFile.MoveTo(actualDestinationFile);
+                        return new FilePath(actualDestinationFile.FullName);
                     }
                 }
                 catch (FileNotFoundException ex)
@@ -929,7 +902,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static void CleanUpLogFile(FileInfo logFile)
+        private static void CleanUpLogFile(FilePath logFile)
         {
             try
             {
@@ -942,30 +915,22 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static void DeleteFileSafety(string targetFilePath)
+        private static void DeleteFileSafety(FilePath targetFilePath)
         {
             try
             {
-                if (File.Exists(targetFilePath))
-                    File.Delete(targetFilePath);
+                if (targetFilePath.Exists)
+                    targetFilePath.Delete();
             }
             catch (IOException)
             {
             }
         }
 
-        private static void DeleteFileSafety(FileInfo targetFile)
-            // targetFile.Delete() を使用しない理由:
-            //   targetFile.Delete() を発行すると、targetFile オブジェクトに「もうこのファイルは存在しない」というフラグが立ってしまうらしく、
-            //   その後 targetFile.FullName のパス名のファイルを作成しても、targetFile.Exists は false を返し続けるから。
-            => DeleteFileSafety(targetFile.FullName);
+        private static void FinalizeLogFile(FilePath logFile, string result)
+            => logFile.MoveTo(ConstructLogFilePath(logFile, result), true);
 
-        private static void FinalizeLogFile(FileInfo logFile, string result)
-            => File.Move(logFile.FullName, ConstructLogFilePath(logFile, result), true);
-
-        private static string ConstructLogFilePath(FileInfo logFile, string result)
-            => Path.Combine(
-                logFile.DirectoryName ?? ".",
-                $"{Path.GetFileNameWithoutExtension(logFile.Name)}.{result}{logFile.Extension}");
+        private static FilePath ConstructLogFilePath(FilePath logFile, string result)
+            => logFile.Directory.GetFile($"{Path.GetFileNameWithoutExtension(logFile.Name)}.{result}{logFile.Extension}");
     }
 }

@@ -10,6 +10,7 @@ using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
+using Palmtree.IO;
 using Palmtree.IO.Console;
 using Palmtree.Numerics;
 
@@ -46,10 +47,10 @@ namespace MatroskaBatchToolBox
         public static void AbortExternalCommands()
             => Command.AbortExternalCommands();
 
-        public static CommandResultCode NormalizeAudioFile(FileInfo logFile, FileInfo inFile, AudioEncoderType audioEncoder, FileInfo outFile, IProgress<double> progressReporter)
+        public static CommandResultCode NormalizeAudioFile(FilePath logFile, FilePath inFile, AudioEncoderType audioEncoder, FilePath outFile, IProgress<double> progressReporter)
         {
             var ffmpegCommandFile =
-                new FileInfo(
+                new FilePath(
                     ProcessUtility.WhereIs("ffmpeg")
                     ?? throw new Exception("ffmpeg command is not installed."));
             Environment.SetEnvironmentVariable(_ffmpegPathEnvironmentVariableName, ffmpegCommandFile.FullName);
@@ -177,7 +178,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static CommandResultCode ConvertMovieFile(Settings localSettings, FileInfo logFile, FileInfo inFile, MovieInformation movieInfo, string? resolutionSpec, string? aspectRatioSpec, VideoEncoderType videoEncoder, bool deleteMetadata, bool setDisposition, bool setMetadata, bool setChapterTitles, bool passthroughStreams, FileInfo outFile, IProgress<double> progressReporter)
+        public static CommandResultCode ConvertMovieFile(Settings localSettings, FilePath logFile, FilePath inFile, MovieInformation movieInfo, string? resolutionSpec, string? aspectRatioSpec, VideoEncoderType videoEncoder, bool deleteMetadata, bool setDisposition, bool setMetadata, bool setChapterTitles, bool passthroughStreams, FilePath outFile, IProgress<double> progressReporter)
         {
             // ffmpeg ではメタデータの削除とタイトル付きチャプターの設定を同時に指定するとチャプターのタイトルが設定されないため、以下の条件での呼び出しを禁止する
             Validation.Assert(!deleteMetadata || !setChapterTitles, "!deleteMetadata || !setChapterTitles");
@@ -190,10 +191,10 @@ namespace MatroskaBatchToolBox
             var audioStreams = movieInfo.AudioStreams.ToList();
             var subtitleStreams = movieInfo.SubtitleStreams.ToList();
             var dataStreams = movieInfo.DataStreams.ToList();
-            if (localSettings.BehaviorForDataStreams == StreamOperationType.Error && dataStreams.Any())
+            if (localSettings.BehaviorForDataStreams == StreamOperationType.Error && dataStreams.Count > 0)
                 throw new Exception("Abort the conversion as there is a data stream in the movie.");
             var attachmentStreams = movieInfo.AttachmentStreams.ToList();
-            if (localSettings.BehaviorForAttachmentStreams == StreamOperationType.Error && attachmentStreams.Any())
+            if (localSettings.BehaviorForAttachmentStreams == StreamOperationType.Error && attachmentStreams.Count > 0)
                 throw new Exception("Abort the conversion as there is a attachment stream in the movie.");
 
             var outputVideoStreams =
@@ -407,7 +408,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static CommandResultCode CalculateVmafScoreFromMovieFile(FileInfo logFile, FileInfo originalFile, FileInfo modifiedFile, string resolutionSpec, out double vmafScore, IProgress<double> progressReporter)
+        public static CommandResultCode CalculateVmafScoreFromMovieFile(FilePath logFile, FilePath originalFile, FilePath modifiedFile, string resolutionSpec, out double vmafScore, IProgress<double> progressReporter)
         {
             var commandParameter = new StringBuilder();
             commandParameter.Append("-hide_banner");
@@ -457,7 +458,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        public static void Log(FileInfo logFile, IEnumerable<string> testLines)
+        public static void Log(FilePath logFile, IEnumerable<string> testLines)
         {
             lock (_loggingLockObject)
             {
@@ -472,7 +473,7 @@ namespace MatroskaBatchToolBox
                 ReportException(ex2);
         }
 
-        public static void ReportAggregateException(FileInfo logFile, AggregateException ex)
+        public static void ReportAggregateException(FilePath logFile, AggregateException ex)
         {
             ReportException(logFile, ex);
             foreach (var ex2 in ex.InnerExceptions)
@@ -495,7 +496,8 @@ namespace MatroskaBatchToolBox
             TinyConsole.WriteLine("----------");
         }
 
-        public static void ReportException(FileInfo logFile, Exception ex)
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1861:引数として定数配列を使用しない", Justification = "<保留中>")]
+        public static void ReportException(FilePath logFile, Exception ex)
         {
             Log(logFile, new[] { "----------", ex.Message, ex.StackTrace ?? "" });
             for (var innerEx = ex.InnerException; innerEx is not null; innerEx = innerEx.InnerException)
@@ -503,7 +505,7 @@ namespace MatroskaBatchToolBox
             Log(logFile, new[] { "----------" });
         }
 
-        private static void ProcessFfmpegOutput(FileInfo logFile, string lineText, ref bool detectedToQuit, ref double maximumDurationSeconds, ref double vmafCalculationResult, IProgress<double> progressReporter)
+        private static void ProcessFfmpegOutput(FilePath logFile, string lineText, ref bool detectedToQuit, ref double maximumDurationSeconds, ref double vmafCalculationResult, IProgress<double> progressReporter)
         {
             if (lineText == "[q] command received. Exiting.")
             {
@@ -573,7 +575,7 @@ namespace MatroskaBatchToolBox
             }
         }
 
-        private static string CreateTemporaryMetadataFile(MovieInformation movieInfo, Settings localSettings, FileInfo logFile)
+        private static string CreateTemporaryMetadataFile(MovieInformation movieInfo, Settings localSettings, FilePath logFile)
         {
             var startTime = localSettings.Trimming.StartTime ?? TimeSpan.Zero;
             var endTime = localSettings.Trimming.EndTime ?? Utility.SimpleChapterElement.DefaultMaximumDuration;
