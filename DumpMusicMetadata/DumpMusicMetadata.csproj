@@ -6,6 +6,11 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>musictag</AssemblyName>
+    <Trimming>full</Trimming>
+    <PublishAot>True</PublishAot>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net7.0|AnyCPU'">
@@ -23,6 +28,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net60|AnyCPU'">
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Palmtree.IO.Console" Version="1.4.2-alpha" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj" />

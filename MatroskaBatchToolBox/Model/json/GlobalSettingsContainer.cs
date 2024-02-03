@@ -2,7 +2,7 @@
 
 namespace MatroskaBatchToolBox.Model.Json
 {
-    public class GlobalSettingsContainer
+    internal class GlobalSettingsContainer
     {
         [JsonPropertyName("ffmpeg_normalize_command_file_path")]
         public string? FfmpegNormalizeCommandFilePath { get; set; }

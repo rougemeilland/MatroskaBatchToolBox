@@ -2,7 +2,7 @@
 
 namespace MatroskaBatchToolBox.Model.Json
 {
-    public class LocalSettingsContainer
+    internal class LocalSettingsContainer
     {
         [JsonPropertyName("ffmpeg_video_encoder")]
         public string? FfmpegVideoEncoder { get; set; }

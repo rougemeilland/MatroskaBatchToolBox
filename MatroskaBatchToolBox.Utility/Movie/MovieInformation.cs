@@ -38,9 +38,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
         public static MovieInformation ParseFromJson(string jsonText)
         {
             var movieInformationContainer =
-                JsonSerializer.Deserialize<MovieInformationContainer>(
-                    jsonText,
-                    new JsonSerializerOptions { AllowTrailingCommas = true, PropertyNameCaseInsensitive = true })
+                JsonSerializer.Deserialize(jsonText, MovieModelSourceGenerator.Default.MovieInformationContainer)
                 ?? throw new Exception("ffprobe returned no information.");
             return new MovieInformation(movieInformationContainer);
         }

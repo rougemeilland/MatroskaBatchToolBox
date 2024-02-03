@@ -22,7 +22,7 @@ namespace MatroskaBatchToolBox
             var settingsFilePath = Path.Combine(baseDirectoryPath, "settings.json");
             var settingsText = File.ReadAllText(settingsFilePath);
             var settings =
-                JsonSerializer.Deserialize<GlobalSettingsContainer>(settingsText, _jsonSerializerOptions)
+                JsonSerializer.Deserialize(settingsText, SettingsSourceGenerator.Default.GlobalSettingsContainer)
                 ?? throw new Exception("Failed to parse 'settings.json'.");
 
             FilePath? ffmpegNormalizeCommandFile;
@@ -202,7 +202,7 @@ namespace MatroskaBatchToolBox
                 if (!File.Exists(localSettingFilePath))
                     return this;
                 var settingsText = File.ReadAllText(localSettingFilePath);
-                var localSettings = JsonSerializer.Deserialize<LocalSettingsContainer>(settingsText, _jsonSerializerOptions);
+                var localSettings = JsonSerializer.Deserialize(settingsText, SettingsSourceGenerator.Default.LocalSettingsContainer);
                 if (localSettings is null)
                     return this;
                 return

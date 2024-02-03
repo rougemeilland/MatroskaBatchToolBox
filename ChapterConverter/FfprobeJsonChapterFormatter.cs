@@ -43,12 +43,7 @@ namespace ChapterConverter
             return
                 JsonSerializer.Serialize(
                     movieInfo,
-                    typeof(MovieInformationContainer),
-                    new JsonSerializerOptions
-                    {
-                        WriteIndented = true,
-                        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
-                    });
+                    MovieModelSourceGenerator.Default.MovieInformationContainer);
         }
     }
 }

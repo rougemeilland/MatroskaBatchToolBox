@@ -34,7 +34,7 @@ namespace AudioNormalizer
         static NormalizationState()
         {
             _ffmpegCommandFile = new FilePath(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException($"ffmpeg is not installed."));
-            var metaeditCommandName = Path.GetFileNameWithoutExtension(typeof(MovieMetadataEditor.Program).Assembly.Location);
+            var metaeditCommandName = "metaedit";
             _metaeditCommandFile = new FilePath(ProcessUtility.WhereIs(metaeditCommandName) ?? throw new FileNotFoundException($"{metaeditCommandName} is not installed."));
         }
 
