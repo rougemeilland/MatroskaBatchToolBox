@@ -22,7 +22,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Palmtree.IO.Console.TerminalInfo" Version="1.0.18-alpha" />
+    <PackageReference Include="Palmtree.IO.Console.TerminalInfo" Version="1.0.19-alpha" />
   </ItemGroup>
 
 </Project>

@@ -28,6 +28,7 @@ namespace CalcVmaf
             // コマンドの入出力エンコーディングを UTF8 にする
             TinyConsole.InputEncoding = Encoding.UTF8;
             TinyConsole.OutputEncoding = Encoding.UTF8;
+            TinyConsole.DefaultTextWriter = ConsoleTextWriterType.StandardError;
 
             var vmafScorePattern = new Regex(@" VMAF score: (?<vmafScore>\d+\.\d+)[\r\n]", RegexOptions.Compiled);
             var baseDirectoryPath = Path.GetDirectoryName(typeof(Program).Assembly.Location) ?? ".";

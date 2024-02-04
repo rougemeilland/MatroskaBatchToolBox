@@ -96,6 +96,7 @@ namespace ChapterConverter
             // コマンドの入出力エンコーディングを UTF8 にする
             TinyConsole.InputEncoding = Encoding.UTF8;
             TinyConsole.OutputEncoding = Encoding.UTF8;
+            TinyConsole.DefaultTextWriter = ConsoleTextWriterType.StandardError;
 
             var options = ParseOptions(args);
             if (options.ActionMode == ActionMode.Help)

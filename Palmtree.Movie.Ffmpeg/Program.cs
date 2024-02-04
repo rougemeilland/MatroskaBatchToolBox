@@ -30,6 +30,7 @@ namespace Palmtree.Movie.Ffmpeg
             // コマンドの入出力エンコーディングを UTF8 にする
             TinyConsole.InputEncoding = Encoding.UTF8;
             TinyConsole.OutputEncoding = Encoding.UTF8;
+            TinyConsole.DefaultTextWriter = ConsoleTextWriterType.StandardError;
 
             var newArgs = MakeFfmpegCommandArguments(args, out var tempFilePath);
             try
