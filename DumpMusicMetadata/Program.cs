@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
+using Palmtree;
 using Palmtree.IO;
 using Palmtree.IO.Console;
 using Palmtree.IO.Serialization;
@@ -16,7 +17,7 @@ namespace DumpMusicMetadata
 
         static Program()
         {
-            _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
+            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
         }
 
         private static int Main(string[] args)

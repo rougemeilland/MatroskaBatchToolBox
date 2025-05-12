@@ -6,7 +6,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using MatroskaBatchToolBox.Utility;
-using Palmtree;
 using Palmtree.IO;
 using Palmtree.IO.Console;
 using Palmtree.Numerics;
@@ -36,8 +35,8 @@ namespace EncoderBenchmarkTest
                 throw new ArgumentException("引数が足りません");
 
             var ffmpegCommandPath = args[0];
-            var logFilePath = Path.Combine(Path.GetDirectoryName(typeof(Program).Assembly.Location) ?? ".", "benchmark.txt");
-            using (var logWriter = new StreamWriter(logFilePath, false, Encoding.UTF8))
+            var logFilePath = typeof(Program).Assembly.GetBaseDirectory().GetFile("benchmark.txt");
+            using (var logWriter = new StreamWriter(logFilePath.FullName, false, Encoding.UTF8))
             {
                 logWriter.WriteLine(string.Join("\t", new[] { "source file", "souce file length [bytes]", "encoder", "encoded file length [bytes]", "elapsed time [sec]", "VMAF score", "compression ratio", "command line" }));
                 foreach (var item in new[]

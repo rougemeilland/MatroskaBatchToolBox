@@ -31,9 +31,9 @@ namespace CalcVmaf
             TinyConsole.DefaultTextWriter = ConsoleTextWriterType.StandardError;
 
             var vmafScorePattern = new Regex(@" VMAF score: (?<vmafScore>\d+\.\d+)[\r\n]", RegexOptions.Compiled);
-            var baseDirectoryPath = Path.GetDirectoryName(typeof(Program).Assembly.Location) ?? ".";
+            var baseDirectoryPath = typeof(Program).Assembly.GetBaseDirectory();
             var ffmpegExecutablePath = FindFfmpegExecutablePath(baseDirectoryPath);
-            if (string.IsNullOrEmpty(ffmpegExecutablePath))
+            if (ffmpegExecutablePath is null)
             {
                 TinyConsole.Error.WriteLine("'ffmpeg' executable not found.");
                 return 1;
@@ -65,7 +65,7 @@ namespace CalcVmaf
                 {
                     Arguments = commandParameter.ToString(),
                     CreateNoWindow = true,
-                    FileName = ffmpegExecutablePath,
+                    FileName = ffmpegExecutablePath.FullName,
                     RedirectStandardError = true,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true,
@@ -171,16 +171,16 @@ namespace CalcVmaf
             }
         }
 
-        private static string? FindFfmpegExecutablePath(string baseDirectoryPath)
+        private static FilePath? FindFfmpegExecutablePath(DirectoryPath baseDirectoryPath)
         {
-            var ffmpegExecutablePath1 = Path.Combine(baseDirectoryPath, "ffmpeg");
-            var ffmpegExecutablePath2 = Path.Combine(baseDirectoryPath, "ffmpeg.exe");
+            var ffmpegExecutablePath1 = baseDirectoryPath.GetFile("ffmpeg");
+            var ffmpegExecutablePath2 = baseDirectoryPath.GetFile("ffmpeg.exe");
             try
             {
                 return
-                    File.Exists(ffmpegExecutablePath1)
+                    ffmpegExecutablePath1.Exists
                     ? ffmpegExecutablePath1
-                    : File.Exists(ffmpegExecutablePath2)
+                    : ffmpegExecutablePath2.Exists
                     ? ffmpegExecutablePath1
                     : null;
             }

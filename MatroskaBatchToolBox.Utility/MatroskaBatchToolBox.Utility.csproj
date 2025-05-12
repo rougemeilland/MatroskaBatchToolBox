@@ -50,6 +50,16 @@
     <IsTrimmable>True</IsTrimmable>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <NoWarn>1701;1702;SYSLIB1045;SYSLIB1054;IDE0290</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <NoWarn>1701;1702;SYSLIB1045;SYSLIB1054;IDE0290</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Palmtree.Core" Version="1.16.0-alpha" />
     <PackageReference Include="Palmtree.IO" Version="1.12.2-alpha" />

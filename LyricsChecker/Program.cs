@@ -31,7 +31,7 @@ namespace LyricsChecker
 
         static Program()
         {
-            _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
+            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
             _lyricsFileTagPattern = new Regex(@"^\[(?<name>[a-z]+):\s*(?<value>.*)\]\s*$", RegexOptions.Compiled);
             _lyricsTextPattern = new Regex(@"^\[(?<lyricsTime>(\d+:)?\d+(\.\d+)?)\](?<lyricsText>.*)$", RegexOptions.Compiled);
         }

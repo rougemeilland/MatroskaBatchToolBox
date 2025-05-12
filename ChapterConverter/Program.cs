@@ -84,7 +84,7 @@ namespace ChapterConverter
         static Program()
         {
             _consoleLockObject = new object();
-            _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
+            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
             _titleOptionPattern = new Regex(@"^(-tt|--set_title):(?<chapterNumber>\d+)$");
         }
 

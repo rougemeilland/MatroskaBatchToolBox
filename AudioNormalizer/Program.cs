@@ -49,7 +49,7 @@ namespace AudioNormalizer
 
         static Program()
         {
-            _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
+            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
             _optionDefinitions = GetOptionDefinitions();
         }
 

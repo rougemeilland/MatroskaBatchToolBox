@@ -17,10 +17,10 @@ namespace MatroskaBatchToolBox
         {
             _jsonSerializerOptions = new JsonSerializerOptions { AllowTrailingCommas = true, PropertyNameCaseInsensitive = true };
             var baseDirectoryPath =
-                Path.GetDirectoryName(typeof(Settings).Assembly.Location)
+                typeof(Settings).Assembly.GetBaseDirectory()
                 ?? throw new Exception("'settings.json' is not found.");
-            var settingsFilePath = Path.Combine(baseDirectoryPath, "settings.json");
-            var settingsText = File.ReadAllText(settingsFilePath);
+            var settingsFilePath = baseDirectoryPath.GetFile("settings.json");
+            var settingsText = settingsFilePath.ReadAllText();
             var settings =
                 JsonSerializer.Deserialize(settingsText, SettingsSourceGenerator.Default.GlobalSettingsContainer)
                 ?? throw new Exception("Failed to parse 'settings.json'.");

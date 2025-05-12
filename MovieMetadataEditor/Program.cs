@@ -177,7 +177,7 @@ namespace MovieMetadataEditor
 
         static Program()
         {
-            _thisProgramName = Path.GetFileNameWithoutExtension(typeof(Program).Assembly.Location);
+            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
             _ffmpegCommandFile = new FilePath(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException("ffmpeg command is not installed."));
             _chapterTitleOptionNamePattern = new Regex(@"^(-tt|--chapter_title):(?<chapterIndex>\d+)$", RegexOptions.Compiled);
             _streamOptionNamePattern = new Regex(@"^(-s|--stream_metadata):(?<streamType>[vasdt]):(?<streamIndex>\d+)$", RegexOptions.Compiled);
