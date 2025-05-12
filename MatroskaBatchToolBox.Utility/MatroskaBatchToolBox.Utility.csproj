@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net7.0</TargetFrameworks>
+    <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
@@ -51,9 +51,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Palmtree.Core" Version="1.10.0-alpha" />
-    <PackageReference Include="Palmtree.IO" Version="1.8.0-alpha" />
-    <PackageReference Include="Palmtree.Numerics" Version="1.1.7-alpha" />
+    <PackageReference Include="Palmtree.Core" Version="1.16.0-alpha" />
+    <PackageReference Include="Palmtree.IO" Version="1.12.2-alpha" />
+    <PackageReference Include="Palmtree.Numerics" Version="1.2.2-alpha" />
   </ItemGroup>
 
   <ItemGroup>

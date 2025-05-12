@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net8.0;net7.0</TargetFrameworks>
+    <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>dumpterminfo</AssemblyName>
@@ -22,7 +22,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Palmtree.IO.Console.TerminalInfo" Version="1.0.19-alpha" />
+    <PackageReference Include="Palmtree.IO.Console.TerminalInfo" Version="1.1.2-alpha" />
   </ItemGroup>
 
 </Project>
