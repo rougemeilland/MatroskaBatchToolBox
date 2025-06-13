@@ -1,15 +1,13 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Unicode;
 using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Models.Json;
 using MatroskaBatchToolBox.Utility.Movie;
 
 namespace ChapterConverter
 {
-    internal class FfprobeJsonChapterFormatter
+    internal sealed class FfprobeJsonChapterFormatter
         : ChapterFormatter
     {
         public FfprobeJsonChapterFormatter(ChapterFormatterParameter parameter)
@@ -26,19 +24,20 @@ namespace ChapterConverter
             var movieInfo = new MovieInformationContainer
             {
                 Chapters =
-                    chapters
-                    .Select((chapter, index) =>
-                        new MovieChapterContainer
-                        {
-                            Id = index + 1,
-                            TimeBase = $"{DefaultTimeBaseNumerator}/{DefaultTimeBaseDenominator}",
-                            Start = chapter.StartTime.FromTimeSpanToTimeCount(DefaultTimeBaseNumerator, DefaultTimeBaseDenominator),
-                            StartTime = chapter.StartTime.FormatTime(TimeFormatType.LongFormat, 6),
-                            End = chapter.EndTime.FromTimeSpanToTimeCount(DefaultTimeBaseNumerator, DefaultTimeBaseDenominator),
-                            EndTime = chapter.EndTime.FormatTime(TimeFormatType.LongFormat, 6),
-                            Tags = !string.IsNullOrEmpty(chapter.Title) ? new MovieChapterTagContainer { Title = chapter.Title } : null,
-                        })
-                    .ToList(),
+                    [..
+                        chapters
+                        .Select((chapter, index) =>
+                            new MovieChapterContainer
+                            {
+                                Id = index + 1,
+                                TimeBase = $"{DefaultTimeBaseNumerator}/{DefaultTimeBaseDenominator}",
+                                Start = chapter.StartTime.FromTimeSpanToTimeCount(DefaultTimeBaseNumerator, DefaultTimeBaseDenominator),
+                                StartTime = chapter.StartTime.FormatTime(TimeFormatType.LongFormat, 6),
+                                End = chapter.EndTime.FromTimeSpanToTimeCount(DefaultTimeBaseNumerator, DefaultTimeBaseDenominator),
+                                EndTime = chapter.EndTime.FormatTime(TimeFormatType.LongFormat, 6),
+                                Tags = !string.IsNullOrEmpty(chapter.Title) ? new MovieChapterTagContainer { Title = chapter.Title } : null,
+                            })
+                    ],
             };
             return
                 JsonSerializer.Serialize(

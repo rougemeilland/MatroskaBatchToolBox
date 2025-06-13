@@ -1,6 +1,6 @@
 ﻿namespace AudioNormalizer
 {
-    internal class MusicFileMetadata
+    internal sealed class MusicFileMetadata
     {
         public string? Album { get; set; }
         public string? AlbumArtist { get; set; }

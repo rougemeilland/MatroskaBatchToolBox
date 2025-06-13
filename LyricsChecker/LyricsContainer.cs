@@ -2,12 +2,12 @@
 
 namespace LyricsChecker
 {
-    internal class LyricsContainer
+    internal sealed class LyricsContainer
     {
         public LyricsContainer()
         {
             Tags = new Dictionary<string, string>();
-            LyricsTexts = new List<string>();
+            LyricsTexts = [];
         }
 
         public IDictionary<string, string> Tags { get; }

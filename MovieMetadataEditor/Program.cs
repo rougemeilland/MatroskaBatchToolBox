@@ -14,7 +14,7 @@ using Palmtree.Linq;
 
 namespace MovieMetadataEditor
 {
-    public static partial class Program
+    internal static partial class Program
     {
         [Flags]
         private enum MetadataType
@@ -52,7 +52,7 @@ namespace MovieMetadataEditor
             All = MinimumMetadata | ChapterMetadata | OtherMetadata,
         }
 
-        private class StreamComparer
+        private sealed class StreamComparer
             : IEqualityComparer<(string streamType, int streamIndex)>
         {
             bool IEqualityComparer<(string streamType, int streamIndex)>.Equals((string streamType, int streamIndex) x, (string streamType, int streamIndex) y)
@@ -63,7 +63,7 @@ namespace MovieMetadataEditor
                 => HashCode.Combine(obj.streamIndex, obj.streamIndex);
         }
 
-        private class CommandParameter
+        private sealed class CommandParameter
         {
             private CommandParameter(IEnumerable<CommandOption<OptionType>> options)
             {
@@ -117,8 +117,8 @@ namespace MovieMetadataEditor
             public bool IsForceMode { get; }
             public IEnumerable<TimeSpan>? ChapterTimes { get; }
             public IDictionary<int, string> ChapterTitles { get; }
-            public IDictionary<(string streamType, int streamIndex), IEnumerable<(string metadataName, string metadataValue)>> StreamMetadata { get; }
-            public IDictionary<(string streamType, int streamIndex), IEnumerable<(string dispositionName, bool dispositionValue)>> StreamDisposition { get; }
+            public Dictionary<(string streamType, int streamIndex), IEnumerable<(string metadataName, string metadataValue)>> StreamMetadata { get; }
+            public Dictionary<(string streamType, int streamIndex), IEnumerable<(string dispositionName, bool dispositionValue)>> StreamDisposition { get; }
             public MetadataType MetadataToClear { get; }
             public bool ClearDisposition { get; }
             public bool ClearChapters { get; }
@@ -135,10 +135,10 @@ namespace MovieMetadataEditor
 
             private static (TimeSpan from, TimeSpan to) GetTrimmingRange(TimeSpan? ssValue, TimeSpan? toValue, TimeSpan? tValue)
             {
-                Validation.Assert(toValue is null || tValue is null, "toValue is null || tValue is null");
-                Validation.Assert(ssValue is null || ssValue.Value >= TimeSpan.Zero, "ssValue is null || ssValue.Value >= TimeSpan.Zero");
-                Validation.Assert(toValue is null || toValue.Value >= TimeSpan.Zero, "toValue is null || toValue.Value >= TimeSpan.Zero");
-                Validation.Assert(tValue is null || tValue.Value >= TimeSpan.Zero, "tValue is null || tValue.Value >= TimeSpan.Zero");
+                Validation.Assert(toValue is null || tValue is null);
+                Validation.Assert(ssValue is null || ssValue.Value >= TimeSpan.Zero);
+                Validation.Assert(toValue is null || toValue.Value >= TimeSpan.Zero);
+                Validation.Assert(tValue is null || tValue.Value >= TimeSpan.Zero);
 
                 var from = ssValue ?? TimeSpan.Zero;
                 if (toValue is not null)
@@ -167,29 +167,25 @@ namespace MovieMetadataEditor
         private const string _metadataNameDuration = "DURATION";
         private const string _dispositionNameForced = "FORCED";
         private const string _dispositionNameDefault = "DEFAULT";
-        private static readonly string _thisProgramName;
-        private static readonly FilePath _ffmpegCommandFile;
-        private static readonly Regex _chapterTitleOptionNamePattern;
-        private static readonly Regex _streamOptionNamePattern;
-        private static readonly Regex _streamOptionValuePattern;
-        private static readonly Regex _dispositionOptionNamePattern;
-        private static readonly IEnumerable<CommandOptionDefinition<OptionType>> _optionDefinitions;
-
-        static Program()
-        {
-            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
-            _ffmpegCommandFile = new FilePath(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException("ffmpeg command is not installed."));
-            _chapterTitleOptionNamePattern = new Regex(@"^(-tt|--chapter_title):(?<chapterIndex>\d+)$", RegexOptions.Compiled);
-            _streamOptionNamePattern = new Regex(@"^(-s|--stream_metadata):(?<streamType>[vasdt]):(?<streamIndex>\d+)$", RegexOptions.Compiled);
-            _streamOptionValuePattern = new Regex(@"^(?<metadataName>[a-zA-Z0-9_]+)=(?<metadataValue>.*)$", RegexOptions.Compiled);
-            _dispositionOptionNamePattern = new Regex(@"^(-d|--stream_disposition):(?<streamType>[vasdt]):(?<streamIndex>\d+)$", RegexOptions.Compiled);
-            _optionDefinitions = GetOptionDefinitions();
-        }
+        private static readonly FilePath _ffmpegCommandFile = new(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException("ffmpeg command is not installed."));
 
         public static int Main(string[] args)
         {
+            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
+            {
+                if (OperatingSystem.IsWindows())
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or output is not UTF8. Consider running the command \"chcp 65001\".");
+                else
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+            }
+
             // このプロセスでは Ctrl+C を無視する。
             TinyConsole.CancelKeyPress += (sender, e) => e.Cancel = true;
+
+            // コマンドの入出力エンコーディングを UTF8 にする
+            TinyConsole.InputEncoding = Encoding.UTF8;
+            TinyConsole.OutputEncoding = Encoding.UTF8;
+            TinyConsole.DefaultTextWriter = ConsoleTextWriterType.StandardError;
 
             try
             {
@@ -203,14 +199,14 @@ namespace MovieMetadataEditor
                     {
                         if (!File.Exists(commandOptions.Input))
                         {
-                            PrintErrorMessage($"The input file specified by the \"--input\" option does not exist.: \"{commandOptions.Input}\"");
+                            TinyConsole.WriteLog(LogCategory.Error, $"The input file specified by the \"--input\" option does not exist.: \"{commandOptions.Input}\"");
                             return 1;
                         }
                     }
                     catch (Exception ex)
                     {
-                        PrintErrorMessage($"Failed to access the input file specified by the \"--input\" option.: \"{commandOptions.Input}\"");
-                        PrintExceptionMessage(ex);
+                        TinyConsole.WriteLog(LogCategory.Error, $"Failed to access the input file specified by the \"--input\" option.: \"{commandOptions.Input}\"");
+                        TinyConsole.WriteLog(ex);
                         return 1;
                     }
                 }
@@ -223,20 +219,20 @@ namespace MovieMetadataEditor
                         var parentDirectory = outputFile.Directory;
                         if (parentDirectory is null || !parentDirectory.Exists)
                         {
-                            PrintErrorMessage($"The output file directory specified with the \"--output\" option is invalid or does not exist.: \"{commandOptions.Output}\"");
+                            TinyConsole.WriteLog(LogCategory.Error, $"The output file directory specified with the \"--output\" option is invalid or does not exist.: \"{commandOptions.Output}\"");
                             return 1;
                         }
 
                         if (!commandOptions.IsForceMode && outputFile.Exists)
                         {
-                            PrintErrorMessage($"The output file specified with the \"--output\" option already exists.: \"{commandOptions.Output}\"");
+                            TinyConsole.WriteLog(LogCategory.Error, $"The output file specified with the \"--output\" option already exists.: \"{commandOptions.Output}\"");
                             return 1;
                         }
                     }
                     catch (Exception ex)
                     {
-                        PrintErrorMessage($"Failed to access the output file specified by the \"--output\" option.: \"{commandOptions.Output}\"");
-                        PrintExceptionMessage(ex);
+                        TinyConsole.WriteLog(LogCategory.Error, $"Failed to access the output file specified by the \"--output\" option.: \"{commandOptions.Output}\"");
+                        TinyConsole.WriteLog(ex);
                         return 1;
                     }
                 }
@@ -248,7 +244,7 @@ namespace MovieMetadataEditor
                 }
 
                 if (commandOptions.Verbose)
-                    PrintInformationMessage("Start processing.");
+                    TinyConsole.WriteLog(LogCategory.Information, "Start processing.");
                 try
                 {
                     // 入力の準備をする (入力元が標準入力である場合は一時ファイルにコピーする)
@@ -263,12 +259,12 @@ namespace MovieMetadataEditor
 
                         if (commandOptions.Verbose)
                         {
-                            PrintInformationMessage("Start movie conversion.");
-                            PrintInformationMessage($"  Input file format: {inputFormat}");
-                            PrintInformationMessage($"  Input file format: \"{inputFile.FullName}\"");
+                            TinyConsole.WriteLog(LogCategory.Information, "Start movie conversion.");
+                            TinyConsole.WriteLog(LogCategory.Information, $"  Input file format: {inputFormat}");
+                            TinyConsole.WriteLog(LogCategory.Information, $"  Input file format: \"{inputFile.FullName}\"");
                             if (outputFormat is not null)
-                                PrintInformationMessage($"  Output file format: {outputFormat}");
-                            PrintInformationMessage($"  Output file format: \"{outputFile.FullName}\"");
+                                TinyConsole.WriteLog(LogCategory.Information, $"  Output file format: {outputFormat}");
+                            TinyConsole.WriteLog(LogCategory.Information, $"  Output file format: \"{outputFile.FullName}\"");
                         }
 
                         EditMetadata(
@@ -281,19 +277,19 @@ namespace MovieMetadataEditor
                             commandOptions.IsForceMode || temporaryOutputFile is not null);
 
                         if (commandOptions.Verbose)
-                            PrintInformationMessage("Movie conversion finished.");
+                            TinyConsole.WriteLog(LogCategory.Information, "Movie conversion finished.");
 
                         if (temporaryOutputFile is not null)
                         {
                             using var inStream = temporaryOutputFile.OpenRead();
                             using var outStream = TinyConsole.OpenStandardOutput();
                             if (commandOptions.Verbose)
-                                PrintInformationMessage($"Copying from temporary file to standard output.: \"{temporaryOutputFile.FullName}\"");
+                                TinyConsole.WriteLog(LogCategory.Information, $"Copying from temporary file to standard output.: \"{temporaryOutputFile.FullName}\"");
 
                             CopyStream(inStream, outStream, inStream.Length);
 
                             if (commandOptions.Verbose)
-                                PrintInformationMessage("Copy finished.");
+                                TinyConsole.WriteLog(LogCategory.Information, "Copy finished.");
                         }
 
                         return 0;
@@ -306,7 +302,7 @@ namespace MovieMetadataEditor
                             {
                                 File.Delete(temporaryInputFile.FullName);
                                 if (commandOptions.Verbose)
-                                    PrintInformationMessage($"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
+                                    TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                             }
                             catch (Exception)
                             {
@@ -319,7 +315,7 @@ namespace MovieMetadataEditor
                             {
                                 File.Delete(temporaryOutputFile.FullName);
                                 if (commandOptions.Verbose)
-                                    PrintInformationMessage($"Temporary file is deleted.: \"{temporaryOutputFile.FullName}\"");
+                                    TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryOutputFile.FullName}\"");
                             }
                             catch (Exception)
                             {
@@ -329,7 +325,7 @@ namespace MovieMetadataEditor
                 }
                 catch (Exception ex)
                 {
-                    PrintExceptionMessage(ex);
+                    TinyConsole.WriteLog(ex);
                     return 1;
                 }
             }
@@ -348,7 +344,7 @@ namespace MovieMetadataEditor
             catch (InvalidCommandOptionException ex)
             {
                 for (var e = ex as Exception; e is not null; e = e.InnerException)
-                    PrintErrorMessage(e.Message);
+                    TinyConsole.WriteLog(LogCategory.Error, e.Message);
                 return null;
             }
         }
@@ -359,7 +355,7 @@ namespace MovieMetadataEditor
             if (commandParameters.Input is not null)
             {
                 if (commandParameters.Verbose)
-                    PrintInformationMessage($"Input file path: \"{commandParameters.Input}\"");
+                    TinyConsole.WriteLog(LogCategory.Information, $"Input file path: \"{commandParameters.Input}\"");
                 return (commandParameters.InputFormat, new FilePath(commandParameters.Input), null);
             }
             else
@@ -367,8 +363,8 @@ namespace MovieMetadataEditor
                 var temporaryInputFile = new FilePath(Path.GetTempFileName());
                 if (commandParameters.Verbose)
                 {
-                    PrintInformationMessage("Read from standard input.");
-                    PrintInformationMessage($"Temprary file is created.: \"{temporaryInputFile.FullName}\"");
+                    TinyConsole.WriteLog(LogCategory.Information, "Read from standard input.");
+                    TinyConsole.WriteLog(LogCategory.Information, $"Temprary file is created.: \"{temporaryInputFile.FullName}\"");
                 }
 
                 try
@@ -377,12 +373,12 @@ namespace MovieMetadataEditor
                     using var outputStream = temporaryInputFile.Create();
                     {
                         if (commandParameters.Verbose)
-                            PrintInformationMessage($"Copying from standard input to temporary file.: \"{temporaryInputFile.FullName}\"");
+                            TinyConsole.WriteLog(LogCategory.Information, $"Copying from standard input to temporary file.: \"{temporaryInputFile.FullName}\"");
 
                         CopyStream(inputStream, outputStream);
 
                         if (commandParameters.Verbose)
-                            PrintInformationMessage("Copy finished.");
+                            TinyConsole.WriteLog(LogCategory.Information, "Copy finished.");
                     }
 
                     return (commandParameters.InputFormat, temporaryInputFile, temporaryInputFile);
@@ -393,13 +389,13 @@ namespace MovieMetadataEditor
                     {
                         File.Delete(temporaryInputFile.FullName);
                         if (commandParameters.Verbose)
-                            PrintInformationMessage($"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
+                            TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                     }
                     catch (Exception)
                     {
                     }
 
-                    throw new Exception("An error occurred while preparing the input file.", ex);
+                    throw new ApplicationException("An error occurred while preparing the input file.", ex);
                 }
             }
         }
@@ -410,7 +406,7 @@ namespace MovieMetadataEditor
             if (commandParameters.Output is not null)
             {
                 if (commandParameters.Verbose)
-                    PrintInformationMessage($"Output file path: \"{commandParameters.Output}\"");
+                    TinyConsole.WriteLog(LogCategory.Information, $"Output file path: \"{commandParameters.Output}\"");
                 return (commandParameters.OutputFormat, new FilePath(commandParameters.Output), null);
             }
             else
@@ -418,8 +414,8 @@ namespace MovieMetadataEditor
                 var temporaryOutputFile = new FilePath(Path.GetTempFileName());
                 if (commandParameters.Verbose)
                 {
-                    PrintInformationMessage("Write to standard output.");
-                    PrintInformationMessage($"Temprary file is created.: \"{temporaryOutputFile.FullName}\"");
+                    TinyConsole.WriteLog(LogCategory.Information, "Write to standard output.");
+                    TinyConsole.WriteLog(LogCategory.Information, $"Temprary file is created.: \"{temporaryOutputFile.FullName}\"");
                 }
 
                 return (commandParameters.OutputFormat, temporaryOutputFile, temporaryOutputFile);
@@ -429,7 +425,7 @@ namespace MovieMetadataEditor
         private static MovieInformation GetMovieInformation(CommandParameter commandParameters, string? inputFormat, FilePath inputFile)
         {
             if (commandParameters.Verbose)
-                PrintInformationMessage($"Probe movie information.: \"{inputFile.FullName}\"");
+                TinyConsole.WriteLog(LogCategory.Information, $"Probe movie information.: \"{inputFile.FullName}\"");
             try
             {
                 return
@@ -439,22 +435,13 @@ namespace MovieMetadataEditor
                         MovieInformationType.Chapters | MovieInformationType.Streams | MovieInformationType.Format,
                         (level, message) =>
                         {
-                            switch (level)
-                            {
-                                case "WARNING":
-                                    PrintWarningMessage("ffprobe", message);
-                                    break;
-                                case "ERROR":
-                                    PrintWarningMessage("ffprobe", message);
-                                    break;
-                                default:
-                                    break;
-                            }
+                            if (level != LogCategory.Information || commandParameters.Verbose)
+                                TinyConsole.WriteLog(level, message);
                         });
             }
             catch (Exception ex)
             {
-                throw new Exception("Failed to get movie information.", ex);
+                throw new ApplicationException("Failed to get movie information.", ex);
             }
         }
 
@@ -568,15 +555,15 @@ namespace MovieMetadataEditor
                 if (doOverWrite)
                     ffmpegCommandParameters.Add("-y");
                 if (inputFormat is not null)
-                    ffmpegCommandParameters.Add($"-f {inputFormat.CommandLineArgumentEncode()}");
-                ffmpegCommandParameters.Add($"-i {inputFile.FullName.CommandLineArgumentEncode()}");
+                    ffmpegCommandParameters.Add($"-f {inputFormat.EncodeCommandLineArgument()}");
+                ffmpegCommandParameters.Add($"-i {inputFile.FullName.EncodeCommandLineArgument()}");
                 if (!commandOptions.ClearChapters)
                 {
                     metadataFilePath = Path.GetTempFileName();
                     if (commandOptions.Verbose)
-                        PrintInformationMessage($"Temprary file is created.: \"{metadataFilePath}\"");
+                        TinyConsole.WriteLog(LogCategory.Information, $"Temprary file is created.: \"{metadataFilePath}\"");
                     File.WriteAllText(metadataFilePath, GetFfmetadataText(commandOptions, movieInformation.Chapters), Encoding.UTF8);
-                    ffmpegCommandParameters.Add($"-f ffmetadata -i {metadataFilePath.CommandLineArgumentEncode()}");
+                    ffmpegCommandParameters.Add($"-f ffmetadata -i {metadataFilePath.EncodeCommandLineArgument()}");
                 }
 
                 ffmpegCommandParameters.Add("-c copy -map 0");
@@ -598,7 +585,7 @@ namespace MovieMetadataEditor
                 foreach (var tag in formatTags)
                 {
                     if (tag.Value != (movieInformation.Format.Tags[tag.Key] ?? ""))
-                        ffmpegCommandParameters.Add($"-metadata {tag.Key.CommandLineArgumentEncode()}={tag.Value.CommandLineArgumentEncode()}");
+                        ffmpegCommandParameters.Add($"-metadata {tag.Key.EncodeCommandLineArgument()}={tag.Value.EncodeCommandLineArgument()}");
                 }
 
                 foreach (var stream in streams)
@@ -606,7 +593,7 @@ namespace MovieMetadataEditor
                     foreach (var tag in stream.tags)
                     {
                         if (tag.Value != (stream.originalTags[tag.Key] ?? ""))
-                            ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} {tag.Key.CommandLineArgumentEncode()}={tag.Value.CommandLineArgumentEncode()}");
+                            ffmpegCommandParameters.Add($"-metadata:s:{stream.streamTypeSymbol}:{stream.index} {tag.Key.EncodeCommandLineArgument()}={tag.Value.EncodeCommandLineArgument()}");
                     }
 
                     var dispositionSpecs = new List<string>();
@@ -614,10 +601,10 @@ namespace MovieMetadataEditor
                     {
                         // default だけは 明示的に設定しないと必ず true になってしまう模様であるため、必ず設定する。
                         if (string.Equals(disposition.Key, _dispositionNameDefault, StringComparison.OrdinalIgnoreCase) || disposition.Value != stream.originalDisPosition[disposition.Key])
-                            dispositionSpecs.Add($"{(disposition.Value ? "+" : "-")}{disposition.Key.CommandLineArgumentEncode()}");
+                            dispositionSpecs.Add($"{(disposition.Value ? "+" : "-")}{disposition.Key.EncodeCommandLineArgument()}");
                     }
 
-                    if (dispositionSpecs.Any())
+                    if (dispositionSpecs.Count > 0)
                         ffmpegCommandParameters.Add($"-disposition:{stream.streamTypeSymbol}:{stream.index} {string.Concat(dispositionSpecs)}");
                 }
 
@@ -626,38 +613,29 @@ namespace MovieMetadataEditor
                 else
                     ffmpegCommandParameters.Add("-map_chapters 1");
                 if (outputFormat is not null)
-                    ffmpegCommandParameters.Add($"-f {outputFormat.CommandLineArgumentEncode()}");
-                ffmpegCommandParameters.Add($"{outputFile.FullName.CommandLineArgumentEncode()}");
+                    ffmpegCommandParameters.Add($"-f {outputFormat.EncodeCommandLineArgument()}");
+                ffmpegCommandParameters.Add($"{outputFile.FullName.EncodeCommandLineArgument()}");
                 var ffmpegCommandLineText = string.Join(" ", ffmpegCommandParameters);
                 if (commandOptions.Verbose)
-                    PrintInformationMessage($"Execute: ffmpeg {ffmpegCommandLineText}");
+                    TinyConsole.WriteLog(LogCategory.Information, $"Execute: ffmpeg {ffmpegCommandLineText}");
 
                 var exitCode =
                     Command.ExecuteCommand(
                         _ffmpegCommandFile,
                         ffmpegCommandLineText,
-                        Encoding.UTF8,
+                        null,
+                        null,
                         null,
                         null,
                         null,
                         (level, message) =>
                         {
-                            switch (level)
-                            {
-                                case "WARNING":
-                                    PrintWarningMessage(message);
-                                    break;
-                                case "ERROR":
-                                    PrintErrorMessage(message);
-                                    break;
-                                default:
-                                    // NOP
-                                    break;
-                            }
+                            if (level != LogCategory.Information)
+                                TinyConsole.WriteLog(level, message);
                         },
                         null);
                 if (exitCode != 0)
-                    throw new Exception($"An error occurred in the \"ffmpeg\" command. : exit-code={exitCode}");
+                    throw new ApplicationException($"An error occurred in the \"ffmpeg\" command. : exit-code={exitCode}");
             }
             finally
             {
@@ -667,7 +645,7 @@ namespace MovieMetadataEditor
                     {
                         File.Delete(metadataFilePath);
                         if (commandOptions.Verbose)
-                            PrintInformationMessage($"Temporary file is deleted.: \"{metadataFilePath}\"");
+                            TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{metadataFilePath}\"");
                     }
                     catch (Exception)
                     {
@@ -685,14 +663,14 @@ namespace MovieMetadataEditor
                 MinimumDuration = commandParameters.MinimumDuration,
                 Titles = commandParameters.ChapterTitles,
                 To = commandParameters.To,
-                WarningMessageReporter = PrintWarningMessage,
+                WarningMessageReporter = message => TinyConsole.WriteLog(LogCategory.Warning, message),
             };
             if (commandParameters.ChapterTimes is not null)
             {
                 // チャプターの時間が即値で指定されている場合
                 return
                     commandParameters.ChapterTimes
-                    .ToSimpleChapterElements(commandParameters.MaximumDuration, PrintWarningMessage)
+                    .ToSimpleChapterElements(commandParameters.MaximumDuration, message => TinyConsole.WriteLog(LogCategory.Warning, message))
                     .ChapterFilter(filterParameter)
                     .ToMetadataString();
             }
@@ -819,7 +797,7 @@ namespace MovieMetadataEditor
                     "",
 #endif
                     "[Usage]",
-                    $"{_thisProgramName} <option list>",
+                    $"{Validation.DefaultApplicationName} <option list>",
                     $"  For \"<option list>\", specify the necessary options from the list below. You can arrange them in any order.",
                     "",
                     "[Options]",
@@ -839,68 +817,16 @@ namespace MovieMetadataEditor
                 TinyConsole.Out.WriteLine(lineText);
         }
 
-        private static void PrintExceptionMessage(Exception ex)
-        {
-            for (var exception = ex; exception != null; exception = exception.InnerException)
-                PrintErrorMessage(exception.Message);
-        }
+        [GeneratedRegex(@"^(-tt|--chapter_title):(?<chapterIndex>\d+)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetChapterTitleOptionNamePattern();
 
-        private static void PrintInformationMessage(string message)
-            => PrintInformationMessage(_thisProgramName, message);
+        [GeneratedRegex(@"^(-s|--stream_metadata):(?<streamType>[vasdt]):(?<streamIndex>\d+)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetStreamOptionNamePattern();
 
-        private static void PrintInformationMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Cyan;
-            TinyConsole.Write($"{programName}:INFORMATION:");
-            TinyConsole.ResetColor();
-            TinyConsole.Write($" {message}");
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
+        [GeneratedRegex(@"^(?<metadataName>[a-zA-Z0-9_]+)=(?<metadataValue>.*)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetStreamOptionValuePattern();
 
-            TinyConsole.WriteLine();
-        }
-
-        private static void PrintWarningMessage(string message)
-            => PrintWarningMessage(_thisProgramName, message);
-
-        private static void PrintWarningMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Yellow;
-            TinyConsole.Write($"{programName}:WARNING: {message}");
-            TinyConsole.ResetColor();
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
-        }
-
-        private static void PrintErrorMessage(string message)
-            => PrintErrorMessage(_thisProgramName, message);
-
-        private static void PrintErrorMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Red;
-            TinyConsole.Write($"{programName}:ERROR: {message}");
-            TinyConsole.ResetColor();
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
-        }
+        [GeneratedRegex(@"^(-d|--stream_disposition):(?<streamType>[vasdt]):(?<streamIndex>\d+)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetDispositionOptionNamePattern();
     }
 }

@@ -4,7 +4,7 @@ using MatroskaBatchToolBox.Utility;
 
 namespace MatroskaBatchToolBox.Model
 {
-    internal class TimeRange
+    internal sealed class TimeRange
     {
         static TimeRange()
         {
@@ -69,7 +69,7 @@ namespace MatroskaBatchToolBox.Model
         private static (bool success, TimeSpan? time) ParseTime(string s)
             => string.IsNullOrEmpty(s)
             ? (true, null)
-            : s.TryParse(TimeParsingMode.LazyMode, out TimeSpan time)
+            : s.TryParse(TimeParsingMode.LazyMode, out var time)
             ? (true, time)
             : (false, null);
     }

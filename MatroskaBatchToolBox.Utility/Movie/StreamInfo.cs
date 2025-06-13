@@ -10,13 +10,13 @@ namespace MatroskaBatchToolBox.Utility.Movie
         {
             Index =
                 stream.Index
-                ?? throw new Exception("The \"index\" property of the stream information is undefined.");
+                ?? throw new ApplicationException("The \"index\" property of the stream information is undefined.");
             CodecName =
                 stream.CodecName
-                ?? throw new Exception("The \"codec_name\" property of the stream information is undefined.");
+                ?? throw new ApplicationException("The \"codec_name\" property of the stream information is undefined.");
             CodecLongName =
                 stream.CodecLongName
-                ?? throw new Exception("The \"codec_long_name\" property of the stream information is undefined.");
+                ?? throw new ApplicationException("The \"codec_long_name\" property of the stream information is undefined.");
             BitsPerRawSample =
                 stream.BitsPerRawSample is not null && stream.BitsPerRawSample.TryParse(out int bitsPerRawSample) ? bitsPerRawSample : null;
             Disposition = new StreamDisposition(stream.Disposition);

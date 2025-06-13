@@ -1,32 +1,20 @@
 ﻿#define NEED_HIGH_PRECISION_FOR_TIME
 using System;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox.Utility
 {
-    public static class TimeSpanExtensions
+    public static partial class TimeSpanExtensions
     {
-        private static readonly Regex _strictLongTimePattern;
-        private static readonly Regex _strictShortTimePattern;
-        private static readonly Regex _strictVeryShortTimePattern;
-        private static readonly Regex _lazyTimePattern;
-
-        static TimeSpanExtensions()
-        {
-            _strictLongTimePattern = new Regex(@"^(?<hour>\d+):(?<minute>\d+):(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-            _strictShortTimePattern = new Regex(@"^(?<minute>\d+):(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-            _strictVeryShortTimePattern = new Regex(@"^(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-            _lazyTimePattern = new Regex(@"^(((?<hour>\d+):)?(?<minute>\d+):)?(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-        }
-
         public static TimeSpan ParseAsTimeSpan(this string s, TimeParsingMode parsingMode)
         {
             switch (parsingMode)
             {
                 case TimeParsingMode.StrictForLongTimeFormat:
                 {
-                    var match = _strictLongTimePattern.Match(s);
+                    var match = GetStrictLongTimePattern().Match(s);
                     if (!match.Success)
                         throw new FormatException($"Time string is expected.: \"{s}\"");
 
@@ -43,7 +31,7 @@ namespace MatroskaBatchToolBox.Utility
                 }
                 case TimeParsingMode.StrictForShortTimeFormat:
                 {
-                    var match = _strictShortTimePattern.Match(s);
+                    var match = GetStrictShortTimePattern().Match(s);
                     if (!match.Success)
                         throw new FormatException($"Time string is expected.: \"{s}\"");
 
@@ -56,7 +44,7 @@ namespace MatroskaBatchToolBox.Utility
                 }
                 case TimeParsingMode.StrictForVeryShortTimeFormat:
                 {
-                    var match = _strictVeryShortTimePattern.Match(s);
+                    var match = GetStrictVeryShortTimePattern().Match(s);
                     if (!match.Success)
                         throw new FormatException($"Time string is expected.: \"{s}\"");
 
@@ -65,7 +53,7 @@ namespace MatroskaBatchToolBox.Utility
                 }
                 case TimeParsingMode.LazyMode:
                 {
-                    var match = _lazyTimePattern.Match(s);
+                    var match = GetLazyTimePattern().Match(s);
                     if (!match.Success)
                         throw new FormatException($"Time string is expected.: \"{s}\"");
 
@@ -96,7 +84,7 @@ namespace MatroskaBatchToolBox.Utility
             {
                 case TimeParsingMode.StrictForLongTimeFormat:
                 {
-                    var match = _strictLongTimePattern.Match(s);
+                    var match = GetStrictLongTimePattern().Match(s);
                     if (!match.Success)
                     {
                         value = TimeSpan.Zero;
@@ -124,7 +112,7 @@ namespace MatroskaBatchToolBox.Utility
                 }
                 case TimeParsingMode.StrictForShortTimeFormat:
                 {
-                    var match = _strictShortTimePattern.Match(s);
+                    var match = GetStrictShortTimePattern().Match(s);
                     if (!match.Success)
                     {
                         value = TimeSpan.Zero;
@@ -145,7 +133,7 @@ namespace MatroskaBatchToolBox.Utility
                 }
                 case TimeParsingMode.StrictForVeryShortTimeFormat:
                 {
-                    var match = _strictVeryShortTimePattern.Match(s);
+                    var match = GetStrictVeryShortTimePattern().Match(s);
                     if (!match.Success)
                     {
                         value = TimeSpan.Zero;
@@ -158,7 +146,7 @@ namespace MatroskaBatchToolBox.Utility
                 }
                 case TimeParsingMode.LazyMode:
                 {
-                    var match = _lazyTimePattern.Match(s);
+                    var match = GetLazyTimePattern().Match(s);
                     if (!match.Success)
                     {
                         value = TimeSpan.Zero;
@@ -206,16 +194,16 @@ namespace MatroskaBatchToolBox.Utility
                     var second = totalSeconds - totalMinutes * 60;
                     var minute = totalMinutes % 60;
                     var totalHours = totalMinutes / 60;
-                    return $"{totalHours:D2}:{minute:D2}:{second.ToString(secondFormat)}";
+                    return $"{totalHours:D2}:{minute:D2}:{second.ToString(secondFormat, CultureInfo.InvariantCulture)}";
                 }
                 case TimeFormatType.ShortFormat:
                 {
                     var totalMinutes = (int)Math.Floor(totalSeconds / 60);
                     var second = totalSeconds - totalMinutes * 60;
-                    return $"{totalMinutes:D2}:{second.ToString(secondFormat)}";
+                    return $"{totalMinutes:D2}:{second.ToString(secondFormat, CultureInfo.InvariantCulture)}";
                 }
                 case TimeFormatType.OnlySeconds:
-                    return $"{totalSeconds.ToString(secondFormat)}";
+                    return $"{totalSeconds.ToString(secondFormat, CultureInfo.InvariantCulture)}";
                 case TimeFormatType.LazyFormat:
                 {
                     var totalMinutes = (int)Math.Floor(totalSeconds / 60);
@@ -223,11 +211,11 @@ namespace MatroskaBatchToolBox.Utility
                     var minute = totalMinutes % 60;
                     var totalHours = totalMinutes / 60;
                     if (totalHours > 0)
-                        return $"{totalHours:D2}:{minute:D2}:{second.ToString(secondFormat)}";
+                        return $"{totalHours:D2}:{minute:D2}:{second.ToString(secondFormat, CultureInfo.InvariantCulture)}";
                     else if (totalMinutes > 0)
-                        return $"{totalMinutes:D2}:{second.ToString(secondFormat)}";
+                        return $"{totalMinutes:D2}:{second.ToString(secondFormat, CultureInfo.InvariantCulture)}";
                     else
-                        return $"{totalSeconds.ToString(secondFormat)}";
+                        return $"{totalSeconds.ToString(secondFormat, CultureInfo.InvariantCulture)}";
                 }
                 default:
                     throw new ArgumentException($"Invalid {nameof(format)} value.: \"{format}\"", nameof(format));
@@ -236,8 +224,7 @@ namespace MatroskaBatchToolBox.Utility
 
         public static TimeSpan FromTimeCountToTimeSpan(this long timeValue, long timeBaseNumerator, long timeBaseDenominator)
         {
-            if (timeValue < 0)
-                throw new ArgumentOutOfRangeException(nameof(timeValue));
+            ArgumentOutOfRangeException.ThrowIfNegative(timeValue);
 
 #if NEED_HIGH_PRECISION_FOR_TIME
             var ticksPerSeconds = TimeSpan.TicksPerSecond;
@@ -252,8 +239,7 @@ namespace MatroskaBatchToolBox.Utility
 
         public static long FromTimeSpanToTimeCount(this TimeSpan time, long timeBaseNumerator, long timeBaseDenominator)
         {
-            if (time < TimeSpan.Zero)
-                throw new ArgumentOutOfRangeException(nameof(time));
+            ArgumentOutOfRangeException.ThrowIfLessThan(time, TimeSpan.Zero);
 
 #if NEED_HIGH_PRECISION_FOR_TIME
             var ticks = time.Ticks;
@@ -267,5 +253,17 @@ namespace MatroskaBatchToolBox.Utility
             return Convert.ToInt64(time.TotalSeconds * timeBaseDenominator / timeBaseNumerator);
 #endif
         }
+
+        [GeneratedRegex(@"^(?<hour>\d+):(?<minute>\d+):(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetStrictLongTimePattern();
+
+        [GeneratedRegex(@"^(?<minute>\d+):(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetStrictShortTimePattern();
+
+        [GeneratedRegex(@"^(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetStrictVeryShortTimePattern();
+
+        [GeneratedRegex(@"^(((?<hour>\d+):)?(?<minute>\d+):)?(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetLazyTimePattern();
     }
 }

@@ -63,9 +63,9 @@ namespace MatroskaBatchToolBox.Utility
                 if (timeSpec.StartsWith('+'))
                 {
                     if (!timeSpec[1..].TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
-                        throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
+                        throw new ApplicationException($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                     if (previousTime is null)
-                        throw new Exception($"Do not prefix the start time of the first chapter with a plus sign (+).: \"{timeSpec}\" in \"{rawText}\"");
+                        throw new ApplicationException($"Do not prefix the start time of the first chapter with a plus sign (+).: \"{timeSpec}\" in \"{rawText}\"");
                     time += previousTime.Value;
                     yield return time;
                     previousTime = time;
@@ -73,9 +73,9 @@ namespace MatroskaBatchToolBox.Utility
                 else
                 {
                     if (!timeSpec.TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
-                        throw new Exception($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
+                        throw new ApplicationException($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                     if (previousTime is not null && time < previousTime.Value)
-                        throw new Exception($"The list of start times is not in ascending order.: {rawText}");
+                        throw new ApplicationException($"The list of start times is not in ascending order.: {rawText}");
                     yield return time;
                     previousTime = time;
                 }
@@ -92,7 +92,7 @@ namespace MatroskaBatchToolBox.Utility
             {
                 var startTime = startTimesArray[index];
                 if (startTime >= maximumDuration)
-                    throw new Exception($"The chapter start time is too large in the input data. Change the maximum chapter duration with the \"--maximum_duration\" option.: start-time=\"{startTime.FormatTime(TimeFormatType.LongFormat, 6)}({startTime.TotalSeconds:F6})\" at #{index}");
+                    throw new ApplicationException($"The chapter start time is too large in the input data. Change the maximum chapter duration with the \"--maximum_duration\" option.: start-time=\"{startTime.FormatTime(TimeFormatType.LongFormat, 6)}({startTime.TotalSeconds:F6})\" at #{index}");
                 var endTime = index + 1 < startTimesArray.Length ? startTimesArray[index + 1] : maximumDuration;
                 yield return new SimpleChapterElement(startTime, endTime, "");
             }
@@ -103,8 +103,8 @@ namespace MatroskaBatchToolBox.Utility
 
         public static IEnumerable<SimpleChapterElement> ChapterFilter(this IEnumerable<SimpleChapterElement> chapters, ChapterFilterParameter filterParameter)
         {
-            Validation.Assert(filterParameter.From >= TimeSpan.Zero, "filterParameter.From >= TimeSpan.Zero");
-            Validation.Assert(filterParameter.From <= filterParameter.To, "filterParameter.From <= filterParameter.To");
+            Validation.Assert(filterParameter.From >= TimeSpan.Zero);
+            Validation.Assert(filterParameter.From <= filterParameter.To);
 
             var duration = filterParameter.To - filterParameter.From;
 
@@ -118,7 +118,7 @@ namespace MatroskaBatchToolBox.Utility
                     chapterList
                     .Select((chapter, index) =>
                     {
-                        Validation.Assert(chapter.StartTime <= chapter.EndTime, "chapter.StartTime <= chapter.EndTime");
+                        Validation.Assert(chapter.StartTime <= chapter.EndTime);
                         return
                             new SimpleChapterElement(
                                 chapter.StartTime - filterParameter.From,
@@ -183,8 +183,8 @@ namespace MatroskaBatchToolBox.Utility
             return
                 invalidTitle is null
                     ? trimmedChapters
-                        .Select((chapter, chapterNumber) => new SimpleChapterElement(chapter.StartTime, chapter.EndTime, !filterParameter.Titles.ContainsKey(chapterNumber) ? chapter.Title : filterParameter.Titles[chapterNumber]))
-                    : throw new Exception($"A chapter title was specified with the '--set_title:{invalidTitle.chapterNumber} \"{invalidTitle.chapterTitle}\"' option, but there is no corresponding chapter #{invalidTitle.chapterNumber}.");
+                        .Select((chapter, chapterNumber) => new SimpleChapterElement(chapter.StartTime, chapter.EndTime, filterParameter.Titles.TryGetValue(chapterNumber, out var chapterTitle) ? chapterTitle : chapter.Title))
+                    : throw new ApplicationException($"A chapter title was specified with the '--set_title:{invalidTitle.chapterNumber} \"{invalidTitle.chapterTitle}\"' option, but there is no corresponding chapter #{invalidTitle.chapterNumber}.");
         }
 
         private static SimpleChapterElement MergeChapter(SimpleChapterElement firstHalf, SimpleChapterElement secondHalf, ChapterFilterParameter filterParameter)

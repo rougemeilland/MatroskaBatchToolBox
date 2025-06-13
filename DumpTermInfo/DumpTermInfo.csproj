@@ -11,18 +11,28 @@
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0|AnyCPU'">
+    <WarningsNotAsErrors>IL3000</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0|AnyCPU'">
+    <WarningsNotAsErrors>IL3000</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0|AnyCPU'">
+    <WarningsNotAsErrors>IL3000</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0|AnyCPU'">
+    <WarningsNotAsErrors>IL3000</WarningsNotAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Palmtree.IO.Console.TerminalInfo" Version="1.1.2-alpha" />
+    <PackageReference Include="Palmtree.IO.Console" Version="1.7.2-alpha" />
+    <PackageReference Include="Palmtree.IO.Console.TerminalInfo" Version="1.1.19-alpha" />
   </ItemGroup>
 
 </Project>

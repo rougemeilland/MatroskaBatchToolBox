@@ -4,13 +4,10 @@ using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox.Model
 {
-    internal class Rectangle
+    internal sealed partial class Rectangle
     {
-        private static readonly Regex _rectanglePattern;
-
         static Rectangle()
         {
-            _rectanglePattern = new Regex(@"^\((?<left>\d+),(?<top>\d+)\)-(?<width>\d+)x(?<height>\d+)$", RegexOptions.Compiled);
             DefaultValue = new Rectangle(-1, -1, -1, -1);
         }
 
@@ -31,7 +28,7 @@ namespace MatroskaBatchToolBox.Model
 
         public static bool TryParse(string text, [NotNullWhen(true)] out Rectangle? rectangle)
         {
-            var match = _rectanglePattern.Match(text);
+            var match = GetRectanglePattern().Match(text);
             if (!match.Success)
             {
                 rectangle = null;
@@ -48,5 +45,8 @@ namespace MatroskaBatchToolBox.Model
                 return true;
             }
         }
+
+        [GeneratedRegex(@"^\((?<left>\d+),(?<top>\d+)\)-(?<width>\d+)x(?<height>\d+)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetRectanglePattern();
     }
 }

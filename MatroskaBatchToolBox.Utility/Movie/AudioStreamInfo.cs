@@ -12,7 +12,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
         {
             IndexWithinAudioStream = indexWithinAudioStream;
             ChannelLayout = stream.ChannelLayout;
-            Channels = stream.Channels ?? throw new Exception("\"channels\" property not found.");
+            Channels = stream.Channels ?? throw new ApplicationException("\"channels\" property not found.");
             SampleFormat = ParseSampleFormat(stream.SampleFormat ?? "unknown");
             BitRate = stream.BitRate is not null && stream.BitRate.TryParse(out int bitRateValue) ? bitRateValue : null;
         }
@@ -38,7 +38,7 @@ namespace MatroskaBatchToolBox.Utility.Movie
                 "S64P" => AudioSampleFormat.S64P,
                 "FLTP" => AudioSampleFormat.FLTP,
                 "DBLP" => AudioSampleFormat.DBLP,
-                _ => throw new Exception($"Not supported audio sample format: \"{s}\""),
+                _ => throw new ApplicationException($"Not supported audio sample format: \"{s}\""),
             };
     }
 }

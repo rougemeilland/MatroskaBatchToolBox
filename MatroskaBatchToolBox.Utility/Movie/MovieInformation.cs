@@ -27,19 +27,19 @@ namespace MatroskaBatchToolBox.Utility.Movie
             _attachmentStreams = info.Streams?.Where(stream => stream.CodecType == "attachment").Select((stream, index) => new AttachmentStreamInfo(stream, index)).ToList();
         }
 
-        public MovieFormat Format => _format ?? throw new Exception("ffprobe returned no format information.");
-        public IEnumerable<ChapterInfo> Chapters => _chapters ?? throw new Exception("\"chapters\" property does not exist.");
-        public IEnumerable<VideoStreamInfo> VideoStreams => _videoStreams ?? throw new Exception("\"streams\" property does not exist.");
-        public IEnumerable<AudioStreamInfo> AudioStreams => _audioStreams ?? throw new Exception("\"streams\" property does not exist.");
-        public IEnumerable<SubtitleStreamInfo> SubtitleStreams => _subtitleStreams ?? throw new Exception("\"streams\" property does not exist.");
-        public IEnumerable<DataStreamInfo> DataStreams => _dataStreams ?? throw new Exception("\"streams\" property does not exist.");
-        public IEnumerable<AttachmentStreamInfo> AttachmentStreams => _attachmentStreams ?? throw new Exception("\"streams\" property does not exist.");
+        public MovieFormat Format => _format ?? throw new ApplicationException("ffprobe returned no format information.");
+        public IEnumerable<ChapterInfo> Chapters => _chapters ?? throw new ApplicationException("\"chapters\" property does not exist.");
+        public IEnumerable<VideoStreamInfo> VideoStreams => _videoStreams ?? throw new ApplicationException("\"streams\" property does not exist.");
+        public IEnumerable<AudioStreamInfo> AudioStreams => _audioStreams ?? throw new ApplicationException("\"streams\" property does not exist.");
+        public IEnumerable<SubtitleStreamInfo> SubtitleStreams => _subtitleStreams ?? throw new ApplicationException("\"streams\" property does not exist.");
+        public IEnumerable<DataStreamInfo> DataStreams => _dataStreams ?? throw new ApplicationException("\"streams\" property does not exist.");
+        public IEnumerable<AttachmentStreamInfo> AttachmentStreams => _attachmentStreams ?? throw new ApplicationException("\"streams\" property does not exist.");
 
         public static MovieInformation ParseFromJson(string jsonText)
         {
             var movieInformationContainer =
                 JsonSerializer.Deserialize(jsonText, MovieModelSourceGenerator.Default.MovieInformationContainer)
-                ?? throw new Exception("ffprobe returned no information.");
+                ?? throw new ApplicationException("ffprobe returned no information.");
             return new MovieInformation(movieInformationContainer);
         }
     }

@@ -11,9 +11,9 @@ using Palmtree.Linq;
 
 namespace AudioNormalizer
 {
-    public static partial class Program
+    internal static partial class Program
     {
-        private class CommandParameter
+        private sealed class CommandParameter
         {
             private CommandParameter(IEnumerable<CommandOption<OptionType>> options)
             {
@@ -44,17 +44,16 @@ namespace AudioNormalizer
                 => new(optionDefinitions.ParseCommandArguments(args));
         }
 
-        private static readonly string _thisProgramName;
-        private static readonly IEnumerable<CommandOptionDefinition<OptionType>> _optionDefinitions;
-
-        static Program()
-        {
-            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
-            _optionDefinitions = GetOptionDefinitions();
-        }
-
         public static int Main(string[] args)
         {
+            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
+            {
+                if (OperatingSystem.IsWindows())
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or output is not UTF8. Consider running the command \"chcp 65001\".");
+                else
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+            }
+
             // このプロセスでは Ctrl+C を無視する。
             TinyConsole.CancelKeyPress += (sender, e) => e.Cancel = true;
 
@@ -77,14 +76,14 @@ namespace AudioNormalizer
                     {
                         if (!File.Exists(commandOptions.Input))
                         {
-                            PrintErrorMessage($"The input file specified by the \"--input\" option does not exist.: \"{commandOptions.Input}\"");
+                            TinyConsole.WriteLog(LogCategory.Error, $"The input file specified by the \"--input\" option does not exist.: \"{commandOptions.Input}\"");
                             return 1;
                         }
                     }
                     catch (Exception ex)
                     {
-                        PrintErrorMessage($"Failed to access the input file specified by the \"--input\" option.: \"{commandOptions.Input}\"");
-                        PrintExceptionMessage(ex);
+                        TinyConsole.WriteLog(LogCategory.Error, $"Failed to access the input file specified by the \"--input\" option.: \"{commandOptions.Input}\"");
+                        TinyConsole.WriteLog(ex);
                         return 1;
                     }
                 }
@@ -98,20 +97,20 @@ namespace AudioNormalizer
                         var parentDirectory = outputFile.Directory;
                         if (parentDirectory is null || !parentDirectory.Exists)
                         {
-                            PrintErrorMessage($"The output file directory specified with the \"--output\" option is invalid or does not exist.: \"{commandOptions.Output}\"");
+                            TinyConsole.WriteLog(LogCategory.Error, $"The output file directory specified with the \"--output\" option is invalid or does not exist.: \"{commandOptions.Output}\"");
                             return 1;
                         }
 
                         if (!commandOptions.IsForceMode && outputFile.Exists)
                         {
-                            PrintErrorMessage($"The output file specified with the \"--output\" option already exists.: \"{commandOptions.Output}\"");
+                            TinyConsole.WriteLog(LogCategory.Error, $"The output file specified with the \"--output\" option already exists.: \"{commandOptions.Output}\"");
                             return 1;
                         }
                     }
                     catch (Exception ex)
                     {
-                        PrintErrorMessage($"Failed to access the output file specified by the \"--output\" option.: \"{commandOptions.Output}\"");
-                        PrintExceptionMessage(ex);
+                        TinyConsole.WriteLog(LogCategory.Error, $"Failed to access the output file specified by the \"--output\" option.: \"{commandOptions.Output}\"");
+                        TinyConsole.WriteLog(ex);
                         return 1;
                     }
                 }
@@ -124,7 +123,7 @@ namespace AudioNormalizer
                 }
 
                 if (commandOptions.Verbose)
-                    PrintInformationMessage("Start processing.");
+                    TinyConsole.WriteLog(LogCategory.Information, "Start processing.");
                 try
                 {
                     // 入力のフォーマットを調べる
@@ -165,11 +164,8 @@ namespace AudioNormalizer
                                 commandOptions.Verbose,
                                 commandOptions.DisableVideoStream,
                                 CopyStream,
-                                PrintInformationMessage,
-                                PrintWarningMessage,
-                                PrintWarningMessage,
-                                PrintErrorMessage,
-                                PrintErrorMessage);
+                                TinyConsole.WriteLog,
+                                TinyConsole.WriteLog);
 
                         state.NormalizeFile(inputFormat, inputFile, outputFormat, outputFile);
 
@@ -182,12 +178,12 @@ namespace AudioNormalizer
                             using var outStream = TinyConsole.OpenStandardOutput();
 
                             if (commandOptions.Verbose)
-                                PrintInformationMessage($"Copying from temporary file to standard output.: {temporaryOutputFile.FullName}");
+                                TinyConsole.WriteLog(LogCategory.Information, $"Copying from temporary file to standard output.: {temporaryOutputFile.FullName}");
 
                             CopyStream(inStream, outStream, inStream.Length);
 
                             if (commandOptions.Verbose)
-                                PrintInformationMessage("Copy finished.");
+                                TinyConsole.WriteLog(LogCategory.Information, "Copy finished.");
                         }
 
                         // 終了する
@@ -203,7 +199,7 @@ namespace AudioNormalizer
                             {
                                 File.Delete(temporaryInputFile.FullName);
                                 if (commandOptions.Verbose)
-                                    PrintInformationMessage($"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
+                                    TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                             }
                             catch (Exception)
                             {
@@ -216,7 +212,7 @@ namespace AudioNormalizer
                             {
                                 File.Delete(temporaryOutputFile.FullName);
                                 if (commandOptions.Verbose)
-                                    PrintInformationMessage($"Temporary file is deleted.: \"{temporaryOutputFile.FullName}\"");
+                                    TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryOutputFile.FullName}\"");
                             }
                             catch (Exception)
                             {
@@ -227,7 +223,7 @@ namespace AudioNormalizer
                 catch (Exception ex)
                 {
                     for (var e = ex; e is not null; e = e.InnerException)
-                        PrintExceptionMessage(e);
+                        TinyConsole.WriteLog(e);
                     return 1;
                 }
             }
@@ -246,7 +242,7 @@ namespace AudioNormalizer
             catch (InvalidCommandOptionException ex)
             {
                 for (var e = ex as Exception; e is not null; e = e.InnerException)
-                    PrintErrorMessage(e.Message);
+                    TinyConsole.WriteLog(LogCategory.Error, e.Message);
                 return null;
             }
         }
@@ -258,7 +254,7 @@ namespace AudioNormalizer
                 // -i オプションが指定されている場合 (入力元がファイルである場合)
 
                 if (commandParameters.Verbose)
-                    PrintInformationMessage($"Input file path: \"{commandParameters.Input}\"");
+                    TinyConsole.WriteLog(LogCategory.Information, $"Input file path: \"{commandParameters.Input}\"");
                 return (commandParameters.InputFormat, new FilePath(commandParameters.Input), null);
             }
             else
@@ -268,8 +264,8 @@ namespace AudioNormalizer
                 var temporaryInputFile = new FilePath(Path.GetTempFileName());
                 if (commandParameters.Verbose)
                 {
-                    PrintInformationMessage("Read from standard input.");
-                    PrintInformationMessage($"Temprary file is created.: \"{temporaryInputFile.FullName}\"");
+                    TinyConsole.WriteLog(LogCategory.Information, "Read from standard input.");
+                    TinyConsole.WriteLog(LogCategory.Information, $"Temprary file is created.: \"{temporaryInputFile.FullName}\"");
                 }
 
                 try
@@ -280,12 +276,12 @@ namespace AudioNormalizer
                     using var outputStream = temporaryInputFile.Create();
 
                     if (commandParameters.Verbose)
-                        PrintInformationMessage($"Copying from standard input to temporary file.: {temporaryInputFile.FullName}");
+                        TinyConsole.WriteLog(LogCategory.Information, $"Copying from standard input to temporary file.: {temporaryInputFile.FullName}");
 
                     CopyStream(inputStream, outputStream);
 
                     if (commandParameters.Verbose)
-                        PrintInformationMessage("Copy finished.");
+                        TinyConsole.WriteLog(LogCategory.Information, "Copy finished.");
 
                     return (commandParameters.InputFormat, temporaryInputFile, temporaryInputFile);
                 }
@@ -295,13 +291,13 @@ namespace AudioNormalizer
                     {
                         File.Delete(temporaryInputFile.FullName);
                         if (commandParameters.Verbose)
-                            PrintInformationMessage($"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
+                            TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                     }
                     catch (Exception)
                     {
                     }
 
-                    throw new Exception("An error occurred while preparing the input file.", ex);
+                    throw new ApplicationException("An error occurred while preparing the input file.", ex);
                 }
             }
         }
@@ -313,7 +309,7 @@ namespace AudioNormalizer
                 // -o オプションが指定されている場合 (出力先がファイルである場合)
 
                 if (commandParameters.Verbose)
-                    PrintInformationMessage($"Output file path: \"{commandParameters.Output}\"");
+                    TinyConsole.WriteLog(LogCategory.Information, $"Output file path: \"{commandParameters.Output}\"");
                 return (commandParameters.OutputFormat, new FilePath(commandParameters.Output), null);
             }
             else
@@ -323,8 +319,8 @@ namespace AudioNormalizer
                 var temporaryOutputFile = new FilePath(Path.GetTempFileName());
                 if (commandParameters.Verbose)
                 {
-                    PrintInformationMessage("Write to standard output.");
-                    PrintInformationMessage($"Temprary file is created.: \"{temporaryOutputFile.FullName}\"");
+                    TinyConsole.WriteLog(LogCategory.Information, "Write to standard output.");
+                    TinyConsole.WriteLog(LogCategory.Information, $"Temprary file is created.: \"{temporaryOutputFile.FullName}\"");
                 }
 
                 return (commandParameters.OutputFormat, temporaryOutputFile, temporaryOutputFile);
@@ -436,7 +432,7 @@ namespace AudioNormalizer
                     "",
 #endif
                     "[Usage]",
-                    $"{_thisProgramName} <option list>",
+                    $"{Validation.DefaultApplicationName} <option list>",
                     $"  For \"<option list>\", specify the necessary options from the list below. You can arrange them in any order.",
                     "",
                     "[Options]",
@@ -454,70 +450,6 @@ namespace AudioNormalizer
                         .Append("")));
             foreach (var lineText in textLines)
                 TinyConsole.Out.WriteLine(lineText);
-        }
-
-        private static void PrintExceptionMessage(Exception ex)
-        {
-            for (var exception = ex; exception != null; exception = exception.InnerException)
-                PrintErrorMessage(exception.Message);
-        }
-
-        private static void PrintInformationMessage(string message)
-            => PrintInformationMessage(_thisProgramName, message);
-
-        private static void PrintInformationMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Cyan;
-            TinyConsole.Write($"{programName}:INFORMATION:");
-            TinyConsole.ResetColor();
-            TinyConsole.Write($" {message}");
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
-        }
-
-        private static void PrintWarningMessage(string message)
-            => PrintWarningMessage(_thisProgramName, message);
-
-        private static void PrintWarningMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Yellow;
-            TinyConsole.Write($"{programName}:WARNING: {message}");
-            TinyConsole.ResetColor();
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
-        }
-
-        private static void PrintErrorMessage(string message)
-            => PrintErrorMessage(_thisProgramName, message);
-
-        private static void PrintErrorMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Red;
-            TinyConsole.Write($"{programName}:ERROR: {message}");
-            TinyConsole.ResetColor();
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
         }
     }
 }

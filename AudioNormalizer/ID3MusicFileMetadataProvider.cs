@@ -5,7 +5,7 @@ using Palmtree;
 
 namespace AudioNormalizer
 {
-    internal class ID3MusicFileMetadataProvider
+    internal sealed class ID3MusicFileMetadataProvider
         : MusicFileMetadataProvider
     {
         private readonly TransferDirection _direction;
@@ -102,8 +102,8 @@ namespace AudioNormalizer
             {
                 null => throw new InvalidOperationException(),
                 "wav" => (MapPcmEncoder(sourceAudioStream.SampleFormat, sourceAudioStream.BitsPerRawSample), MapPcmEncoderOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.BitsPerRawSample)),
-                "mp3" => ("libmp3lame", new[] { "-q:a 0" }),
-                _ => throw Validation.GetFailErrorException($"_format == \"{_fileFormat}\""),
+                "mp3" => ("libmp3lame", ["-q:a 0"]),
+                _ => throw Validation.GetFailErrorException(),
             };
         }
 
@@ -130,9 +130,9 @@ namespace AudioNormalizer
         private static string[] MapPcmEncoderOptions(int index, int? bitsPerRawSample)
         {
             if (bitsPerRawSample is null)
-                return Array.Empty<string>();
+                return [];
             else
-                return new[] { $"-bits_per_raw_sample:a:{index} {bitsPerRawSample.Value}" };
+                return [$"-bits_per_raw_sample:a:{index} {bitsPerRawSample.Value}"];
         }
     }
 }

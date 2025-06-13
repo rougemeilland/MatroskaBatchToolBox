@@ -23,6 +23,14 @@ namespace Palmtree.Movie.Ffmpeg
 
         public static int Main(string[] args)
         {
+            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
+            {
+                if (OperatingSystem.IsWindows())
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or output is not UTF8. Consider running the command \"chcp 65001\".");
+                else
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+            }
+
             // このプロセスでは Ctrl+C を無視する。
             // 子プロセスの ffmpeg は Ctrl+C を受け付けて、非ゼロの exit code で終了する。
             TinyConsole.CancelKeyPress += (sender, e) => e.Cancel = true;
@@ -47,9 +55,6 @@ namespace Palmtree.Movie.Ffmpeg
             }
             catch (Exception ex)
             {
-                TinyConsole.ForegroundColor = ConsoleColor.Red;
-                TinyConsole.Error.Write($"\r{_thisCommandName}:ERROR: {ex.Message}");
-                TinyConsole.ResetColor();
                 try
                 {
                     TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
@@ -58,7 +63,7 @@ namespace Palmtree.Movie.Ffmpeg
                 {
                 }
 
-                TinyConsole.WriteLine();
+                TinyConsole.WriteLog(ex);
                 return 1;
             }
             finally
@@ -97,11 +102,11 @@ namespace Palmtree.Movie.Ffmpeg
 
             var startInfo = new ProcessStartInfo
             {
-                Arguments = string.Join(" ", args.Select(arg => arg.CommandLineArgumentEncode())),
+                Arguments = string.Join(" ", args.Select(arg => arg.EncodeCommandLineArgument())),
                 FileName = _ffmpegCommandPath,
                 UseShellExecute = false,
             };
-            using var process = Process.Start(startInfo) ?? throw new Exception("Could not start ffmpeg.");
+            using var process = Process.Start(startInfo) ?? throw new ApplicationException("Could not start ffmpeg.");
             process.WaitForExit();
             return process.ExitCode;
         }

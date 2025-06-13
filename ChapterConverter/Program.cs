@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using MatroskaBatchToolBox.Utility;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
@@ -13,7 +13,7 @@ using Palmtree.Numerics;
 
 namespace ChapterConverter
 {
-    public class Program
+    public partial class Program
     {
         private enum ActionMode
         {
@@ -37,7 +37,7 @@ namespace ChapterConverter
             Movie,
         }
 
-        private class CommandLineOptions
+        private sealed class CommandLineOptions
         {
             public CommandLineOptions()
             {
@@ -77,19 +77,25 @@ namespace ChapterConverter
         private const string _fileFormatFfprobeFlat = "ffprobe_flat";
         private const string _fileFormatFfprobeJson = "ffprobe_json";
         private const string _fileFormatMovie = "movie";
-        private static readonly object _consoleLockObject;
-        private static readonly string _thisProgramName;
-        private static readonly Regex _titleOptionPattern;
-
-        static Program()
-        {
-            _consoleLockObject = new object();
-            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
-            _titleOptionPattern = new Regex(@"^(-tt|--set_title):(?<chapterNumber>\d+)$");
-        }
+#if NET9_0_OR_GREATER
+        private static readonly Lock _consoleLockObject = new();
+#else
+        private static readonly object _consoleLockObject = new();
+#endif
 
         public static int Main(string[] args)
         {
+            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
+            {
+                if (OperatingSystem.IsWindows())
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or output is not UTF8. Consider running the command \"chcp 65001\".");
+                else
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+            }
+
+            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
+                TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+
             // このプロセスでは Ctrl+C を無視する。
             TinyConsole.CancelKeyPress += (sender, e) => e.Cancel = true;
 
@@ -123,7 +129,7 @@ namespace ChapterConverter
             }
             else
             {
-                PrintErrorMessage($"Specify the \"-help\" option to see how to use {_thisProgramName}.");
+                TinyConsole.WriteLog(LogCategory.Error, $"Specify the \"-help\" option to see how to use {Validation.DefaultApplicationName}.");
                 return 1;
             }
         }
@@ -132,7 +138,7 @@ namespace ChapterConverter
         {
             var helpMessageTextLines = new[]
             {
-                $"Usage: {_thisProgramName} <option1> <option2> ... <optionN>",
+                $"Usage: {Validation.DefaultApplicationName} <option1> <option2> ... <optionN>",
                 $"",
                 $"  * You can specify the options in any order. However, the \"-help\" option cannot be specified together with other options.",
                 $"",
@@ -206,7 +212,7 @@ namespace ChapterConverter
                 $"",
                 $"      * Commentary",
                 $"        In general, chapters that are too short to be visible are meaningless.",
-                $"        So {_thisProgramName} will automatically merge chapters shorter than the value specified in this option with the chapter before or after it.",
+                $"        So {Validation.DefaultApplicationName} will automatically merge chapters shorter than the value specified in this option with the chapter before or after it.",
                 $"",
                 $"        More specifically, if the first chapter is too short, merge it with the second chapter.",
                 $"        Also, if the second and subsequent chapters are too short, they are combined with the previous chapter.",
@@ -308,7 +314,7 @@ namespace ChapterConverter
             if (inputRawText is null)
                 return false;
 
-            var formatterParameter = new ChapterFormatterParameter(options.MaximumDuration, PrintWarningMessage);
+            var formatterParameter = new ChapterFormatterParameter(options.MaximumDuration, TinyConsole.WriteLog);
 
             var inputChapterFormatter =
                 options.InputFormat switch
@@ -326,7 +332,7 @@ namespace ChapterConverter
                 };
             if (inputChapterFormatter is null)
             {
-                PrintErrorMessage($"Not supported format for intput: {options.InputFormat}");
+                TinyConsole.WriteLog(LogCategory.Error, $"Not supported format for intput: {options.InputFormat}");
                 return false;
             }
 
@@ -351,7 +357,7 @@ namespace ChapterConverter
                 };
             if (outputChapterFormatter is null)
             {
-                PrintErrorMessage($"Not supported format for output: {options.OutputFormat}");
+                TinyConsole.WriteLog(LogCategory.Error, $"Not supported format for output: {options.OutputFormat}");
                 return false;
             }
 
@@ -374,12 +380,12 @@ namespace ChapterConverter
                             Titles = options.Titles,
                             MinimumDuration = options.MinimumDuration,
                             KeepEmptyChapter = options.KeepEmptyChapter,
-                            WarningMessageReporter = PrintWarningMessage,
+                            WarningMessageReporter = message => TinyConsole.WriteLog(LogCategory.Warning, message),
                         });
             }
             catch (Exception ex)
             {
-                PrintErrorMessage(ex.Message);
+                TinyConsole.WriteLog(ex);
                 return null;
             }
         }
@@ -390,7 +396,7 @@ namespace ChapterConverter
             {
                 if (inputFormat.IsAnyOf(ChapterFormat.Immediate, ChapterFormat.Movie))
                 {
-                    Validation.Assert(inputFilePath is not null, "inputFilePath is not null");
+                    Validation.Assert(inputFilePath is not null);
                     return inputFilePath;
                 }
                 else
@@ -404,7 +410,7 @@ namespace ChapterConverter
             }
             catch (Exception ex)
             {
-                PrintErrorMessage(ex.Message);
+                TinyConsole.WriteLog(LogCategory.Error, ex.Message);
                 return null;
             }
         }
@@ -425,21 +431,21 @@ namespace ChapterConverter
             }
             catch (Exception ex)
             {
-                PrintErrorMessage(ex.Message);
+                TinyConsole.WriteLog(LogCategory.Error, ex.Message);
                 return false;
             }
         }
 
-        private static IEnumerable<SimpleChapterElement>? ParseChapters(IChapterFormatter inputChapterFormatter, string inputRawText)
+        private static SimpleChapterElement[]? ParseChapters(IChapterFormatter inputChapterFormatter, string inputRawText)
         {
             try
             {
-                return inputChapterFormatter.Parse(inputRawText).ToList();
+                return [.. inputChapterFormatter.Parse(inputRawText)];
             }
             catch (Exception ex)
             {
                 for (var exception = ex; exception is not null; exception = exception.InnerException)
-                    PrintErrorMessage(exception.Message);
+                    TinyConsole.WriteLog(LogCategory.Error, exception.Message);
                 return null;
             }
         }
@@ -453,7 +459,7 @@ namespace ChapterConverter
             catch (Exception ex)
             {
                 for (var exception = ex; exception is not null; exception = exception.InnerException)
-                    PrintErrorMessage(exception.Message);
+                    TinyConsole.WriteLog(LogCategory.Error, exception.Message);
                 return null;
             }
         }
@@ -481,13 +487,13 @@ namespace ChapterConverter
                     case "-help":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (actionMode == ActionMode.Convert)
                         {
-                            PrintErrorMessage("The '-help' option must be specified alone.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option must be specified alone.");
                             return defaultReturnValue;
                         }
 
@@ -497,19 +503,19 @@ namespace ChapterConverter
                     case "--input_format":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (inputFormat != ChapterFormat.NotSpecified)
                         {
-                            PrintErrorMessage("The \"-if\" option or \"--input_format\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"-if\" option or \"--input_format\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (index + 1 >= args.Length)
                         {
-                            PrintErrorMessage("The value of the \"-if\" option or \"--input_format\" option is not specified.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The value of the \"-if\" option or \"--input_format\" option is not specified.");
                             return defaultReturnValue;
                         }
 
@@ -531,7 +537,7 @@ namespace ChapterConverter
                                 };
                             if (optionValue == ChapterFormat.NotSpecified)
                             {
-                                PrintErrorMessage($"The value of the \"-if\" option or \"--input_format\" option is an unsupported value.: \"{args[index]}\"");
+                                TinyConsole.WriteLog(LogCategory.Error, $"The value of the \"-if\" option or \"--input_format\" option is an unsupported value.: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -544,19 +550,19 @@ namespace ChapterConverter
                     case "--input":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (inputFilePath is not null)
                         {
-                            PrintErrorMessage("The \"-i\" option or \"--input\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"-i\" option or \"--input\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (index + 1 >= args.Length)
                         {
-                            PrintErrorMessage("The value of the \"-i\" option or \"--input\" option is not specified.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The value of the \"-i\" option or \"--input\" option is not specified.");
                             return defaultReturnValue;
                         }
 
@@ -568,19 +574,19 @@ namespace ChapterConverter
                     case "--output_format":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (outputFormat != ChapterFormat.NotSpecified)
                         {
-                            PrintErrorMessage("The \"-of\" option or \"--output_format\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"-of\" option or \"--output_format\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (index + 1 >= args.Length)
                         {
-                            PrintErrorMessage("The value of the \"-if\" option or \"--input_format\" option is not specified.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The value of the \"-if\" option or \"--input_format\" option is not specified.");
                             return defaultReturnValue;
                         }
 
@@ -600,7 +606,7 @@ namespace ChapterConverter
                                 };
                             if (optionValue == ChapterFormat.NotSpecified)
                             {
-                                PrintErrorMessage($"The value of the \"-of\" option or \"--output_format\" option is an unsupported value.: \"{args[index]}\"");
+                                TinyConsole.WriteLog(LogCategory.Error, $"The value of the \"-of\" option or \"--output_format\" option is an unsupported value.: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -613,19 +619,19 @@ namespace ChapterConverter
                     case "--output":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (outputFilePath is not null)
                         {
-                            PrintErrorMessage("The \"-o\" option or \"--output\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"-o\" option or \"--output\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (index + 1 >= args.Length)
                         {
-                            PrintErrorMessage("The value of the \"-o\" option or \"--output\" option is not specified.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The value of the \"-o\" option or \"--output\" option is not specified.");
                             return defaultReturnValue;
                         }
 
@@ -637,13 +643,13 @@ namespace ChapterConverter
                     case "--force":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (force is not null)
                         {
-                            PrintErrorMessage("The \"-f\" option or \"--force\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"-f\" option or \"--force\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
@@ -653,27 +659,27 @@ namespace ChapterConverter
                     case "--maximum_duration":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (maximumDuration is not null)
                         {
-                            PrintErrorMessage("The \"--maximum_duration\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"--maximum_duration\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (index + 1 >= args.Length)
                         {
-                            PrintErrorMessage("The value of the \"--maximum_duration\" option is not specified.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The value of the \"--maximum_duration\" option is not specified.");
                             return defaultReturnValue;
                         }
 
                         ++index;
                         {
-                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan maximumDurationValue))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out var maximumDurationValue))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--maximum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
+                                TinyConsole.WriteLog(LogCategory.Error, $"The format of the value of the \"--maximum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -685,27 +691,27 @@ namespace ChapterConverter
                     case "-ss":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (from is not null)
                         {
-                            PrintErrorMessage("The \"-ss\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"-ss\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (index + 1 >= args.Length)
                         {
-                            PrintErrorMessage("The value of the \"-ss\" option is not specified.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The value of the \"-ss\" option is not specified.");
                             return defaultReturnValue;
                         }
 
                         ++index;
                         {
-                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out var time))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--ss\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
+                                TinyConsole.WriteLog(LogCategory.Error, $"The format of the value of the \"--ss\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -717,27 +723,27 @@ namespace ChapterConverter
                     case "-to":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (to is not null)
                         {
-                            PrintErrorMessage("The \"-to\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"-to\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (index + 1 >= args.Length)
                         {
-                            PrintErrorMessage("The value of the \"-to\" option is not specified.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The value of the \"-to\" option is not specified.");
                             return defaultReturnValue;
                         }
 
                         ++index;
                         {
-                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out var time))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
+                                TinyConsole.WriteLog(LogCategory.Error, $"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -749,27 +755,27 @@ namespace ChapterConverter
                     case "-t":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (t is not null)
                         {
-                            PrintErrorMessage("The \"-to\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"-to\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (index + 1 >= args.Length)
                         {
-                            PrintErrorMessage("The value of the \"-to\" option is not specified.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The value of the \"-to\" option is not specified.");
                             return defaultReturnValue;
                         }
 
                         ++index;
                         {
-                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out var time))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
+                                TinyConsole.WriteLog(LogCategory.Error, $"The format of the value of the \"--to\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -781,27 +787,27 @@ namespace ChapterConverter
                     case "--minimum_duration":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (maximumDuration is not null)
                         {
-                            PrintErrorMessage("The \"--minimum_duration\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"--minimum_duration\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (index + 1 >= args.Length)
                         {
-                            PrintErrorMessage("The value of the \"--minimum_duration\" option is not specified.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The value of the \"--minimum_duration\" option is not specified.");
                             return defaultReturnValue;
                         }
 
                         ++index;
                         {
-                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out TimeSpan minimumDurationValue))
+                            if (!args[index].TryParse(TimeParsingMode.LazyMode, out var minimumDurationValue))
                             {
-                                PrintErrorMessage($"The format of the value of the \"--minimum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
+                                TinyConsole.WriteLog(LogCategory.Error, $"The format of the value of the \"--minimum_duration\" option is incorrect. The values for these options must be in hour-minute-second format (eg 00:12:34.567) or seconds format (eg 1234.567).: \"{args[index]}\"");
                                 return defaultReturnValue;
                             }
 
@@ -813,13 +819,13 @@ namespace ChapterConverter
                     case "--keep_empty_chapter":
                         if (actionMode == ActionMode.Help)
                         {
-                            PrintErrorMessage("The '-help' option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                             return defaultReturnValue;
                         }
 
                         if (keepEmptyChapter is not null)
                         {
-                            PrintErrorMessage("The \"--keep_empty_chapter\" option is specified more than once.");
+                            TinyConsole.WriteLog(LogCategory.Error, "The \"--keep_empty_chapter\" option is specified more than once.");
                             return defaultReturnValue;
                         }
 
@@ -828,19 +834,19 @@ namespace ChapterConverter
                         break;
                     default:
                     {
-                        var match = _titleOptionPattern.Match(args[index]);
+                        var match = GetTitleOptionPattern().Match(args[index]);
                         if (match.Success)
                         {
                             if (actionMode == ActionMode.Help)
                             {
-                                PrintErrorMessage("The '-help' option is specified more than once.");
+                                TinyConsole.WriteLog(LogCategory.Error, "The '-help' option is specified more than once.");
                                 return defaultReturnValue;
                             }
 
                             var chapterNumber = match.Groups["chapterNumber"].Value.ParseAsInt32();
                             if (index + 1 >= args.Length)
                             {
-                                PrintErrorMessage($"The value of the \"-tt:{chapterNumber}\" option or \"--set_title\" option is not specified.");
+                                TinyConsole.WriteLog(LogCategory.Error, $"The value of the \"-tt:{chapterNumber}\" option or \"--set_title\" option is not specified.");
                                 return defaultReturnValue;
                             }
 
@@ -848,7 +854,7 @@ namespace ChapterConverter
                             var chapterName = args[index];
                             if (titles.ContainsKey(chapterNumber))
                             {
-                                PrintErrorMessage($"The \"-tt:{chapterNumber}\" option or \"--set_title:{chapterNumber}\" option is specified more than once.");
+                                TinyConsole.WriteLog(LogCategory.Error, $"The \"-tt:{chapterNumber}\" option or \"--set_title:{chapterNumber}\" option is specified more than once.");
                                 return defaultReturnValue;
                             }
 
@@ -856,7 +862,7 @@ namespace ChapterConverter
                         }
                         else
                         {
-                            PrintErrorMessage($"Incorrect option specified. : \"{args[index]}\"");
+                            TinyConsole.WriteLog(LogCategory.Error, $"Incorrect option specified. : \"{args[index]}\"");
                             return defaultReturnValue;
                         }
 
@@ -868,7 +874,7 @@ namespace ChapterConverter
 
             if (actionMode == ActionMode.NotSpecified)
             {
-                PrintErrorMessage("No arguments specified.");
+                TinyConsole.WriteLog(LogCategory.Error, "No arguments specified.");
                 return defaultReturnValue;
             }
 
@@ -877,13 +883,13 @@ namespace ChapterConverter
 
             if (inputFormat == ChapterFormat.NotSpecified)
             {
-                PrintErrorMessage($"Input file format is not specified. Please specify the \"--input_format\" option.");
+                TinyConsole.WriteLog(LogCategory.Error, $"Input file format is not specified. Please specify the \"--input_format\" option.");
                 return defaultReturnValue;
             }
 
             if (outputFormat == ChapterFormat.NotSpecified)
             {
-                PrintErrorMessage($"Output file format is not specified. Please specify the \"--output_format\" option.");
+                TinyConsole.WriteLog(LogCategory.Error, $"Output file format is not specified. Please specify the \"--output_format\" option.");
                 return defaultReturnValue;
             }
 
@@ -891,7 +897,7 @@ namespace ChapterConverter
             {
                 if (inputFilePath is null)
                 {
-                    PrintErrorMessage($"Neither the \"-i\" option nor the \"--input\" option is specified even though \"{inputFormat switch { ChapterFormat.Immediate => _fileFormatImmediate, ChapterFormat.Movie => _fileFormatMovie, _ => "???", }}\" is specified for the input format. Specify a list of chapter start times with the \"-i\" or \"--input\" option.");
+                    TinyConsole.WriteLog(LogCategory.Error, $"Neither the \"-i\" option nor the \"--input\" option is specified even though \"{inputFormat switch { ChapterFormat.Immediate => _fileFormatImmediate, ChapterFormat.Movie => _fileFormatMovie, _ => "???", }}\" is specified for the input format. Specify a list of chapter start times with the \"-i\" or \"--input\" option.");
                     return defaultReturnValue;
                 }
             }
@@ -899,14 +905,14 @@ namespace ChapterConverter
             {
                 if (inputFilePath is not null && !File.Exists(inputFilePath))
                 {
-                    PrintErrorMessage($"Input file does not exist.: \"{inputFilePath}\"");
+                    TinyConsole.WriteLog(LogCategory.Error, $"Input file does not exist.: \"{inputFilePath}\"");
                     return defaultReturnValue;
                 }
             }
 
             if (outputFilePath is not null && !(force ?? false) && File.Exists(outputFilePath))
             {
-                PrintErrorMessage($"Output file already exists. Specify the \"-f\" option or \"--force\" option to allow overwriting of the output file.: \"{outputFilePath}\"");
+                TinyConsole.WriteLog(LogCategory.Error, $"Output file already exists. Specify the \"-f\" option or \"--force\" option to allow overwriting of the output file.: \"{outputFilePath}\"");
                 return defaultReturnValue;
             }
 
@@ -914,7 +920,7 @@ namespace ChapterConverter
 
             if (to is not null && t is not null)
             {
-                PrintErrorMessage("\"-to\" option and \"-t\" option cannot be specified at once.");
+                TinyConsole.WriteLog(LogCategory.Error, "\"-to\" option and \"-t\" option cannot be specified at once.");
                 return defaultReturnValue;
             }
 
@@ -923,7 +929,7 @@ namespace ChapterConverter
                 var (actualFrom, actualTo) = GetTrimmingRange(from, to, t);
                 if (actualFrom >= actualMaximumDuration)
                 {
-                    PrintErrorMessage("The value of the \"-ss\" option is too large. Consider changing the value of the \"--maximum_duration\" option or \"-ss\" option.");
+                    TinyConsole.WriteLog(LogCategory.Error, "The value of the \"-ss\" option is too large. Consider changing the value of the \"--maximum_duration\" option or \"-ss\" option.");
                     return defaultReturnValue;
                 }
 
@@ -946,7 +952,7 @@ namespace ChapterConverter
             }
             catch (Exception ex)
             {
-                PrintErrorMessage(ex.Message);
+                TinyConsole.WriteLog(ex);
                 return defaultReturnValue;
             }
         }
@@ -954,11 +960,11 @@ namespace ChapterConverter
         private static (TimeSpan from, TimeSpan to) GetTrimmingRange(TimeSpan? ssValue, TimeSpan? toValue, TimeSpan? tValue)
         {
             if (toValue is not null && tValue is not null)
-                throw new Exception("\"-to\" option and \"-t\" option cannot be specified at once.");
+                throw new ApplicationException("\"-to\" option and \"-t\" option cannot be specified at once.");
 
-            Validation.Assert(ssValue is null || ssValue.Value >= TimeSpan.Zero, "ssValue is null || ssValue.Value >= TimeSpan.Zero");
-            Validation.Assert(toValue is null || toValue.Value >= TimeSpan.Zero, "toValue is null || toValue.Value >= TimeSpan.Zero");
-            Validation.Assert(tValue is null || tValue.Value >= TimeSpan.Zero, "tValue is null || tValue.Value >= TimeSpan.Zero");
+            Validation.Assert(ssValue is null || ssValue.Value >= TimeSpan.Zero);
+            Validation.Assert(toValue is null || toValue.Value >= TimeSpan.Zero);
+            Validation.Assert(tValue is null || tValue.Value >= TimeSpan.Zero);
 
             var from = ssValue ?? TimeSpan.Zero;
             var to =
@@ -970,29 +976,10 @@ namespace ChapterConverter
             return
                 to >= from
                 ? (from, to)
-                : throw new Exception("The value of the \"-to\" option is smaller than the value of the \"-ss\" option. Consider changing the value of the \"-to\" option or \"-ss\" option.");
+                : throw new ApplicationException("The value of the \"-to\" option is smaller than the value of the \"-ss\" option. Consider changing the value of the \"-to\" option or \"-ss\" option.");
         }
 
-        private static void PrintWarningMessage(string message)
-        {
-            lock (_consoleLockObject)
-            {
-                var color = TinyConsole.ForegroundColor;
-                TinyConsole.ForegroundColor = ConsoleColor.Yellow;
-                TinyConsole.Error.WriteLine($"{_thisProgramName}: WARNING: {message}");
-                TinyConsole.ForegroundColor = color;
-            }
-        }
-
-        private static void PrintErrorMessage(string message)
-        {
-            lock (_consoleLockObject)
-            {
-                var color = TinyConsole.ForegroundColor;
-                TinyConsole.ForegroundColor = ConsoleColor.Red;
-                TinyConsole.Error.WriteLine($"{_thisProgramName}: ERROR: {message}");
-                TinyConsole.ForegroundColor = color;
-            }
-        }
+        [GeneratedRegex(@"^(-tt|--set_title):(?<chapterNumber>\d+)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetTitleOptionPattern();
     }
 }

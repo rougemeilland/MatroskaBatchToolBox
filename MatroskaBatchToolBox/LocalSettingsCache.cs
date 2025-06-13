@@ -3,13 +3,13 @@ using Palmtree.IO;
 
 namespace MatroskaBatchToolBox
 {
-    internal class LocalSettingsCache
+    internal sealed class LocalSettingsCache
     {
-        private readonly IDictionary<string, Settings> _cache;
+        private readonly Dictionary<string, Settings> _cache;
 
         public LocalSettingsCache()
         {
-            _cache = new Dictionary<string, Settings>();
+            _cache = [];
         }
 
         public Settings this[DirectoryPath? sourceFileDirectory]
@@ -32,7 +32,7 @@ namespace MatroskaBatchToolBox
             var key = directory.FullName;
 
             // 対象ディレクトリに対するローカル設定がキャッシュに既にあればそれを返す。
-            if (_cache.TryGetValue(key, out Settings? settings))
+            if (_cache.TryGetValue(key, out var settings))
                 return settings;
 
             // 対象ディレクトリの親ディレクトリに対するローカル設定に、対象ディレクトリにある設定を上書きして、キャッシュに追加する。(再帰呼び出し)

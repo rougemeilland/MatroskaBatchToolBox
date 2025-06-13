@@ -5,7 +5,7 @@ using MatroskaBatchToolBox.Utility;
 
 namespace ChapterConverter
 {
-    internal class ImmediateChapterFormatter
+    internal sealed class ImmediateChapterFormatter
         : ChapterFormatter
     {
         public ImmediateChapterFormatter(ChapterFormatterParameter parameter)

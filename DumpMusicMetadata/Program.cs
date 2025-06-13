@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
@@ -11,20 +12,26 @@ using Palmtree.IO.Serialization;
 
 namespace DumpMusicMetadata
 {
-    internal class Program
+    internal static class Program
     {
-        private static readonly string _thisProgramName;
-
-        static Program()
-        {
-            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
-        }
-
         private static int Main(string[] args)
         {
+            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
+            {
+                if (OperatingSystem.IsWindows())
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or output is not UTF8. Consider running the command \"chcp 65001\".");
+                else
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+            }
+
+            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
+                TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+
+            TinyConsole.DefaultTextWriter = ConsoleTextWriterType.StandardError;
+
             if (args.Length != 2)
             {
-                PrintErrorMessage("Invalid argument.");
+                TinyConsole.WriteLog(LogCategory.Error, "Invalid argument.");
                 return 1;
             }
 
@@ -38,7 +45,7 @@ namespace DumpMusicMetadata
                 var sourceFile = GetFileInfo(sourceFilePathName);
                 var musicInfo = GetMovieInformation(null, sourceFile);
                 if (musicInfo.AudioStreams.Count() != 1)
-                    throw new Exception($"The music file has no or multiple audio streams.: {sourceFilePathName}");
+                    throw new ApplicationException($"The music file has no or multiple audio streams.: {sourceFilePathName}");
                 var tagValues = new List<string>();
                 foreach (var (arg, tagName) in tagNameSpecs)
                 {
@@ -58,7 +65,7 @@ namespace DumpMusicMetadata
                             "TITLE" => MusicTagType.Title,
                             "TRACK" => MusicTagType.Track,
                             "FILE_NAME" => MusicTagType.FileName,
-                            _ => throw new Exception($"Not supported tag name.: \"{arg}\""),
+                            _ => throw new ApplicationException($"Not supported tag name.: \"{arg}\""),
                         };
                     tagValues.Add(GetTagValue(musicInfo, tagType));
                 }
@@ -68,7 +75,7 @@ namespace DumpMusicMetadata
             }
             catch (Exception ex)
             {
-                PrintExceptionMessage(ex);
+                TinyConsole.WriteLine(ex);
                 return 1;
             }
         }
@@ -79,12 +86,12 @@ namespace DumpMusicMetadata
             {
                 var fileInfo = new FilePath(sourceFilePathName);
                 if (!fileInfo.Exists)
-                    throw new Exception($"File does not exist.: \"{sourceFilePathName}\"");
+                    throw new ApplicationException($"File does not exist.: \"{sourceFilePathName}\"");
                 return fileInfo;
             }
             catch (IOException ex)
             {
-                throw new Exception($"Unable to access file.: \"{sourceFilePathName}\"", ex);
+                throw new ApplicationException($"Unable to access file.: \"{sourceFilePathName}\"", ex);
             }
         }
 
@@ -99,22 +106,13 @@ namespace DumpMusicMetadata
                         MovieInformationType.Chapters | MovieInformationType.Streams | MovieInformationType.Format,
                         (level, message) =>
                         {
-                            switch (level)
-                            {
-                                case "WARNING":
-                                    PrintWarningMessage("ffprobe", message);
-                                    break;
-                                case "ERROR":
-                                    PrintErrorMessage("ffprobe", message);
-                                    break;
-                                default:
-                                    break;
-                            }
+                            if (level != LogCategory.Information)
+                                TinyConsole.WriteLog("ffprobe", level, message);
                         });
             }
             catch (Exception ex)
             {
-                throw new Exception("Failed to get movie information.", ex);
+                throw new ApplicationException("Failed to get movie information.", ex);
             }
         }
 
@@ -137,79 +135,15 @@ namespace DumpMusicMetadata
                     MusicTagType.Lyricist => musicInfo.Format.FormatName is "mp3" or "wav" ? "text" : "lyricist",
                     MusicTagType.Title => "title",
                     MusicTagType.Track => "track",
-                    _ => throw new Exception($"Not supported {nameof(MusicTagType)} value.: {tagType}"),
+                    _ => throw new ApplicationException($"Not supported {nameof(MusicTagType)} value.: {tagType}"),
                 };
             return
                 musicInfo.Format.FormatName switch
                 {
                     "wav" or "mp3" or "flac" => musicInfo.Format.Tags[metadataName] ?? "",
                     "ogg" => musicInfo.AudioStreams.FirstOrDefault()?.Tags[metadataName] ?? "",
-                    _ => throw new Exception($"Not supported music file format.: \"{musicInfo.Format.FormatName}\""),
+                    _ => throw new ApplicationException($"Not supported music file format.: \"{musicInfo.Format.FormatName}\""),
                 };
-        }
-
-        private static void PrintExceptionMessage(Exception ex)
-        {
-            for (var exception = ex; exception != null; exception = exception.InnerException)
-                PrintErrorMessage(exception.Message);
-        }
-
-        private static void PrintInformationMessage(string message)
-            => PrintInformationMessage(_thisProgramName, message);
-
-        private static void PrintInformationMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Cyan;
-            TinyConsole.Write($"{programName}:INFORMATION:");
-            TinyConsole.ResetColor();
-            TinyConsole.Write($" {message}");
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
-        }
-
-        private static void PrintWarningMessage(string message)
-            => PrintWarningMessage(_thisProgramName, message);
-
-        private static void PrintWarningMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Yellow;
-            TinyConsole.Write($"{programName}:WARNING: {message}");
-            TinyConsole.ResetColor();
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
-        }
-
-        private static void PrintErrorMessage(string message)
-            => PrintErrorMessage(_thisProgramName, message);
-
-        private static void PrintErrorMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Red;
-            TinyConsole.Write($"{programName}:ERROR: {message}");
-            TinyConsole.ResetColor();
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
         }
     }
 }

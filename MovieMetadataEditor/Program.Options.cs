@@ -9,18 +9,17 @@ using Palmtree.Numerics;
 
 namespace MovieMetadataEditor
 {
-    partial class Program
+    internal partial class Program
     {
-        private static readonly char[] anyOfPlusOrMinus = new[] { '+', '-' };
+        private static readonly char[] anyOfPlusOrMinus = ['+', '-'];
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1861:引数として定数配列を使用しない", Justification = "<保留中>")]
-        private static CommandOptionDefinition<OptionType>[] GetOptionDefinitions()
-            => new CommandOptionDefinition<OptionType>[]
+        private static readonly IEnumerable<CommandOptionDefinition<OptionType>> _optionDefinitions
+            = new CommandOptionDefinition<OptionType>[]
             {
 #region 入出力オプション
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.InputFormat,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-if", "--input_format" },
                     // 追加引数の数
                     1,
@@ -59,7 +58,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.Input,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-i", "--input" },
                     // 追加引数の数
                     1,
@@ -78,7 +77,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.OutputFormat,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-of", "--output_format" },
                     // 追加引数の数
                     1,
@@ -117,7 +116,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.Output,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-o", "--output" },
                     // 追加引数の数
                     1,
@@ -136,7 +135,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.Force,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-f", "--force" },
                     // 同一オプションの重複のみ NG
                     (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
@@ -153,7 +152,7 @@ namespace MovieMetadataEditor
 #region チャプター編集オプション
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.ChapterTimes,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-ti", "--chapter_times" },
                     // 追加引数の数
                     1,
@@ -179,7 +178,7 @@ namespace MovieMetadataEditor
                             }
                             // 追加引数の数が範囲外であれば例外 (自己矛盾)
                             default:
-                                throw Validation.GetFailErrorException($"parsing {optionName}");
+                                throw Validation.GetFailErrorException();
                         }
                     },
                     // 同一オプションの重複のみ NG
@@ -213,7 +212,7 @@ namespace MovieMetadataEditor
                 new RegexCommandOptionDefinition<OptionType>(
                     OptionType.ChapterTitle,
                     // オプション名の正規表現
-                    _chapterTitleOptionNamePattern,
+                    GetChapterTitleOptionNamePattern(),
                     // 追加引数の数
                     1,
                     // 引数の変換
@@ -224,8 +223,8 @@ namespace MovieMetadataEditor
                             // 最初の引数(オプション名)に付属しているインデックスを抽出して int に変換する
                             case 0:
                             {
-                                var match = _chapterTitleOptionNamePattern.Match(arg);
-                                Validation.Assert(match.Success, $"match.Success (at parsing {optionName})");
+                                var match = GetChapterTitleOptionNamePattern().Match(arg);
+                                Validation.Assert(match.Success == true);
                                 var chapterIndex = match.Groups["chapterIndex"].Value.ParseAsInt32();
                                 return new object []{ arg, chapterIndex };
                             }
@@ -234,7 +233,7 @@ namespace MovieMetadataEditor
                                 return new object[]{ arg };
                             // 追加引数の数が範囲外であれば例外 (自己矛盾)
                             default:
-                                throw Validation.GetFailErrorException($"parsing {optionName}");
+                                throw Validation.GetFailErrorException();
                         }
                     },
                     // 同一オプションかつ同一インデックスの重複のみ NG
@@ -261,7 +260,7 @@ namespace MovieMetadataEditor
                 new RegexCommandOptionDefinition<OptionType>(
                     OptionType.StreamMetadata,
                     // オプション名の正規表現
-                    _streamOptionNamePattern,
+                    GetStreamOptionNamePattern(),
                     // 追加引数の数
                     1,
                     // 引数の変換
@@ -272,8 +271,8 @@ namespace MovieMetadataEditor
                             // 最初の引数(オプション名)に付属しているタイプとインデックスを抽出する
                             case 0:
                             {
-                                var match = _streamOptionNamePattern.Match(arg);
-                                Validation.Assert(match.Success, $"match.Success (at parsing {optionName})");
+                                var match = GetStreamOptionNamePattern().Match(arg);
+                                Validation.Assert(match.Success == true);
                                 var streamType = match.Groups["streamType"].Value;
                                 var streamIndex = match.Groups["streamIndex"].Value.ParseAsInt32();
                                 return new object []{ arg, streamType, streamIndex };
@@ -281,7 +280,7 @@ namespace MovieMetadataEditor
                             // 1番目の追加引数からメタデータの名前と値を抽出する
                             case 1:
                             {
-                                var match = _streamOptionValuePattern.Match(arg);
+                                var match = GetStreamOptionValuePattern().Match(arg);
                                 if (!match.Success)
                                     throw new InvalidCommandOptionException($"Argument format is invalid.: {optionName} {arg}");
                                 var metadataName = match.Groups["metadataName"].Value;
@@ -290,7 +289,7 @@ namespace MovieMetadataEditor
                             }
                             // 追加引数の数が範囲外であれば例外 (自己矛盾)
                             default:
-                                throw Validation.GetFailErrorException($"parsing {optionName}");
+                                throw Validation.GetFailErrorException();
                         }
                     },
                     // 同一オプションかつ同一タイプかつ同一インデックスかつ同一メタデータ名の重複のみ NG
@@ -320,7 +319,7 @@ namespace MovieMetadataEditor
                 new RegexCommandOptionDefinition<OptionType>(
                     OptionType.StreamDisposition,
                     // オプション名の正規表現
-                    _dispositionOptionNamePattern,
+                    GetDispositionOptionNamePattern(),
                     // 追加引数の数
                     1,
                     // 引数の変換
@@ -331,8 +330,8 @@ namespace MovieMetadataEditor
                             // 最初の引数(オプション名)に付属しているタイプとインデックスを抽出する
                             case 0:
                             {
-                                var match = _dispositionOptionNamePattern.Match(arg);
-                                Validation.Assert(match.Success, $"match.Success (at parsing {optionName})");
+                                var match = GetDispositionOptionNamePattern().Match(arg);
+                                Validation.Assert(match.Success == true);
                                 var streamType = match.Groups["streamType"].Value;
                                 var streamIndex = match.Groups["streamIndex"].Value.ParseAsInt32();
                                 return new object []{ arg, streamType, streamIndex };
@@ -355,7 +354,7 @@ namespace MovieMetadataEditor
                             }
                             // 追加引数の数が範囲外であれば例外 (自己矛盾)
                             default:
-                                throw Validation.GetFailErrorException($"parsing {optionName}");
+                                throw Validation.GetFailErrorException();
                         }
                     },
                     // 同一オプションかつ同一タイプかつ同一インデックスの重複のみ NG
@@ -380,12 +379,12 @@ namespace MovieMetadataEditor
                         "  Example 3) When setting the default flag to ON and the forced flag to OFF for the disposition of the first video stream",
                         "    -d:v:0 +default-forced",
                     }),
-                #endregion
+#endregion
 
 #region メタデータ消去オプション
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.ClearAllMetadata,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-ca", "--clear_all_metadata" },
                     // メタデータ消去系のオプションの重複のみ NG
                     (option, otherOpton) => otherOpton.OptionType.IsNoneOf(OptionType.ClearAllMetadata, OptionType.ClearChapterMetadata, OptionType.ClearMetadata),
@@ -402,7 +401,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.ClearChapters,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-cc", "--clear_chapters" },
                     // チャプター消去系のオプションの重複のみ NG
                     (option, otherOpton) => otherOpton.OptionType.IsNoneOf(OptionType.ClearChapterMetadata, OptionType.ClearChapters),
@@ -416,7 +415,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.ClearChapterMetadata,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-ccm", "--clear_chapter_metadata" },
                     // チャプターに影響のあるメタデータ消去系、またはチャプター消去系のオプションの重複のみ NG
                     (option, otherOpton) => otherOpton.OptionType.IsNoneOf(OptionType.ClearAllMetadata, OptionType.ClearChapterMetadata, OptionType.ClearChapters),
@@ -430,7 +429,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.ClearDisposition,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-cd", "--clear_disposition" },
                     // ClearDispositionオプションの重複のみ NG
                     (option, otherOpton) => otherOpton.OptionType != OptionType.ClearDisposition,
@@ -446,7 +445,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.ClearMetadata,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-c", "--clear_metadata" },
                     // クリア対象が重複するオプション重複のみ NG
                     (option, otherOpton) => otherOpton.OptionType.IsNoneOf(OptionType.ClearAllMetadata, OptionType.ClearMetadata),
@@ -460,12 +459,12 @@ namespace MovieMetadataEditor
                         "- \"language\" in stream metadata",
                         "- \"title\" in chapter metadata",
                     }),
-                #endregion
+#endregion
 
 #region チャプタートリミングオプション
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.FromForTrimming,
-                     // オプション名
+                        // オプション名
                     "-ss",
                     // 追加引数の数
                     1,
@@ -473,12 +472,12 @@ namespace MovieMetadataEditor
                     (index, arg, optionName) =>
                         index switch
                         {
-                            0 => new object[] { arg },
+                            0 => [arg],
                             1 =>
-                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out var duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
-                            _ => throw Validation.GetFailErrorException($"parsing {optionName}"),
+                            _ => throw Validation.GetFailErrorException(),
                         },
                     // 同一オプションの重複のみ NG
                     (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
@@ -504,7 +503,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.ToForTrimming,
-                     // オプション名
+                        // オプション名
                     "-to",
                     // 追加引数の数
                     1,
@@ -512,12 +511,12 @@ namespace MovieMetadataEditor
                     (index, arg, optionName) =>
                         index switch
                         {
-                            0 => new object[] { arg },
+                            0 => [arg],
                             1 =>
-                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out var duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
-                            _ => throw Validation.GetFailErrorException($"parsing {optionName}"),
+                            _ => throw Validation.GetFailErrorException(),
                         },
                     // 同一オプションの重複、または -t オプションとの混在で NG
                     (option, otherOpton) => otherOpton.OptionType.IsNoneOf(option.OptionType, OptionType.DurationForTrimming),
@@ -543,7 +542,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.DurationForTrimming,
-                     // オプション名
+                        // オプション名
                     "-t",
                     // 追加引数の数
                     1,
@@ -551,12 +550,12 @@ namespace MovieMetadataEditor
                     (index, arg, optionName) =>
                         index switch
                         {
-                            0 => new object[] { arg },
+                            0 => [arg],
                             1 =>
-                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out var duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
-                            _ => throw Validation.GetFailErrorException($"parsing {optionName}"),
+                            _ => throw Validation.GetFailErrorException(),
                         },
                     // 同一オプションの重複、または -to オプションとの混在で NG
                     (option, otherOpton) => otherOpton.OptionType.IsNoneOf(option.OptionType, OptionType.ToForTrimming),
@@ -579,12 +578,12 @@ namespace MovieMetadataEditor
                         "Then specify the trimming range of the video file with the \"-ss\" option, \"-to\" option and \"-t\" option.",
                         "That way you don't have to do the math yourself to correct the chapter times.",
                     }),
-                #endregion
+#endregion
 
 #region チューニングパラメタ設定オプション
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.MaximumDuration,
-                     // オプション名
+                        // オプション名
                     "--maximum_duration",
                     // 追加引数の数
                     1,
@@ -592,12 +591,12 @@ namespace MovieMetadataEditor
                     (index, arg, optionName) =>
                         index switch
                         {
-                            0 => new object[] { arg },
+                            0 => [arg],
                             1 =>
-                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out var duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
-                            _ => throw Validation.GetFailErrorException($"parsing {optionName}"),
+                            _ => throw Validation.GetFailErrorException(),
                         },
                     // 同一オプションの重複のみ NG
                     (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
@@ -614,7 +613,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.MinimumDuration,
-                     // オプション名
+                        // オプション名
                     "--minimum_duration",
                     // 追加引数の数
                     1,
@@ -622,12 +621,12 @@ namespace MovieMetadataEditor
                     (index, arg, optionName) =>
                         index switch
                         {
-                            0 => new object[] { arg },
+                            0 => [arg],
                             1 =>
-                                arg.TryParse(TimeParsingMode.LazyMode, out TimeSpan duration)
+                                arg.TryParse(TimeParsingMode.LazyMode, out var duration)
                                 ? new object[] { (TimeSpan?)duration }
                                 : throw new InvalidCommandOptionException($"Invalid time format: {arg}"),
-                            _ => throw Validation.GetFailErrorException($"parsing {optionName}"),
+                            _ => throw Validation.GetFailErrorException(),
                         },
                     // 同一オプションの重複のみ NG
                     (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
@@ -642,7 +641,7 @@ namespace MovieMetadataEditor
                         "",
                         "* Commentary",
                         "  In general, chapters that are too short to be visible are meaningless.",
-                        $"  So {_thisProgramName} will automatically merge chapters shorter than the value specified in this option with the chapter before or after it.",
+                        $"  So {Validation.DefaultApplicationName} will automatically merge chapters shorter than the value specified in this option with the chapter before or after it.",
                         "",
                         "  More specifically, if the first chapter is too short, merge it with the second chapter.",
                         "  Also, if the second and subsequent chapters are too short, they are combined with the previous chapter.",
@@ -657,7 +656,7 @@ namespace MovieMetadataEditor
 #region その他のオプション
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.KeepEemptyChapter,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     "--keep_empty_chapter",
                     // 同一オプションの重複のみ NG
                     (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
@@ -672,7 +671,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.Verbose,
-                     // エイリアスも含めたオプション名の配列
+                        // エイリアスも含めたオプション名の配列
                     new string[]{ "-v", "--verbose" },
                     // 同一オプションの重複のみ NG
                     (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
@@ -686,7 +685,7 @@ namespace MovieMetadataEditor
 
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.Help,
-                     // オプション名
+                        // オプション名
                     "-help",
                     // 常にNG (同一オプションの重複または他のすべてのオプションとの混在がNG)
                     (option, otherOpton) => false,

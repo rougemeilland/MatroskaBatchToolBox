@@ -7,17 +7,10 @@ using Palmtree.Numerics;
 
 namespace ChapterConverter
 {
-    internal class FfprobeFlatChapterFormatter
+    internal sealed partial class FfprobeFlatChapterFormatter
         : ChapterFormatter
     {
-        private static readonly Regex _quotedRowPattern;
-        private static readonly Regex _unquotedRowPattern;
-
-        static FfprobeFlatChapterFormatter()
-        {
-            _quotedRowPattern = new Regex(@"^chapters\.chapter\.(?<index>\d+)\.(?<key>[^=]+)=""(?<value>.*)""$", RegexOptions.Compiled);
-            _unquotedRowPattern = new Regex(@"^chapters\.chapter\.(?<index>\d+)\.(?<key>[^=]+)=(?<value>\d+)$", RegexOptions.Compiled);
-        }
+        private static readonly char[] _textLineSeparators = ['\r', '\n'];
 
         public FfprobeFlatChapterFormatter(ChapterFormatterParameter parameter)
             : base(parameter)
@@ -27,7 +20,7 @@ namespace ChapterConverter
         protected override IEnumerable<InternalChapterElement> Parse(string rawText)
         {
             var flatRows = new Dictionary<int, IDictionary<string, string>>();
-            foreach (var rowText in rawText.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            foreach (var rowText in rawText.Split(_textLineSeparators, StringSplitOptions.RemoveEmptyEntries))
                 AddToFlatRows(flatRows, rowText);
 
             foreach (var flatRow in flatRows.OrderBy(flatRow => flatRow.Key))
@@ -36,15 +29,15 @@ namespace ChapterConverter
                 var keyValue = flatRow.Value;
                 var id = GetValue(keyValue, index, "id");
                 var timeBase = GetValue(keyValue, index, "time_base");
-                if (!timeBase.TryParse(out long timeBaseNumerator, out long timeBaseDenominator))
-                    throw new Exception($"The format of \"{"time_base"}\" in the input data is invalid.: \"chapters.chapter.{index}.{"time_base"}={timeBase}\"");
+                if (!timeBase.TryParse(out var timeBaseNumerator, denominator: out long timeBaseDenominator))
+                    throw new ApplicationException($"The format of \"{"time_base"}\" in the input data is invalid.: \"chapters.chapter.{index}.{"time_base"}={timeBase}\"");
                 var startText = GetValue(keyValue, index, "start");
-                if (!startText.TryParse(out long start))
-                    throw new Exception($"The format of \"{"start"}\" in the input data is invalid.: \"chapters.chapter.{index}.{"start"}={startText}\"");
+                if (!startText.TryParse(value: out long start))
+                    throw new ApplicationException($"The format of \"{"start"}\" in the input data is invalid.: \"chapters.chapter.{index}.{"start"}={startText}\"");
                 var startTime = start.FromTimeCountToTimeSpan(timeBaseNumerator, timeBaseDenominator);
                 var endText = GetValue(keyValue, index, "end");
-                if (!endText.TryParse(out long end))
-                    throw new Exception($"The format of \"{"end"}\" in the input data is invalid.: \"chapters.chapter.{index}.{"end"}={endText}\"");
+                if (!endText.TryParse(value: out long end))
+                    throw new ApplicationException($"The format of \"{"end"}\" in the input data is invalid.: \"chapters.chapter.{index}.{"end"}={endText}\"");
                 var endTime = end.FromTimeCountToTimeSpan(timeBaseNumerator, timeBaseDenominator);
                 var title = GetValue(keyValue, index, "tags.title", "");
                 yield return new InternalChapterElement($"id#{id}", startTime, endTime, title);
@@ -53,11 +46,11 @@ namespace ChapterConverter
             static string GetValue(IDictionary<string, string> keyValue, int index, string key, string? defaultValue = null)
             {
                 return
-                    keyValue.TryGetValue(key, out string? value)
+                    keyValue.TryGetValue(key, out var value)
                     ? value
                     : defaultValue is not null
                     ? defaultValue
-                    : throw new Exception($"The line \"chapters.chapter.{index}.{key}=...\" was not found in the input data.");
+                    : throw new ApplicationException($"The line \"chapters.chapter.{index}.{key}=...\" was not found in the input data.");
             }
         }
 
@@ -86,7 +79,7 @@ namespace ChapterConverter
 
         private static void AddToFlatRows(IDictionary<int, IDictionary<string, string>> searchResult, string rowText)
         {
-            var quoted_match = _quotedRowPattern.Match(rowText);
+            var quoted_match = GetQuotedRowPattern().Match(rowText);
             if (quoted_match.Success)
             {
                 Register(
@@ -97,7 +90,7 @@ namespace ChapterConverter
             }
             else
             {
-                var unquoted_match = _unquotedRowPattern.Match(rowText);
+                var unquoted_match = GetUnquotedRowPattern().Match(rowText);
                 if (unquoted_match.Success)
                 {
                     Register(
@@ -110,7 +103,7 @@ namespace ChapterConverter
 
             static void Register(IDictionary<int, IDictionary<string, string>> searchResult, int index, string key, string value)
             {
-                if (!searchResult.TryGetValue(index, out IDictionary<string, string>? keyValueDic))
+                if (!searchResult.TryGetValue(index, out var keyValueDic))
                 {
                     keyValueDic = new Dictionary<string, string>();
                     searchResult.Add(index, keyValueDic);
@@ -119,5 +112,11 @@ namespace ChapterConverter
                 keyValueDic.Add(key, value);
             }
         }
+
+        [GeneratedRegex(@"^chapters\.chapter\.(?<index>\d+)\.(?<key>[^=]+)=""(?<value>.*)""$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetQuotedRowPattern();
+
+        [GeneratedRegex(@"^chapters\.chapter\.(?<index>\d+)\.(?<key>[^=]+)=(?<value>\d+)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetUnquotedRowPattern();
     }
 }

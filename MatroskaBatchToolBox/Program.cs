@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -26,25 +27,29 @@ namespace MatroskaBatchToolBox
 
         private const string _optionStringNormalizeAudio = "--normalize-audio";
         private const string _optionStringResizeResolution = "--convert-video";
-        private static readonly string _applicationUniqueId;
-        private static readonly object _lockConsoleObject;
-        private static readonly TimeSpan _maximumTimeForProgressUpdate;
-        private static string _previousProgressText;
+        private static readonly string _applicationUniqueId = $"{nameof(MatroskaBatchToolBox)}.{typeof(Program).GUID}";
+#if NET9_0_OR_GREATER
+        private static readonly Lock _lockConsoleObject = new();
+#else
+        private static readonly object _lockConsoleObject = new();
+#endif
+        private static readonly TimeSpan _maximumTimeForProgressUpdate = TimeSpan.FromMinutes(1);
+        private static readonly CompositeFormat _alreadyRunnningMessasgeText = CompositeFormat.Parse(Resource.AlreadyRunnningMessasgeText);
+
+        private static string _previousProgressText = "";
         private static bool _cancelRequested;
         private static bool _completed;
 
-        static Program()
-        {
-            _applicationUniqueId = $"{nameof(MatroskaBatchToolBox)}.{typeof(Program).GUID}";
-            _lockConsoleObject = new object();
-            _maximumTimeForProgressUpdate = TimeSpan.FromMinutes(1);
-            _previousProgressText = "";
-            _cancelRequested = false;
-            _completed = false;
-        }
-
         public static void Main(string[] args)
         {
+            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
+            {
+                if (OperatingSystem.IsWindows())
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or output is not UTF8. Consider running the command \"chcp 65001\".");
+                else
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+            }
+
             // このプロセスでは Ctrl+C を無視する。
             TinyConsole.CancelKeyPress += (sender, e) => e.Cancel = true;
 
@@ -55,6 +60,7 @@ namespace MatroskaBatchToolBox
 
             TinyConsole.Title = Process.GetCurrentProcess().ProcessName;
 
+            var success = false;
             try
             {
                 var actionMode = ActionMode.None;
@@ -80,7 +86,7 @@ namespace MatroskaBatchToolBox
                 if (!applicationLock.WaitOne(0, false))
                 {
                     TinyConsole.ForegroundColor = ConsoleColor.Red;
-                    TinyConsole.WriteLine(string.Format(Resource.AlreadyRunnningMessasgeText, nameof(MatroskaBatchToolBox)));
+                    TinyConsole.WriteLine(string.Format(CultureInfo.InvariantCulture, _alreadyRunnningMessasgeText, nameof(MatroskaBatchToolBox)));
                     TinyConsole.ResetColor();
                     return;
                 }
@@ -90,7 +96,7 @@ namespace MatroskaBatchToolBox
                     {
                         ActionMode.NormalizeAudio => Resource.AudioNormalizationProcessStartMessageText,
                         ActionMode.ConvertVideo => Resource.VideoConversionStartMessageText,
-                        _ => throw Validation.GetFailErrorException($"Unexpected {nameof(ActionMode)} value: {actionMode}"),
+                        _ => throw Validation.GetFailErrorException(),
                     });
                 TinyConsole.WriteLine();
 
@@ -154,13 +160,11 @@ namespace MatroskaBatchToolBox
                 TinyConsole.CursorVisible = ConsoleCursorVisiblity.NormalMode;
                 TinyConsole.WriteLine();
                 TinyConsole.WriteLine();
-                TinyConsole.Beep();
-                TinyConsole.WriteLine(Resource.ProcessCompletedMessageText);
-                _ = TinyConsole.ReadLine();
+                success = true;
 
                 void worker()
                 {
-                    while (progressState.TryGetNextSourceFile(out int sourceFileId, out FilePath? sourceFile))
+                    while (progressState.TryGetNextSourceFile(out var sourceFileId, out var sourceFile))
                     {
                         if (_cancelRequested)
                             break;
@@ -178,7 +182,7 @@ namespace MatroskaBatchToolBox
                                 sourceFile.Exists && !localSettings.DoNotConvert
                                 ? actionMode switch
                                 {
-                                    ActionMode.NormalizeAudio => MatroskaAction.NormalizeMovieFile(localSettings, sourceFile, progress),
+                                    ActionMode.NormalizeAudio => MatroskaAction.NormalizeMovieFile(sourceFile, progress),
                                     ActionMode.ConvertVideo => MatroskaAction.ResizeMovieFile(localSettings, sourceFile, progress),
                                     _ => ActionResult.Skipped,
                                 }
@@ -189,7 +193,7 @@ namespace MatroskaBatchToolBox
                         catch (Exception ex)
                         {
                             // ここに到達することはないはず
-                            throw Validation.GetFailErrorException("Unreachable code", ex);
+                            throw Validation.GetFailErrorException(ex);
 
                         }
                         finally
@@ -198,34 +202,24 @@ namespace MatroskaBatchToolBox
                     }
                 }
             }
-            catch (AggregateException ex)
-            {
-                TinyConsole.CursorVisible = ConsoleCursorVisiblity.NormalMode;
-                TinyConsole.WriteLine();
-                TinyConsole.WriteLine();
-                TinyConsole.ForegroundColor = ConsoleColor.Red;
-                TinyConsole.WriteLine($"Fatal error occured.");
-                TinyConsole.ForegroundColor = ConsoleColor.White;
-                ExternalCommand.ReportAggregateException(ex);
-                TinyConsole.WriteLine();
-                TinyConsole.Beep();
-                TinyConsole.WriteLine("Press ENTER key to exit.");
-                _ = TinyConsole.ReadLine();
-            }
             catch (Exception ex)
             {
                 TinyConsole.CursorVisible = ConsoleCursorVisiblity.NormalMode;
                 TinyConsole.WriteLine();
                 TinyConsole.WriteLine();
-                TinyConsole.ForegroundColor = ConsoleColor.Red;
-                TinyConsole.WriteLine($"Fatal error occured.");
-                TinyConsole.ForegroundColor = ConsoleColor.White;
-                ExternalCommand.ReportException(ex);
-                TinyConsole.WriteLine();
-                TinyConsole.Beep();
+                TinyConsole.WriteLog(ex);
                 TinyConsole.WriteLine("Press ENTER key to exit.");
                 _ = TinyConsole.ReadLine();
             }
+
+            if (success)
+                TinyConsole.WriteLine(Resource.ProcessCompletedMessageText);
+            else
+                TinyConsole.WriteLine("Press ENTER key to exit.");
+
+            TinyConsole.Beep();
+            _ = TinyConsole.ReadLine();
+
         }
 
         private static IEnumerable<FilePath> CreateSourceFileList(string[] args, ActionMode actionMode)
@@ -268,7 +262,7 @@ namespace MatroskaBatchToolBox
                 modifiedSourceFileList.Add(sourceQueueWithSimpleConversion.Dequeue());
             while (sourceQueueWithComplexConversion.Count > 0)
                 modifiedSourceFileList.Add(sourceQueueWithComplexConversion.Dequeue());
-            return modifiedSourceFileList;
+            return modifiedSourceFileList.AsEnumerable();
         }
 
         private static IEnumerable<FilePath> EnumerateSourceFile(IEnumerable<string> args)

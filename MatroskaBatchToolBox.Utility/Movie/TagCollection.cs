@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -22,17 +23,17 @@ namespace MatroskaBatchToolBox.Utility.Movie
                         JsonValueKind.Undefined => "undefined",
                         JsonValueKind.Object => "<object>",
                         JsonValueKind.Array => "<array>",
-                        JsonValueKind.String => tag.Value.GetString() ?? throw Validation.GetFailErrorException("tag.Value.GetString() is not null"),
-                        JsonValueKind.Number => tag.Value.GetDecimal().ToString(),
+                        JsonValueKind.String => tag.Value.GetString() ?? throw Validation.GetFailErrorException(),
+                        JsonValueKind.Number => tag.Value.GetDecimal().ToString(CultureInfo.InvariantCulture),
                         JsonValueKind.True => "true",
                         JsonValueKind.False => "false",
                         JsonValueKind.Null => "null",
                         _ => throw new NotSupportedException($"Object of unknown type.: {tag.Value.ValueKind}"),
                     };
                     if (tag.Value.ValueKind != JsonValueKind.String)
-                        throw new Exception($"Metadata value is not a string.: key=\"{tag.Key}\", value={tagValue}");
+                        throw new ApplicationException($"Metadata value is not a string.: key=\"{tag.Key}\", value={tagValue}");
                     if (!InternalTags.TryAdd(tag.Key, tagValue))
-                        throw new Exception($"Duplicate named metadata exists in the stream.: \"{tag.Key}\"");
+                        throw new ApplicationException($"Duplicate named metadata exists in the stream.: \"{tag.Key}\"");
                 }
             }
         }

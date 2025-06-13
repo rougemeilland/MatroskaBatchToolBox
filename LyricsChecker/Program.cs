@@ -15,7 +15,7 @@ using Palmtree.Numerics;
 
 namespace LyricsChecker
 {
-    internal class Program
+    internal static partial class Program
     {
         private const string _metadataNameAlbum = "Album";
         private const string _metadataMameAlbumArtist = "album_artist";
@@ -25,21 +25,24 @@ namespace LyricsChecker
         private const string _metadataNameText = "text";
         private const string _metadataNameTitle = "title";
         private const string _metadataNameTrack = "track";
-        private static readonly string _thisProgramName;
-        private static readonly Regex _lyricsFileTagPattern;
-        private static readonly Regex _lyricsTextPattern;
-
-        static Program()
-        {
-            _thisProgramName = typeof(Program).Assembly.GetAssemblyFileNameWithoutExtension();
-            _lyricsFileTagPattern = new Regex(@"^\[(?<name>[a-z]+):\s*(?<value>.*)\]\s*$", RegexOptions.Compiled);
-            _lyricsTextPattern = new Regex(@"^\[(?<lyricsTime>(\d+:)?\d+(\.\d+)?)\](?<lyricsText>.*)$", RegexOptions.Compiled);
-        }
 
         private static int Main(string[] args)
         {
-            Console.OutputEncoding = Encoding.UTF8;
-            Console.InputEncoding = Encoding.UTF8;
+            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
+            {
+                if (OperatingSystem.IsWindows())
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or output is not UTF8. Consider running the command \"chcp 65001\".");
+                else
+                    TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+            }
+
+            // このプロセスでは Ctrl+C を無視する。
+            TinyConsole.CancelKeyPress += (sender, e) => e.Cancel = true;
+
+            // コマンドの入出力エンコーディングを UTF8 にする
+            TinyConsole.InputEncoding = Encoding.UTF8;
+            TinyConsole.OutputEncoding = Encoding.UTF8;
+            TinyConsole.DefaultTextWriter = ConsoleTextWriterType.StandardError;
 
             var options = new List<string>();
             var lyricsFilePath = (string?)null;
@@ -61,7 +64,7 @@ namespace LyricsChecker
                 lyricsFilePath = args[index++];
             if (index < args.Length)
             {
-                PrintErrorMessage("Only one lyrics file and one music file can be specified.");
+                TinyConsole.WriteLog(LogCategory.Error, "Only one lyrics file and one music file can be specified.");
                 return 1;
             }
 
@@ -71,7 +74,7 @@ namespace LyricsChecker
                 {
                     if (doHelp is not null)
                     {
-                        PrintErrorMessage("Duplicate \"-help\" option specified.");
+                        TinyConsole.WriteLog(LogCategory.Error, "Duplicate \"-help\" option specified.");
                         return 1;
                     }
 
@@ -81,7 +84,7 @@ namespace LyricsChecker
                 {
                     if (doModify is not null)
                     {
-                        PrintErrorMessage("Duplicate \"--modify_lyrics\" or \"-m\" option specified.");
+                        TinyConsole.WriteLog(LogCategory.Error, "Duplicate \"--modify_lyrics\" or \"-m\" option specified.");
                         return 1;
                     }
 
@@ -89,20 +92,20 @@ namespace LyricsChecker
                 }
                 else
                 {
-                    PrintErrorMessage($"An invalid option is specified.: \"{option}\"");
+                    TinyConsole.WriteLog(LogCategory.Error, $"An invalid option is specified.: \"{option}\"");
                     return 1;
                 }
             }
 
             if (doHelp == true && doModify == true)
             {
-                PrintErrorMessage("\"-help\" option and \"--modify_lyrics\" option cannot be specified at the same time.");
+                TinyConsole.WriteLog(LogCategory.Error, "\"-help\" option and \"--modify_lyrics\" option cannot be specified at the same time.");
                 return 1;
             }
 
             if (musicFilePath is null)
             {
-                PrintErrorMessage("No music file specified.");
+                TinyConsole.WriteLog(LogCategory.Error, "No music file specified.");
                 return 1;
             }
 
@@ -132,7 +135,7 @@ namespace LyricsChecker
             }
             catch (Exception ex)
             {
-                PrintExceptionMessage(ex);
+                TinyConsole.WriteLog(ex);
                 return 1;
             }
         }
@@ -153,18 +156,8 @@ namespace LyricsChecker
                     MovieInformationType.Format | MovieInformationType.Streams,
                     (level, message) =>
                     {
-                        switch (level)
-                        {
-                            case "WARNING":
-                                PrintWarningMessage(message);
-                                break;
-                            case "ERROR":
-                                PrintErrorMessage(message);
-                                break;
-                            case "INFORMATION":
-                            default:
-                                break;
-                        }
+                        if (level != LogCategory.Information)
+                            TinyConsole.WriteLog(level, message);
                     });
             var ok = true;
             ok = CheckFileNameStrictly(musicFileInfo, musicFile) && ok;
@@ -200,18 +193,8 @@ namespace LyricsChecker
                     MovieInformationType.Format | MovieInformationType.Streams,
                     (level, message) =>
                     {
-                        switch (level)
-                        {
-                            case "WARNING":
-                                PrintWarningMessage(message);
-                                break;
-                            case "ERROR":
-                                PrintErrorMessage(message);
-                                break;
-                            case "INFORMATION":
-                            default:
-                                break;
-                        }
+                        if (level != LogCategory.Information)
+                            TinyConsole.WriteLog(level, message);
                     });
             try
             {
@@ -282,18 +265,8 @@ namespace LyricsChecker
                     MovieInformationType.Format | MovieInformationType.Streams,
                     (level, message) =>
                     {
-                        switch (level)
-                        {
-                            case "WARNING":
-                                PrintWarningMessage(message);
-                                break;
-                            case "ERROR":
-                                PrintErrorMessage(message);
-                                break;
-                            case "INFORMATION":
-                            default:
-                                break;
-                        }
+                        if (level != LogCategory.Information)
+                            TinyConsole.WriteLog(level, message);
                     });
             _ = CheckFileNameStrictly(musicFileInfo, musicFile, lyricsFile);
             var modified = false;
@@ -334,7 +307,7 @@ namespace LyricsChecker
                 }
             }
 
-            if (newLyricsTexts.Count > 0 && !newLyricsTexts.First().StartsWith("[00:00.00]"))
+            if (newLyricsTexts.Count > 0 && !newLyricsTexts.First().StartsWith("[00:00.00]", StringComparison.Ordinal))
             {
                 // 最初の歌詞行がタイムスタンプ [00:00.00] で始まっていない場合
 
@@ -389,7 +362,7 @@ namespace LyricsChecker
                     }
                 }
 
-                Validation.Assert(!File.Exists(lyricsFile.FullName), "!File.Exists(lyricsFile.FullName)");
+                Validation.Assert(!File.Exists(lyricsFile.FullName));
                 var successfullRenaming = false;
                 try
                 {
@@ -467,10 +440,10 @@ namespace LyricsChecker
                 return true;
 
             var actualAlbumArtistDirectory = baseDirectory.GetSubDirectory(albumArtistDirectory.Name);
-            Validation.Assert(actualAlbumArtistDirectory.Exists, "actualAlbumArtistDirectory.Exists");
+            Validation.Assert(actualAlbumArtistDirectory.Exists);
 
             var actualAlbumDirectory = albumArtistDirectory.GetSubDirectory(albumDirectory.Name);
-            Validation.Assert(actualAlbumDirectory.Exists, "actualAlbumDirectory.Exists");
+            Validation.Assert(actualAlbumDirectory.Exists);
 
             var desiredAlbumArtistDirectoryName = albumArtist.WindowsFileNameEncoding();
 
@@ -531,7 +504,7 @@ namespace LyricsChecker
                 var lineText = lyricsReader.ReadLine();
                 if (lineText is null)
                     break;
-                var tagMatch = _lyricsFileTagPattern.Match(lineText);
+                var tagMatch = GetLyricsFileTagPattern().Match(lineText);
                 if (tagMatch.Success)
                 {
                     var tagName = tagMatch.Groups["name"].Value;
@@ -550,7 +523,7 @@ namespace LyricsChecker
 
         private static (string timeStamp, string text) NormalizeLyricsText(string lyricsLineText)
         {
-            var lyricsTextMatch = _lyricsTextPattern.Match(lyricsLineText);
+            var lyricsTextMatch = GetLyricsTextPattern().Match(lyricsLineText);
             if (!lyricsTextMatch.Success)
                 return ("", lyricsLineText.Trim());
 
@@ -704,7 +677,7 @@ namespace LyricsChecker
                 }
                 else
                 {
-                    if (!lyricsTagValue.TryParse(TimeParsingMode.StrictForShortTimeFormat, out TimeSpan durationForLyrics))
+                    if (!lyricsTagValue.TryParse(TimeParsingMode.StrictForShortTimeFormat, out var durationForLyrics))
                     {
                         TinyConsole.Out.WriteLine($"Invalid length tag format in lyrics file.: \"{lyricsTagValue}\", \"{lyricsFile.FullName}\"");
                         return false;
@@ -771,7 +744,7 @@ namespace LyricsChecker
             {
                 if (musicTagValue is not null)
                 {
-                    if (!lyricsTagValue.TryParse(TimeParsingMode.StrictForShortTimeFormat, out TimeSpan durationForLyrics))
+                    if (!lyricsTagValue.TryParse(TimeParsingMode.StrictForShortTimeFormat, out var durationForLyrics))
                     {
                         TinyConsole.Out.WriteLine($"Invalid length tag format in lyrics file.: \"{lyricsTagValue}\", \"{lyricsFile.FullName}\"");
                         return false;
@@ -818,9 +791,9 @@ namespace LyricsChecker
         {
             var ok = true;
             var parentDirectory = file.Directory;
-            Validation.Assert(parentDirectory is not null, "parentDirectory is not null");
+            Validation.Assert(parentDirectory is not null);
             var actualFiles = parentDirectory.EnumerateFiles().Where(f => string.Equals(f.Name, file.Name, StringComparison.OrdinalIgnoreCase)).ToList();
-            Validation.Assert(actualFiles.Count > 0, "actualFiles.Count > 0");
+            Validation.Assert(actualFiles.Count > 0);
             if (actualFiles.Count > 1)
             {
                 TinyConsole.Out.WriteLine($"The specified file name is ambiguous. There is probably a case difference.: \"{file.FullName}\"");
@@ -842,7 +815,7 @@ namespace LyricsChecker
             {
                 "mp3" or "wav" => GetTagValue(musicFileInfo, _metadataNameText),
                 "flac" or "ogg" => GetTagValue(musicFileInfo, _metadataNameLyricist),
-                _ => throw new Exception($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
+                _ => throw new ApplicationException($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
             };
 
         private static string GetTagValue(MovieInformation musicFileInfo, string tagName)
@@ -850,7 +823,7 @@ namespace LyricsChecker
             {
                 "wav" or "mp3" or "flac" => musicFileInfo.Format.Tags[tagName] ?? "",
                 "ogg" => musicFileInfo.AudioStreams.FirstOrDefault()?.Tags[tagName] ?? "",
-                _ => throw new Exception($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
+                _ => throw new ApplicationException($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
             };
 
         private static string GetMusicFileExtension(MovieInformation musicFileInfo)
@@ -870,10 +843,10 @@ namespace LyricsChecker
                     else if (musicFileInfo.AudioStreams.Any(stream => stream.CodecName == "vorbis"))
                         return ".ogg";
                     else
-                        throw new Exception($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\"");
+                        throw new ApplicationException($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\"");
                 }
                 default:
-                    throw new Exception($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\"");
+                    throw new ApplicationException($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\"");
             }
         }
 
@@ -894,7 +867,7 @@ namespace LyricsChecker
                 new[]
                 {
                     "[Usage]",
-                    $"{_thisProgramName} <option list> <audio file path> [<lyrics file path>]",
+                    $"{Validation.DefaultApplicationName} <option list> <audio file path> [<lyrics file path>]",
                     "",
                     "[Options]",
                     "--modify_lyrics  or  -m",
@@ -904,48 +877,10 @@ namespace LyricsChecker
                 TinyConsole.Out.WriteLine(lineText);
         }
 
-        private static void PrintExceptionMessage(Exception ex)
-        {
-            for (var exception = ex; exception != null; exception = exception.InnerException)
-                PrintErrorMessage(exception.Message);
-        }
+        [GeneratedRegex(@"^\[(?<name>[a-z]+):\s*(?<value>.*)\]\s*$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetLyricsFileTagPattern();
 
-        private static void PrintWarningMessage(string message)
-            => PrintWarningMessage(_thisProgramName, message);
-
-        private static void PrintWarningMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Yellow;
-            TinyConsole.Write($"{programName}:WARNING: {message}");
-            TinyConsole.ResetColor();
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
-        }
-
-        private static void PrintErrorMessage(string message)
-            => PrintErrorMessage(_thisProgramName, message);
-
-        private static void PrintErrorMessage(string programName, string message)
-        {
-            TinyConsole.ForegroundColor = ConsoleColor.Red;
-            TinyConsole.Write($"{programName}:ERROR: {message}");
-            TinyConsole.ResetColor();
-            try
-            {
-                TinyConsole.Erase(ConsoleEraseMode.FromCursorToEndOfLine);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            TinyConsole.WriteLine();
-        }
+        [GeneratedRegex(@"^\[(?<lyricsTime>(\d+:)?\d+(\.\d+)?)\](?<lyricsText>.*)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetLyricsTextPattern();
     }
 }

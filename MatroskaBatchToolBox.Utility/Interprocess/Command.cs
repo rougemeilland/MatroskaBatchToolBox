@@ -8,12 +8,13 @@ using System.Threading.Tasks;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
 using Palmtree.IO;
+using Palmtree.IO.Console;
 
 namespace MatroskaBatchToolBox.Utility.Interprocess
 {
-    public static class Command
+    public static partial class Command
     {
-        private class BinaryInputRedirector
+        private sealed class BinaryInputRedirector
             : IChildProcessInputRedirectable
         {
             private readonly Func<ReadOnlyMemory<byte>> _binaryWriter;
@@ -39,7 +40,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 };
         }
 
-        private class TextInputRedirector
+        private sealed class TextInputRedirector
             : IChildProcessInputRedirectable
         {
             private readonly Func<string?> _textWriter;
@@ -65,7 +66,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 };
         }
 
-        private class NullInputRedirector
+        private sealed class NullInputRedirector
             : IChildProcessInputRedirectable
         {
             public NullInputRedirector()
@@ -76,7 +77,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 => () => { };
         }
 
-        private class BinaryOutputRedirector
+        private sealed class BinaryOutputRedirector
             : IChildProcessOutputRedirectable
         {
             private readonly Action<ReadOnlyMemory<byte>> _binaryReader;
@@ -100,7 +101,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 };
         }
 
-        private class TextOutputRedirector
+        private sealed class TextOutputRedirector
             : IChildProcessOutputRedirectable
         {
             private readonly Action<string> _textReader;
@@ -123,7 +124,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 };
         }
 
-        private class ChildProcessCanceller
+        private sealed class ChildProcessCanceller
             : IChildProcessCancellable
         {
             private readonly Action<Process> _canceller;
@@ -136,7 +137,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             void IChildProcessCancellable.CancelChildProcess(Process process) => _canceller(process);
         }
 
-        private class FfmpegLogState
+        private sealed class FfmpegLogState
         {
             public FfmpegLogState()
             {
@@ -149,18 +150,9 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         }
 
         private const int _ioBufferSize = 64 * 1024;
-        private static readonly TimeSpan _childProcessCancellationInterval;
-        private static readonly Regex _ffmpegConversionDurationPattern;
-        private static readonly Regex _ffmpegConversionProgressPattern;
+        private static readonly TimeSpan _childProcessCancellationInterval = TimeSpan.FromSeconds(10);
+        private static readonly Encoding _defaultInputOutputEncoding = new UTF8Encoding(false);
         private static bool _requestedCancellation;
-
-        static Command()
-        {
-            _childProcessCancellationInterval = TimeSpan.FromSeconds(10);
-            _ffmpegConversionDurationPattern = new Regex(@"\s*(Duration|DURATION)\s*:\s*(?<time>\d+:\d+:\d+(\.\d+)?)", RegexOptions.Compiled);
-            _ffmpegConversionProgressPattern = new Regex(@" time=(?<time>\d+:\d+:\d+(\.\d+)?) ", RegexOptions.Compiled);
-            _requestedCancellation = false;
-        }
 
         public static void AbortExternalCommands()
             => _requestedCancellation = true;
@@ -169,12 +161,12 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             string? inFileFormat,
             FilePath inFile,
             MovieInformationType requestedInfo,
-            Action<string, string> logger)
+            Action<LogCategory, string> logger)
         {
             var ffprobeCommandFile =
                 new FilePath(
                     ProcessUtility.WhereIs("ffprobe")
-                    ?? throw new Exception("ffprobe command is not installed."));
+                    ?? throw new ApplicationException("ffprobe command is not installed."));
 
             var commandParameters = new List<string>
             {
@@ -198,15 +190,16 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 ExecuteCommand(
                     ffprobeCommandFile,
                     string.Join(" ", commandParameters),
-                    new UTF8Encoding(false),
+                    null,
+                    null,
                     null,
                     GetTextOutputRedirector(standardOutputTextLines.Add),
                     null,
                     logger,
                     null);
-            logger("INFORMATION", $"ffprobe exited with exit code {exitCode}.");
+            logger(LogCategory.Information, $"ffprobe exited with exit code {exitCode}.");
             if (exitCode != 0)
-                throw new Exception($"ffprobe failed. (exit code {exitCode})");
+                throw new ApplicationException($"ffprobe failed. (exit code {exitCode})");
             var jsonText = string.Join("\r\n", standardOutputTextLines);
             try
             {
@@ -214,7 +207,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             }
             catch (Exception ex)
             {
-                throw new Exception($"The information returned by ffprobe is in an unknown format.: \"{jsonText}\"", ex);
+                throw new ApplicationException($"The information returned by ffprobe is in an unknown format.: \"{jsonText}\"", ex);
             }
         }
 
@@ -223,20 +216,21 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             IChildProcessInputRedirectable? standardInputRedirector,
             IChildProcessOutputRedirectable? standardOutputRedirector,
             Action<string> ffmpegLogRedirector,
-            Action<string, string> logger,
+            Action<LogCategory, string> logger,
             IProgress<double> progressReporter)
         {
             var ffmpegCommandFile =
                 new FilePath(
                     ProcessUtility.WhereIs("pffmpeg")
-                    ?? throw new Exception("ffmpeg command is not installed."));
+                    ?? throw new ApplicationException("ffmpeg command is not installed."));
 
             var logState = new FfmpegLogState();
             return
                 ExecuteCommand(
                     ffmpegCommandFile,
                     args,
-                    new UTF8Encoding(false),
+                    null,
+                    null,
                     standardInputRedirector,
                     standardOutputRedirector,
                     GetTextOutputRedirector(lineText =>
@@ -259,7 +253,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                             }
 
                             // 進捗状況の解析
-                            var match = _ffmpegConversionProgressPattern.Match(lineText);
+                            var match = GetFfmpegConversionProgressPattern().Match(lineText);
                             if (!match.Success)
                             {
                                 // 解析に失敗した場合は何もしない
@@ -285,7 +279,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                             ffmpegLogRedirector(lineText);
 
                             // ログの中に Duration 値が含まれているか探す
-                            var durationMatch = _ffmpegConversionDurationPattern.Match(lineText);
+                            var durationMatch = GetFfmpegConversionDurationPattern().Match(lineText);
                             if (durationMatch.Success)
                             {
                                 // ログの中に Duration 値が含まれている場合
@@ -308,33 +302,40 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         public static int ExecuteCommand(
             FilePath programFile,
             string args,
-            Encoding intputOutputEncoding,
+            Encoding? intpuEncoding,
+            Encoding? outputEncoding,
             IChildProcessInputRedirectable? standardInputRedirector,
             IChildProcessOutputRedirectable? standardOutputRedirector,
             IChildProcessOutputRedirectable? standardErrorRedirector,
-            Action<string, string> logger,
+            Action<LogCategory, string> messageReporter,
             IChildProcessCancellable? childProcessCcanceller)
         {
+            standardInputRedirector ??= new TextInputRedirector(TinyConsole.ReadLine);
+            standardOutputRedirector ??= new TextOutputRedirector(TinyConsole.WriteLine);
+            standardErrorRedirector ??= new TextOutputRedirector(TinyConsole.WriteLine);
+            Validation.Assert(standardInputRedirector is not null);
+            Validation.Assert(standardOutputRedirector is not null);
+            Validation.Assert(standardErrorRedirector is not null);
             var processStartInfo =
                 new ProcessStartInfo
                 {
                     Arguments = args,
                     FileName = programFile.FullName,
                     CreateNoWindow = false,
-                    RedirectStandardError = standardErrorRedirector is not null,
-                    RedirectStandardInput = standardInputRedirector is not null,
-                    RedirectStandardOutput = standardOutputRedirector is not null,
-                    StandardErrorEncoding = standardErrorRedirector is not null ? intputOutputEncoding : null,
-                    StandardInputEncoding = standardInputRedirector is not null ? intputOutputEncoding : null,
-                    StandardOutputEncoding = standardOutputRedirector is not null ? intputOutputEncoding : null,
+                    RedirectStandardError = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    StandardErrorEncoding = intpuEncoding ?? _defaultInputOutputEncoding,
+                    StandardInputEncoding = outputEncoding ?? _defaultInputOutputEncoding,
+                    StandardOutputEncoding = outputEncoding ?? _defaultInputOutputEncoding,
                     UseShellExecute = false,
                 };
             var process =
                 Process.Start(processStartInfo)
-                ?? throw new Exception("Could not start process");
+                ?? throw new ApplicationException("Could not start process");
             try
             {
-                logger("INFORMATION", $"Child process started.: id={process.Id} \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
+                messageReporter(LogCategory.Information, $"Child process started.: id={process.Id} \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
                 var cancelled = false;
                 var cancellationWatcherTask =
                     Task.Run(() =>
@@ -375,27 +376,16 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                         }
                     });
 
-                var standardInputRedirectorTask =
-                    standardInputRedirector is not null
-                    ? Task.Run(standardInputRedirector.GetInputRedirector(process.StandardInput))
-                    : null;
+                var standardInputRedirectorTask = Task.Run(standardInputRedirector.GetInputRedirector(process.StandardInput));
+                var standardOutputRedirectorTask = Task.Run(standardOutputRedirector.GetOutputRedirector(process.StandardOutput));
+                var standardErrorRedirectorTask = Task.Run(standardErrorRedirector.GetOutputRedirector(process.StandardError));
 
-                var standardOutputRedirectorTask =
-                    standardOutputRedirector is not null
-                    ? Task.Run(standardOutputRedirector.GetOutputRedirector(process.StandardOutput))
-                    : null;
-
-                var standardErrorRedirectorTask =
-                    standardErrorRedirector is not null
-                    ? Task.Run(standardErrorRedirector.GetOutputRedirector(process.StandardError))
-                    : null;
-
-                standardInputRedirectorTask?.Wait();
-                standardOutputRedirectorTask?.Wait();
-                standardErrorRedirectorTask?.Wait();
+                standardInputRedirectorTask.Wait();
+                standardOutputRedirectorTask.Wait();
+                standardErrorRedirectorTask.Wait();
 
                 process.WaitForExit();
-                logger("INFORMATION", $"Child process exited.: id={process.Id}, process-total-time={process.TotalProcessorTime.TotalSeconds:F2}[sec], \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
+                messageReporter(LogCategory.Information, $"Child process exited.: id={process.Id}, process-total-time={process.TotalProcessorTime.TotalSeconds:F2}[sec], \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
 
                 return
                     !cancelled
@@ -425,5 +415,11 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
 
         public static IChildProcessCancellable GetChildProcessCanceller(Action<Process> childProcessCanceller)
             => new ChildProcessCanceller(childProcessCanceller);
+
+        [GeneratedRegex(@"\s*(Duration|DURATION)\s*:\s*(?<time>\d+:\d+:\d+(\.\d+)?)", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetFfmpegConversionDurationPattern();
+
+        [GeneratedRegex(@" time=(?<time>\d+:\d+:\d+(\.\d+)?) ", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetFfmpegConversionProgressPattern();
     }
 }

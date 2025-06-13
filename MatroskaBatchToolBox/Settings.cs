@@ -8,22 +8,19 @@ using Palmtree.IO.Console;
 
 namespace MatroskaBatchToolBox
 {
-    internal class Settings
+    internal sealed class Settings
     {
         private const string _localSettingFileName = $".{nameof(MatroskaBatchToolBox)}.setting.json";
-        private static readonly JsonSerializerOptions _jsonSerializerOptions;
 
         static Settings()
         {
-            _jsonSerializerOptions = new JsonSerializerOptions { AllowTrailingCommas = true, PropertyNameCaseInsensitive = true };
             var baseDirectoryPath =
-                typeof(Settings).Assembly.GetBaseDirectory()
-                ?? throw new Exception("'settings.json' is not found.");
+                typeof(Settings).Assembly.GetBaseDirectory();
             var settingsFilePath = baseDirectoryPath.GetFile("settings.json");
             var settingsText = settingsFilePath.ReadAllText();
             var settings =
                 JsonSerializer.Deserialize(settingsText, SettingsSourceGenerator.Default.GlobalSettingsContainer)
-                ?? throw new Exception("Failed to parse 'settings.json'.");
+                ?? throw new ApplicationException("Failed to parse 'settings.json'.");
 
             FilePath? ffmpegNormalizeCommandFile;
             if (string.IsNullOrEmpty(settings.FfmpegNormalizeCommandFilePath))
@@ -243,7 +240,7 @@ namespace MatroskaBatchToolBox
                 "keep" => StreamOperationType.Keep,
                 "delete" => StreamOperationType.Delete,
                 "error" => StreamOperationType.Error,
-                _ => throw new Exception($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{valueText}\""),
+                _ => throw new ApplicationException($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{valueText}\""),
             };
 
         private static StreamOperationType DeriveStreamOperation(StreamOperationType originalValue, string? newValueText, string propertyName)
@@ -253,21 +250,21 @@ namespace MatroskaBatchToolBox
                 "keep" => StreamOperationType.Keep,
                 "delete" => StreamOperationType.Delete,
                 "error" => StreamOperationType.Error,
-                _ => throw new Exception($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{newValueText}\""),
+                _ => throw new ApplicationException($"The value of the \"{propertyName}\" property is invalid. Set the value of this property to \"keep\", \"delete\" or \"error\". : \"{newValueText}\""),
             };
 
         private static TimeRange DeriveTimeRange(TimeRange originalValue, string? newValueText)
             => newValueText is null
                 ? originalValue
-                : TimeRange.TryParse(newValueText, out TimeRange? newValue)
+                : TimeRange.TryParse(newValueText, out var newValue)
                 ? newValue
-                : throw new Exception($"Invalid time range format.: \"{newValueText}\"");
+                : throw new ApplicationException($"Invalid time range format.: \"{newValueText}\"");
 
         private static Rectangle DeriveRectangle(Rectangle originalValue, string? newValueText)
             => newValueText is null
                 ? originalValue
-                : Rectangle.TryParse(newValueText, out Rectangle? newValue)
+                : Rectangle.TryParse(newValueText, out var newValue)
                 ? newValue
-                : throw new Exception($"Invalid rectangle format.: {newValueText}");
+                : throw new ApplicationException($"Invalid rectangle format.: {newValueText}");
     }
 }

@@ -7,7 +7,7 @@ using Palmtree.Linq;
 
 namespace AudioNormalizer
 {
-    internal class OggMusicFileMetadataProvider
+    internal sealed class OggMusicFileMetadataProvider
         : MusicFileMetadataProvider
     {
         private const int _bitratePerChannelForLibVorbis = 96000;
@@ -103,8 +103,8 @@ namespace AudioNormalizer
             if (_direction != TransferDirection.Input)
                 throw new InvalidOperationException();
 
-            Validation.Assert(musicFileInfo.AudioStreams.Any(), "musicFileInfo.AudioStreams.Any()");
-            Validation.Assert(musicFileInfo.AudioStreams.Skip(1).None(), "musicFileInfo.AudioStreams.Skip(1).None()");
+            Validation.Assert(musicFileInfo.AudioStreams.Any());
+            Validation.Assert(musicFileInfo.AudioStreams.Skip(1).None());
 
             var sourceStream = musicFileInfo.AudioStreams.First();
 
@@ -176,7 +176,7 @@ namespace AudioNormalizer
                     null => throw new InvalidOperationException(),
                     "opus" => GetOpusEncoder(sourceAudioStream),
                     "vorbis" => GetVorbisEncoder(sourceAudioStream),
-                    _ => throw Validation.GetFailErrorException($"_format == \"{_fileFormat}\""),
+                    _ => throw Validation.GetFailErrorException(),
                 };
 
             static (string encoder, IEnumerable<string> encoderOptions) GetOpusEncoder(AudioStreamInfo sourceStreamInfo)
@@ -188,7 +188,9 @@ namespace AudioNormalizer
             }
 
             static (string encoder, IEnumerable<string> encoderOptions) GetVorbisEncoder(AudioStreamInfo sourceStreamInfo)
-                => ("libvirbis", new[] { $"-q:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateLibVorbisQualityByBitRate(sourceStreamInfo.Channels * _bitratePerChannelForLibVorbis):F1}" }.Append(MapLibvorbisSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)));
+            {
+                return ("libvirbis", new[] { $"-q:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateLibVorbisQualityByBitRate(sourceStreamInfo.Channels * _bitratePerChannelForLibVorbis):F1}" }.Append(MapLibvorbisSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)));
+            }
         }
 
         public override string GuessFileFormat()
@@ -230,7 +232,7 @@ namespace AudioNormalizer
                 return 10.0;
         }
 
-        static double CalculateBitRateForOpus(int channels)
+        private static double CalculateBitRateForOpus(int channels)
         {
             if (channels <= 1)
                 return 96000;

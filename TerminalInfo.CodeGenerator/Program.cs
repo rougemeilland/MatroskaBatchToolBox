@@ -9,13 +9,10 @@ using System.Text.RegularExpressions;
 
 namespace TerminalInfo.CodeGenerator
 {
-    public static class Program
+    internal static partial class Program
     {
-        private static readonly Regex _stringValueVariableNamePattern = new(@"%p(?<n>\d)", RegexOptions.Compiled);
-        private static readonly Regex _snakeCasePattern = new(@"(^|_)(?<c>[a-z])", RegexOptions.Compiled);
-
         [SuppressMessage("Style", "IDE0060:未使用のパラメーターを削除します", Justification = "<保留中>")]
-        public static void Main(string[] args)
+        private static void Main(string[] args)
         {
             var legacyCapabilityNames = new Dictionary<string, string>();
 
@@ -104,8 +101,8 @@ namespace TerminalInfo.CodeGenerator
                 var maxVariableNumber =
                     capabilityItem.valueImtems
                         .SelectMany(valueItem =>
-                            _stringValueVariableNamePattern.Matches(valueItem.value)
-                            .Select(match => int.Parse(match.Groups["n"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat)))
+                            GetStringValueVariableNamePattern().Matches(valueItem.value)
+                            .Select(match => int.Parse(match.Groups["n"].Value, NumberStyles.None, CultureInfo.InvariantCulture)))
                         .Append(0)
                         .Max();
 
@@ -158,12 +155,17 @@ namespace TerminalInfo.CodeGenerator
                 var columns = line.Split('\t');
                 yield return
                     columns.Length == 3
-                    ? ((string type, string name, int value))(columns[0], columns[1], int.Parse(columns[2], NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat))
+                    ? ((string type, string name, int value))(columns[0], columns[1], int.Parse(columns[2], NumberStyles.None, CultureInfo.InvariantCulture))
                     : throw new Exception();
             }
         }
 
         private static string ToCamelCase(string source)
-            => _snakeCasePattern.Replace(source, match => match.Groups["c"].Value.ToUpper());
+            => GetSnakeCasePattern().Replace(source, match => match.Groups["c"].Value.ToUpperInvariant());
+        [GeneratedRegex(@"%p(?<n>\d)", RegexOptions.ExplicitCapture | RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetStringValueVariableNamePattern();
+
+        [GeneratedRegex(@"(^|_)(?<c>[a-z])", RegexOptions.ExplicitCapture | RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetSnakeCasePattern();
     }
 }

@@ -8,7 +8,7 @@ using Palmtree.IO.Serialization;
 
 namespace ChapterConverter
 {
-    internal class CsvChapterFormatter
+    internal sealed class CsvChapterFormatter
         : ChapterFormatter
     {
         public CsvChapterFormatter(ChapterFormatterParameter parameter)
@@ -25,10 +25,10 @@ namespace ChapterConverter
                     row.Length.IsBetween(1, 2)
                     ? (new
                     {
-                        startTime = row[0].TryParse(TimeParsingMode.LazyMode, out TimeSpan time) ? time : throw new Exception($"Invalid row format in input data.: {row[0]}"),
+                        startTime = row[0].TryParse(TimeParsingMode.LazyMode, out TimeSpan time) ? time : throw new ApplicationException($"Invalid row format in input data.: {row[0]}"),
                         title = row.Length >= 2 ? row[1] : "",
                     })
-                    : throw new Exception("The format of the input CSV data is invalid. (not enough columns in row)"))
+                    : throw new ApplicationException("The format of the input CSV data is invalid. (not enough columns in row)"))
                 .ToArray();
 
             for (var index = 0; index < chapters.Length; ++index)

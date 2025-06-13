@@ -6,7 +6,7 @@ using Palmtree;
 
 namespace AudioNormalizer
 {
-    internal class FlacMusicFileMetadataProvider
+    internal sealed class FlacMusicFileMetadataProvider
         : MusicFileMetadataProvider
     {
         private readonly TransferDirection _direction;
@@ -101,7 +101,7 @@ namespace AudioNormalizer
             {
                 null => throw new InvalidOperationException(),
                 "flac" => ("flac", new[] { $"-compression_level:a:{sourceAudioStream.IndexWithinAudioStream} 12" }.Concat(MapEncoderOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.SampleFormat, sourceAudioStream.BitsPerRawSample))),
-                _ => throw Validation.GetFailErrorException($"_format == \"{_fileFormat}\""),
+                _ => throw Validation.GetFailErrorException(),
             };
         }
 

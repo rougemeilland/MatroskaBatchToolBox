@@ -8,18 +8,10 @@ namespace ChapterConverter
     internal abstract class ChapterFormatter
         : IChapterFormatter
     {
-        protected class InternalChapterElement
+        protected sealed class InternalChapterElement
         {
-            protected static readonly TimeSpan DefaultMaximumDuration;
-            protected static readonly TimeSpan DefaultMinimumDuration;
-
-            protected const long _timeBaseDenominator = 1000000000;
-
-            static InternalChapterElement()
-            {
-                DefaultMaximumDuration = SimpleChapterElement.DefaultMaximumDuration;
-                DefaultMinimumDuration = SimpleChapterElement.DefaultMinimumDuration;
-            }
+            public static readonly TimeSpan DefaultMaximumDuration = SimpleChapterElement.DefaultMaximumDuration;
+            public static readonly TimeSpan DefaultMinimumDuration = SimpleChapterElement.DefaultMinimumDuration;
 
             public InternalChapterElement(string friendlyId, TimeSpan startTime, TimeSpan endTime, string title)
             {
@@ -60,17 +52,17 @@ namespace ChapterConverter
                 var currentChapter = chapters[index];
                 var nextChapter = chapters[index + 1];
                 if (currentChapter.StartTime > nextChapter.StartTime)
-                    throw new Exception($"The chapters in the input data are not arranged in ascending chronological order.: \"{currentChapter.FriendlyId}\".start-time=\"{currentChapter.StartTime.TotalSeconds:F6}\", \"{nextChapter.FriendlyId}\".start-time=\"{nextChapter.StartTime.TotalSeconds:F6}\"");
+                    throw new ApplicationException($"The chapters in the input data are not arranged in ascending chronological order.: \"{currentChapter.FriendlyId}\".start-time=\"{currentChapter.StartTime.TotalSeconds:F6}\", \"{nextChapter.FriendlyId}\".start-time=\"{nextChapter.StartTime.TotalSeconds:F6}\"");
                 if (currentChapter.EndTime != nextChapter.StartTime)
-                    throw new Exception($"In the input data, the start time of one chapter does not match the end time of the next chapter.: \"{currentChapter.FriendlyId}\".start-time=\"{currentChapter.StartTime.TotalSeconds:F6}\", \"{nextChapter.FriendlyId}\".start-time=\"{nextChapter.StartTime.TotalSeconds:F6}\"");
+                    throw new ApplicationException($"In the input data, the start time of one chapter does not match the end time of the next chapter.: \"{currentChapter.FriendlyId}\".start-time=\"{currentChapter.StartTime.TotalSeconds:F6}\", \"{nextChapter.FriendlyId}\".start-time=\"{nextChapter.StartTime.TotalSeconds:F6}\"");
             }
 
             foreach (var chapter in chapters)
             {
                 if (chapter.StartTime > chapter.EndTime)
-                    throw new Exception($"The value of \"start-time\" is greater than the value of \"end-time\" in the input data. : start-time={chapter.StartTime.TotalSeconds:F6}, end-time={chapter.EndTime.TotalSeconds:F6}");
+                    throw new ApplicationException($"The value of \"start-time\" is greater than the value of \"end-time\" in the input data. : start-time={chapter.StartTime.TotalSeconds:F6}, end-time={chapter.EndTime.TotalSeconds:F6}");
                 if (chapter.StartTime >= Parameter.MaximumDuration)
-                    throw new Exception($"The chapter start time is too large in the input data. Change the maximum chapter duration with the \"--maximum_duration\" option.: start-time=\"{chapter.StartTime.TotalSeconds:F6}\" at \"{chapter.FriendlyId}\"");
+                    throw new ApplicationException($"The chapter start time is too large in the input data. Change the maximum chapter duration with the \"--maximum_duration\" option.: start-time=\"{chapter.StartTime.TotalSeconds:F6}\" at \"{chapter.FriendlyId}\"");
             }
 
             return

@@ -1,14 +1,14 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using Palmtree.Linq;
 
 namespace AudioNormalizer
 {
-    partial class Program
+    internal static partial class Program
     {
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1861:引数として定数配列を使用しない", Justification = "<保留中>")]
-        private static CommandOptionDefinition<OptionType>[] GetOptionDefinitions()
-            => new CommandOptionDefinition<OptionType>[]
+        private static readonly IEnumerable<CommandOptionDefinition<OptionType>> _optionDefinitions
+            = new CommandOptionDefinition<OptionType>[]
             {
                 new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.InputFormat,

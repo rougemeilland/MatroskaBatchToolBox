@@ -7,7 +7,7 @@ using Palmtree.Numerics;
 
 namespace ChapterConverter
 {
-    internal class FfmetadataChapterFormatter
+    internal sealed partial class FfmetadataChapterFormatter
         : ChapterFormatter
     {
         private static readonly Regex _ffMetadataHeaderPattern;
@@ -15,8 +15,8 @@ namespace ChapterConverter
 
         static FfmetadataChapterFormatter()
         {
-            _ffMetadataHeaderPattern = new Regex(@"^;FFMETADATA1\r?\nencoder=[^\r\n]+\r?\n", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-            _chapterPattern = new Regex(@"\[CHAPTER\]\r?\nTIMEBASE=(?<timeBase>\d+/\d+)\r?\nSTART=(?<startTime>\d+)\r?\nEND=(?<endTime>\d+)\r?\n(title=(?<title>[^\r\n]*)\r?\n)?", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            _ffMetadataHeaderPattern = GetFfmetadataHeaderPattern();
+            _chapterPattern = GetChapterPattern();
         }
 
         public FfmetadataChapterFormatter(ChapterFormatterParameter parameter)
@@ -29,18 +29,24 @@ namespace ChapterConverter
                 ? _chapterPattern.Matches(rawText)
                     .Select((match, index) =>
                     {
-                        if (!match.Groups["timeBase"].Value.TryParse(out long timeBaseNumerator, out long timeBaseDenominator))
+                        if (!match.Groups["timeBase"].Value.TryParse(out long timeBaseNumerator, out var timeBaseDenominator))
                             throw new Exception("internal error (illegal timeBase format)");
                         var startTime = match.Groups["startTime"].Value.ParseAsInt64().FromTimeCountToTimeSpan(timeBaseNumerator, timeBaseDenominator);
                         var endTime = match.Groups["endTime"].Value.ParseAsInt64().FromTimeCountToTimeSpan(timeBaseNumerator, timeBaseDenominator);
                         var title = match.Groups["title"].Success ? match.Groups["title"].Value : "";
                         return new InternalChapterElement($"[CHAPTER]#{index}", startTime, endTime, title);
                     })
-                : throw new Exception("Input data is not in \"ffmetadata\" format.");
+                : throw new ApplicationException("Input data is not in \"ffmetadata\" format.");
 
         protected override string Render(IEnumerable<InternalChapterElement> chapters)
             => chapters
                 .Select(chapter => new SimpleChapterElement(chapter.StartTime, chapter.EndTime, chapter.Title))
                 .ToMetadataString();
+
+        [GeneratedRegex(@"^;FFMETADATA1\r?\nencoder=[^\r\n]+\r?\n", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetFfmetadataHeaderPattern();
+
+        [GeneratedRegex(@"\[CHAPTER\]\r?\nTIMEBASE=(?<timeBase>\d+/\d+)\r?\nSTART=(?<startTime>\d+)\r?\nEND=(?<endTime>\d+)\r?\n(title=(?<title>[^\r\n]*)\r?\n)?", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetChapterPattern();
     }
 }

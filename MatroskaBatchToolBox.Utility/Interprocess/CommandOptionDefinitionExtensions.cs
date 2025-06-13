@@ -62,7 +62,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                 var matchedDefinitions = definitions.Where(definition => definition.IsMatch(args.Span[index])).ToArray();
                 if (matchedDefinitions.Length <= 0)
                     throw new InvalidCommandOptionException($"Unsupported argument: \"{args.Span[index]}\"");
-                Validation.Assert(matchedDefinitions.Length <= 1, "matchedDefinitions.Length <= 1");
+                Validation.Assert(matchedDefinitions.Length <= 1);
                 var matchedDefinition = matchedDefinitions[0];
                 yield return
                     index + matchedDefinition.OptionParameters < args.Length

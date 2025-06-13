@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using MatroskaBatchToolBox.Properties;
 using Palmtree;
 using Palmtree.IO;
@@ -10,9 +12,9 @@ using Palmtree.Linq;
 
 namespace MatroskaBatchToolBox
 {
-    internal class ProgressState
+    internal sealed class ProgressState
     {
-        private class SourceFileInfo
+        private sealed class SourceFileInfo
         {
             public SourceFileInfo(int uniqueId, FilePath file, ulong fileLength)
             {
@@ -29,7 +31,7 @@ namespace MatroskaBatchToolBox
             public double Progress { get; set; }
         }
 
-        private class ProgressHistoryElement
+        private sealed class ProgressHistoryElement
         {
             public ProgressHistoryElement(DateTime dateTime, double percentage)
             {
@@ -62,9 +64,18 @@ namespace MatroskaBatchToolBox
         /// </summary>
         private const double _minimumPercentageForFinishTimeCalculation = 0.01 / 100.0;
 
+        private static readonly CompositeFormat _progressFormat1Text = CompositeFormat.Parse(Resource.ProgressFormat1Text);
+        private static readonly CompositeFormat _progressFormat2Text = CompositeFormat.Parse(Resource.ProgressFormat2Text);
+        private static readonly CompositeFormat _completionDateTimeFriendlyFormat1Text = CompositeFormat.Parse(Resource.CompletionDateTimeFriendlyFormat1Text);
+        private static readonly CompositeFormat _completionDateTimeFriendlyFormat2Text = CompositeFormat.Parse(Resource.CompletionDateTimeFriendlyFormat2Text);
+        private static readonly CompositeFormat _completionDateTimeFriendlyFormat3Text = CompositeFormat.Parse(Resource.CompletionDateTimeFriendlyFormat3Text);
+        private static readonly CompositeFormat _timeSpanFriendlyFormat1Text = CompositeFormat.Parse(Resource.TimeSpanFriendlyFormat1Text);
+        private static readonly CompositeFormat _timeSpanFriendlyFormat2Text = CompositeFormat.Parse(Resource.TimeSpanFriendlyFormat2Text);
+        private static readonly CompositeFormat _timeSpanFriendlyFormat3Text = CompositeFormat.Parse(Resource.TimeSpanFriendlyFormat3Text);
+
         private readonly Queue<SourceFileInfo> _unprocessedSourceFiles;
         private readonly IDictionary<int, SourceFileInfo> _processingSourceFiles;
-        private readonly IDictionary<ActionResult, ICollection<SourceFileInfo>> _processedSourceFiles;
+        private readonly Dictionary<ActionResult, ICollection<SourceFileInfo>> _processedSourceFiles;
         private readonly DateTime _firstDateTime;
         private readonly LinkedList<ProgressHistoryElement> _progressHistory;
         private ulong _totalLengthOfUnprocessedSourceFiles;
@@ -128,7 +139,7 @@ namespace MatroskaBatchToolBox
 
             lock (this)
             {
-                if (!_processingSourceFiles.TryGetValue(sourceFieId, out SourceFileInfo? item))
+                if (!_processingSourceFiles.TryGetValue(sourceFieId, out var item))
                 {
                     // sourceFieId が変換中のソールファイルのものではない。
                     // 本来ならエラーとするべきであるが、UpdateProgress は非同期に呼び出される可能性があるため、
@@ -157,7 +168,7 @@ namespace MatroskaBatchToolBox
             lock (this)
             {
                 if (!_processingSourceFiles.TryGetValue(sourceFieId, out var item))
-                    throw Validation.GetFailErrorException("Failed in '_processingSourceFiles.TryGetValue(sourceFieId, out var item)'");
+                    throw Validation.GetFailErrorException();
                 _processedSourceFiles[actionResult].Add(item);
                 _ = _processingSourceFiles.Remove(sourceFieId);
                 switch (actionResult)
@@ -189,24 +200,25 @@ namespace MatroskaBatchToolBox
             var now = DateTime.UtcNow;
             lock (this)
             {
-                Validation.Assert(_progressHistory.First is not null, "_progressHistory.First is not null");
+                Validation.Assert(_progressHistory.First is not null);
                 oldDateTime = _progressHistory.First.Value.DateTime;
                 oldPercentage = _progressHistory.First.Value.Percentage;
-                Validation.Assert(_progressHistory.Last is not null, "_progressHistory.Last is not null");
+                Validation.Assert(_progressHistory.Last is not null);
                 latestDateTime = _progressHistory.Last.Value.DateTime;
                 latestPercentage = _progressHistory.Last.Value.Percentage;
                 progressValue = GetProgressValue();
             }
 
             var elapsedTime = latestDateTime - _firstDateTime;
-            var percentText = (progressValue * 100).ToString("F2");
+            var percentText = (progressValue * 100).ToString("F2", CultureInfo.InvariantCulture);
             var elapsedTimeFromNow = now - _firstDateTime;
 
             if (elapsedTime < _minimumHistoryIntervalForFinishTimeCalculation || latestPercentage < _minimumPercentageForFinishTimeCalculation)
             {
                 consoleWriter(
                     string.Format(
-                        Resource.ProgressFormat1Text,
+                        CultureInfo.InvariantCulture,
+                        _progressFormat1Text,
                         percentText,
                         FormatTimeSpanFriendly(elapsedTimeFromNow)));
             }
@@ -216,7 +228,8 @@ namespace MatroskaBatchToolBox
                 var untilDateTime = now + remainTime;
                 consoleWriter(
                     string.Format(
-                        Resource.ProgressFormat2Text,
+                        CultureInfo.InvariantCulture,
+                        _progressFormat2Text,
                         percentText,
                         FormatTimeSpanFriendly(elapsedTimeFromNow),
                         FormatTimeSpanFriendly(remainTime),
@@ -278,18 +291,18 @@ namespace MatroskaBatchToolBox
 
         private static string FormatDateTimeFriendly(DateTime localDateTime, DateTime localNow)
             => localDateTime.Year != localNow.Year
-                ? string.Format(Resource.CompletionDateTimeFriendlyFormat1Text, localDateTime.Year, localDateTime.Month, localDateTime.Day, localDateTime.Hour, localDateTime.Minute)
+                ? string.Format(CultureInfo.InvariantCulture, _completionDateTimeFriendlyFormat1Text, localDateTime.Year, localDateTime.Month, localDateTime.Day, localDateTime.Hour, localDateTime.Minute)
                 : localDateTime.Month != localNow.Month || localDateTime.Day != localNow.Day
-                ? string.Format(Resource.CompletionDateTimeFriendlyFormat2Text, localDateTime.Month, localDateTime.Day, localDateTime.Hour, localDateTime.Minute)
-                : string.Format(Resource.CompletionDateTimeFriendlyFormat3Text, localDateTime.Hour, localDateTime.Minute);
+                ? string.Format(CultureInfo.InvariantCulture, _completionDateTimeFriendlyFormat2Text, localDateTime.Month, localDateTime.Day, localDateTime.Hour, localDateTime.Minute)
+                : string.Format(CultureInfo.InvariantCulture, _completionDateTimeFriendlyFormat3Text, localDateTime.Hour, localDateTime.Minute);
 
         private static string FormatTimeSpanFriendly(TimeSpan time)
             => time >= TimeSpan.FromDays(1)
-                ? string.Format(Resource.TimeSpanFriendlyFormat1Text, time.Days, time.Hours, time.Minutes)
+                ? string.Format(CultureInfo.InvariantCulture, _timeSpanFriendlyFormat1Text, time.Days, time.Hours, time.Minutes)
                 : time >= TimeSpan.FromHours(1)
-                ? string.Format(Resource.TimeSpanFriendlyFormat2Text, time.Hours, time.Minutes)
+                ? string.Format(CultureInfo.InvariantCulture, _timeSpanFriendlyFormat2Text, time.Hours, time.Minutes)
                 : time >= TimeSpan.FromMinutes(1)
-                ? string.Format(Resource.TimeSpanFriendlyFormat3Text, time.Minutes)
+                ? string.Format(CultureInfo.InvariantCulture, _timeSpanFriendlyFormat3Text, time.Minutes)
                 : Resource.TimeSpanFriendlyFormat4Text;
     }
 }

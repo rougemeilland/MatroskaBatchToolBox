@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -11,42 +12,9 @@ using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox
 {
-    internal static class MatroskaAction
+    internal static partial class MatroskaAction
     {
-        private const string _convertModeSymbolPatternText = @"(?<convertMode>==)";
-        private const string _resolutionPatternText = @"(?<resolutionWidth>\d+)x(?<resolutionHeight>\d+)";
-        private const string _separaterBetweenResolutionSpecAndAspectRatioPatternText = @" +|\-|_";
-        private const string _aspectRatioPatternText = @"((?<aspectRatioWidth>\d+)(?<aspectRatioSeparater>to|：|:)(?<aspectRatioHeight>\d+))|(?<aspectRatioValue>\d+\.\d+)";
-        private static readonly Regex _duplicatedFileNamePattern;
-        private static readonly Regex _normalizedFileNamePattern;
-        private static readonly Regex _encodedFileNamePattern;
-        private static readonly Regex _startsWithConvertModeSymbolPattern;
-        private static readonly Regex _startsWithResolutionSpecPattern;
-        private static readonly Regex _startsWithSeparaterBetweenResolutionSpecAndAspectRatioPattern;
-        private static readonly Regex _startsWithAspectRatioSpecPattern;
-        private static readonly Regex _startsWithCommentPattern;
-        private static readonly Regex _resolutionAndAspectRatioSpecInFileNamePattern;
-
-        static MatroskaAction()
-        {
-            _duplicatedFileNamePattern = new Regex(@" \(\d+\)$", RegexOptions.Compiled);
-            _normalizedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]*? )?)audio-normalized(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
-            _encodedFileNamePattern = new Regex(@"(?<prefix>\[([^\]]*? )?)(H\.264|x264|MPEG\-4|AVC|H\.265|x265|HEVC|AV1) (CRF|crf)(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled);
-            _startsWithConvertModeSymbolPattern = new Regex($"^({_convertModeSymbolPatternText})", RegexOptions.Compiled);
-            _startsWithResolutionSpecPattern = new Regex($"^({_resolutionPatternText})", RegexOptions.Compiled);
-            _startsWithSeparaterBetweenResolutionSpecAndAspectRatioPattern = new Regex($"^({_separaterBetweenResolutionSpecAndAspectRatioPatternText})", RegexOptions.Compiled);
-            _startsWithAspectRatioSpecPattern = new Regex($"^({_aspectRatioPatternText})", RegexOptions.Compiled);
-            _startsWithCommentPattern = new Regex($"^ *#", RegexOptions.Compiled);
-            var groupNamePattern = new Regex(@"\?<[^>]+>");
-            var resolutionPatternTextWithoutGroup = groupNamePattern.Replace(_resolutionPatternText, "");
-            var aspectRatioPatternTextWithoutGroup = groupNamePattern.Replace(_aspectRatioPatternText, "");
-            _resolutionAndAspectRatioSpecInFileNamePattern =
-                new Regex(
-                    $"(?<prefix>\\[([^\\]]*? )?)(?<resolutionAndAspectRatioSpec>({resolutionPatternTextWithoutGroup})( ({aspectRatioPatternTextWithoutGroup}))?)(?<suffix>( [^\\]]*)?\\])",
-                    RegexOptions.Compiled);
-        }
-
-        public static ActionResult NormalizeMovieFile(Settings localSettings, FilePath sourceFile, IProgress<double> progressReporter)
+        public static ActionResult NormalizeMovieFile(FilePath sourceFile, IProgress<double> progressReporter)
         {
             var logFile = new FilePath(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
@@ -64,7 +32,11 @@ namespace MatroskaBatchToolBox
             if (audioCodecIsNotSupported)
             {
                 CleanUpLogFile(logFile);
-                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Failed to normalize the audio of the video with libopus, so normalize with libvorbis instead.: \"{sourceFile.FullName}\"", });
+                using (var logWriter = logFile.AppendText().AsValidationLogger())
+                {
+                    logWriter.WriteLog(LogCategory.Information, $"Failed to normalize the audio of the video with libopus, so normalize with libvorbis instead.: \"{sourceFile.FullName}\"");
+                }
+
                 (actionResult, audioCodecIsNotSupported) =
                     NormalizeMovieFile(
                         sourceFile,
@@ -77,7 +49,9 @@ namespace MatroskaBatchToolBox
             return !audioCodecIsNotSupported ? actionResult : ActionResult.Failed;
 
             static FilePath MakeDestinationFilePath(FilePath sourceFile, AudioEncoderType audioEncoder)
-                => sourceFile.Directory.GetFile($"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{audioEncoder.ToFormatName()} audio-normalized].mkv");
+            {
+                return sourceFile.Directory.GetFile($"{Path.GetFileNameWithoutExtension(sourceFile.Name)} [{audioEncoder.ToFormatName()} audio-normalized].mkv");
+            }
         }
 
         private static (ActionResult actionResult, bool audioCodecIsNotSupported) NormalizeMovieFile(FilePath sourceFile, FilePath logFile, AudioEncoderType audioEncoder, FilePath destinationFile, IProgress<double> progressReporter)
@@ -85,88 +59,93 @@ namespace MatroskaBatchToolBox
             var workingFile = sourceFile.Directory.GetFile($".work.audio-normalize.{sourceFile.Name}.mkv");
             DeleteFileSafety(workingFile);
             var actionResult = ActionResult.Failed;
-            FilePath? actualDestinationFilePath = null;
+            var actualDestinationFilePath = (FilePath?)null;
             try
             {
-                if (_normalizedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                using var logWriter = logFile.AppendText().AsValidationLogger();
+                try
                 {
-                    // ファイル名に正規化されたマーク文字列があるので、何もせずに復帰する。
-                    return (actionResult = ActionResult.Skipped, false);
-                }
+                    if (GetNormalizedFileNamePattern().IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                    {
+                        // ファイル名に正規化されたマーク文字列があるので、何もせずに復帰する。
+                        return (actionResult = ActionResult.Skipped, false);
+                    }
 
-                if (destinationFile.Exists)
-                {
-                    // 出力先ファイルが既に存在しているので、何もせず復帰する。
-                    return (actionResult = ActionResult.Skipped, false);
-                }
+                    if (destinationFile.Exists)
+                    {
+                        // 出力先ファイルが既に存在しているので、何もせず復帰する。
+                        return (actionResult = ActionResult.Skipped, false);
+                    }
 
-                if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                    if (GetDuplicatedFileNamePattern().IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                    {
+                        // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
+                        logWriter.WriteLog(LogCategory.Information, "Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"");
+                        return (actionResult = ActionResult.Failed, false);
+                    }
+
+                    switch (ExternalCommand.NormalizeAudioFile(sourceFile, audioEncoder, workingFile, logWriter, progressReporter))
+                    {
+                        case CommandResultCode.NotSupported:
+                            return (actionResult = ActionResult.Failed, true);
+                        case CommandResultCode.Cancelled:
+                            return (actionResult = ActionResult.Cancelled, false);
+                        case CommandResultCode.Completed:
+                        default:
+                            break;
+                    }
+
+                    actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
+                    logWriter.WriteLog(LogCategory.Information, $"File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\".");
+                    return (actionResult = ActionResult.Success, false);
+                }
+                catch (Exception ex)
                 {
-                    // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
+                    if (destinationFile.Exists)
+                    {
+                        DeleteFileSafety(destinationFile);
+                        logWriter.WriteLog(LogCategory.Information, $"File was deleted: \"{destinationFile.FullName}\"");
+                    }
+
+                    logWriter.WriteLog(ex);
                     return (actionResult = ActionResult.Failed, false);
                 }
-
-                switch (ExternalCommand.NormalizeAudioFile(logFile, sourceFile, audioEncoder, workingFile, progressReporter))
+                finally
                 {
-                    case CommandResultCode.NotSupported:
-                        return (actionResult = ActionResult.Failed, true);
-                    case CommandResultCode.Cancelled:
-                        return (actionResult = ActionResult.Cancelled, false);
-                    case CommandResultCode.Completed:
-                    default:
-                        break;
-                }
+                    if (workingFile.Exists)
+                    {
+                        DeleteFileSafety(workingFile);
+                        logWriter.WriteLog(LogCategory.Information, $"File was deleted: \"{workingFile.FullName}\"");
+                    }
 
-                actualDestinationFilePath = MoveToDestinationFile(workingFile, destinationFile);
-                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File moved from \"{workingFile.FullName}\" to \"{actualDestinationFilePath.FullName}\".", });
-                return (actionResult = ActionResult.Success, false);
-            }
-            catch (AggregateException ex)
-            {
-                if (destinationFile.Exists)
-                {
-                    DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"", });
+                    switch (actionResult)
+                    {
+                        case ActionResult.Success:
+                            logWriter.WriteLog(LogCategory.Information, $"The audio in movie file was successfully normalized.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"");
+                            break;
+                        case ActionResult.Failed:
+                            logWriter.WriteLog(LogCategory.Error, $"Failed to normalize the audio of the movie file.: \"{sourceFile.FullName}\"");
+                            break;
+                        case ActionResult.Cancelled:
+                            logWriter.WriteLog(LogCategory.Information, $"Movie audio normalization was interrupted by the user.: \"{sourceFile.FullName}\"");
+                            break;
+                        default:
+                            break;
+                    }
                 }
-
-                ExternalCommand.ReportAggregateException(logFile, ex);
-                return (actionResult = ActionResult.Failed, false);
-            }
-            catch (Exception ex)
-            {
-                if (destinationFile.Exists)
-                {
-                    DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"", });
-                }
-
-                ExternalCommand.ReportException(logFile, ex);
-                return (actionResult = ActionResult.Failed, false);
             }
             finally
             {
-                if (workingFile.Exists)
-                {
-                    DeleteFileSafety(workingFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile.FullName}\"", });
-                }
-
                 switch (actionResult)
                 {
                     case ActionResult.Success:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: The audio in movie file was successfully normalized.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
                         FinalizeLogFile(logFile, "OK");
                         break;
                     case ActionResult.Skipped:
                         CleanUpLogFile(logFile);
                         break;
                     case ActionResult.Failed:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Failed to normalize the audio of the movie file.: \"{sourceFile.FullName}\"", });
                         FinalizeLogFile(logFile, "NG");
-                        break;
-                    case ActionResult.Cancelled:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Movie audio normalization was interrupted by the user.: \"{sourceFile.FullName}\"", });
                         break;
                     default:
                         break;
@@ -186,7 +165,7 @@ namespace MatroskaBatchToolBox
             }
 
             var conversionSpec = sourceFileDirectory.Name;
-            var match = _startsWithConvertModeSymbolPattern.Match(conversionSpec);
+            var match = GetStartsWithConvertModeSymbolPattern().Match(conversionSpec);
             if (match.Success)
             {
                 // 親ディレクトリ名に単純変換の指示があった場合、単純変換を実行する。
@@ -216,174 +195,176 @@ namespace MatroskaBatchToolBox
             DeleteFileSafety(workingFile1);
             DeleteFileSafety(workingFile2);
             var actionResult = ActionResult.Failed;
-            FilePath? actualDestinationFilePath = null;
+            var actualDestinationFilePath = (FilePath?)null;
             try
             {
-                if (sourceFile.Name == destinationFile.Name)
+                using var logWriter = logFile.AppendText().AsValidationLogger();
+                try
                 {
-                    // 出力ファイル名が入力ファイル名と同じなので、既に変換済みとみなして、何もせず復帰する。
-                    return actionResult = ActionResult.Skipped;
-                }
-
-                if (destinationFile.Exists)
-                {
-                    // 出力先ファイルが既に存在しているので、何もせず復帰する。
-                    return actionResult = ActionResult.Skipped;
-                }
-
-                if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
-                {
-                    // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
-                    return actionResult = ActionResult.Failed;
-                }
-
-                var movieInfo =
-                    Command.GetMovieInformation(
-                        null,
-                        sourceFile,
-                        MovieInformationType.Streams | MovieInformationType.Chapters,
-                        (level, message) =>
-                            ExternalCommand.Log(
-                                logFile,
-                                new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }));
-
-                if (!string.IsNullOrEmpty(resolutionSpec))
-                {
-                    var invalidStreams =
-                        movieInfo.VideoStreams
-                        .Where(stream => !stream.IsImageVideoStream && stream.Resolution != resolutionSpec)
-                        .ToList();
-                    if (invalidStreams.Count > 0)
+                    if (sourceFile.Name == destinationFile.Name)
                     {
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Simple conversion is not possible because the movie file resolution ({string.Join(", ", invalidStreams.Select(stream => stream.Resolution))}) is different from the destination resolution ({resolutionSpec}).: \"{sourceFile.FullName}\"", });
+                        // 出力ファイル名が入力ファイル名と同じなので、既に変換済みとみなして、何もせず復帰する。
+                        return actionResult = ActionResult.Skipped;
+                    }
+
+                    if (destinationFile.Exists)
+                    {
+                        // 出力先ファイルが既に存在しているので、何もせず復帰する。
+                        return actionResult = ActionResult.Skipped;
+                    }
+
+                    if (GetDuplicatedFileNamePattern().IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                    {
+                        // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
+                        logWriter.WriteLog(LogCategory.Information, $"Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"");
                         return actionResult = ActionResult.Failed;
                     }
-                }
 
-                if (CheckingForNeedToDoMultiStepConversion(localSettings, movieInfo))
-                {
-                    var stepWeight1 = 1.0;
-                    var stepWeight2 = 1.0;
-                    var totalWeight = stepWeight1 + stepWeight2;
-
-                    // 第1段階: メタデータの削除 (progress の重みづけ: 1)
-                    var conversionResult1 =
-                        ExternalCommand.ConvertMovieFile(
-                            localSettings,
-                            logFile,
+                    var movieInfo =
+                        Command.GetMovieInformation(
+                            null,
                             sourceFile,
-                            movieInfo,
-                            null,
-                            aspectRatioSpec,
-                            VideoEncoderType.Copy,
-                            true,
-                            false,
-                            false,
-                            false,
-                            false,
-                            workingFile2,
-                            new Progress<double>(progress => progressReporter.Report((0.0 + progress * stepWeight1) / totalWeight)));
-                    if (conversionResult1 == CommandResultCode.Cancelled)
-                        return actionResult = ActionResult.Cancelled;
+                            MovieInformationType.Streams | MovieInformationType.Chapters,
+                            logWriter.WriteLog);
 
-                    // 第2段階: 最低限のメタデータ(チャプタータイトルを含む)の付加 (progress の重みづけ: 1)
-                    var commandResult2 =
-                        ExternalCommand.ConvertMovieFile(
-                            localSettings,
-                            logFile,
-                            workingFile2,
-                            movieInfo,
-                            null,
-                            null,
-                            VideoEncoderType.Copy,
-                            false,
-                            true,
-                            true,
-                            true,
-                            true,
-                            workingFile1,
-                            new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress * stepWeight2) / totalWeight)));
-                    if (commandResult2 == CommandResultCode.Cancelled)
-                        return actionResult = ActionResult.Cancelled;
+                    if (!string.IsNullOrEmpty(resolutionSpec))
+                    {
+                        var invalidStreams =
+                            movieInfo.VideoStreams
+                            .Where(stream => !stream.IsImageVideoStream && stream.Resolution != resolutionSpec)
+                            .ToList();
+                        if (invalidStreams.Count > 0)
+                        {
+                            logWriter.WriteLog(LogCategory.Error, $"Simple conversion is not possible because the movie file resolution ({string.Join(", ", invalidStreams.Select(stream => stream.Resolution))}) is different from the destination resolution ({resolutionSpec}).: \"{sourceFile.FullName}\"");
+                            return actionResult = ActionResult.Failed;
+                        }
+                    }
+
+                    if (CheckingForNeedToDoMultiStepConversion(localSettings, movieInfo))
+                    {
+                        var stepWeight1 = 1.0;
+                        var stepWeight2 = 1.0;
+                        var totalWeight = stepWeight1 + stepWeight2;
+
+                        // 第1段階: メタデータの削除 (progress の重みづけ: 1)
+                        var conversionResult1 =
+                            ExternalCommand.ConvertMovieFile(
+                                localSettings,
+                                logWriter,
+                                sourceFile,
+                                movieInfo,
+                                null,
+                                aspectRatioSpec,
+                                VideoEncoderType.Copy,
+                                true,
+                                false,
+                                false,
+                                false,
+                                false,
+                                workingFile2,
+                                new Progress<double>(progress => progressReporter.Report((0.0 + progress * stepWeight1) / totalWeight)));
+                        if (conversionResult1 == CommandResultCode.Cancelled)
+                            return actionResult = ActionResult.Cancelled;
+
+                        // 第2段階: 最低限のメタデータ(チャプタータイトルを含む)の付加 (progress の重みづけ: 1)
+                        var commandResult2 =
+                            ExternalCommand.ConvertMovieFile(
+                                localSettings,
+                                logWriter,
+                                workingFile2,
+                                movieInfo,
+                                null,
+                                null,
+                                VideoEncoderType.Copy,
+                                false,
+                                true,
+                                true,
+                                true,
+                                true,
+                                workingFile1,
+                                new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress * stepWeight2) / totalWeight)));
+                        if (commandResult2 == CommandResultCode.Cancelled)
+                            return actionResult = ActionResult.Cancelled;
+                    }
+                    else
+                    {
+                        var conversionResult =
+                            ExternalCommand.ConvertMovieFile(
+                                localSettings,
+                                logWriter,
+                                sourceFile,
+                                movieInfo,
+                                null,
+                                aspectRatioSpec,
+                                VideoEncoderType.Copy,
+                                localSettings.DeleteMetadata,
+                                true,
+                                true,
+                                false,
+                                false,
+                                workingFile1,
+                                progressReporter);
+                        if (conversionResult == CommandResultCode.Cancelled)
+                            return actionResult = ActionResult.Cancelled;
+                    }
+
+                    actualDestinationFilePath = MoveToDestinationFile(workingFile1, destinationFile);
+                    logWriter.WriteLog(LogCategory.Information, $"File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\".");
+                    return actionResult = ActionResult.Success;
                 }
-                else
+                catch (Exception ex)
                 {
-                    var conversionResult =
-                        ExternalCommand.ConvertMovieFile(
-                            localSettings,
-                            logFile,
-                            sourceFile,
-                            movieInfo,
-                            null,
-                            aspectRatioSpec,
-                            VideoEncoderType.Copy,
-                            localSettings.DeleteMetadata,
-                            true,
-                            true,
-                            false,
-                            false,
-                            workingFile1,
-                            progressReporter);
-                    if (conversionResult == CommandResultCode.Cancelled)
-                        return actionResult = ActionResult.Cancelled;
-                }
+                    if (destinationFile.Exists)
+                    {
+                        DeleteFileSafety(destinationFile);
+                        logWriter.WriteLog(LogCategory.Information, $"File was deleted: \"{destinationFile.FullName}\"");
+                    }
 
-                actualDestinationFilePath = MoveToDestinationFile(workingFile1, destinationFile);
-                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
-                return actionResult = ActionResult.Success;
-            }
-            catch (AggregateException ex)
-            {
-                if (destinationFile.Exists)
+                    logWriter.WriteLog(ex);
+                    return actionResult = ActionResult.Failed;
+                }
+                finally
                 {
-                    DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"" });
-                }
+                    if (workingFile1.Exists)
+                    {
+                        DeleteFileSafety(workingFile1);
+                        logWriter.WriteLog(LogCategory.Information, $"File was deleted: \"{workingFile1.FullName}\"");
+                    }
 
-                ExternalCommand.ReportAggregateException(logFile, ex);
-                return actionResult = ActionResult.Failed;
-            }
-            catch (Exception ex)
-            {
-                if (destinationFile.Exists)
-                {
-                    DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"" });
-                }
+                    if (workingFile2.Exists)
+                    {
+                        DeleteFileSafety(workingFile2);
+                        logWriter.WriteLog(LogCategory.Information, $"File was deleted: \"{workingFile2.FullName}\"");
+                    }
 
-                ExternalCommand.ReportException(logFile, ex);
-                return actionResult = ActionResult.Failed;
+                    switch (actionResult)
+                    {
+                        case ActionResult.Success:
+                            logWriter.WriteLog(LogCategory.Information, $"The movie file was successfully converted.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"");
+                            break;
+                        case ActionResult.Failed:
+                            logWriter.WriteLog(LogCategory.Error, $"Failed to convert the movie file.: \"{sourceFile.FullName}\"");
+                            break;
+                        case ActionResult.Cancelled:
+                            logWriter.WriteLog(LogCategory.Information, $"Movie file conversion was interrupted by the user.: \"{sourceFile.FullName}\"");
+                            break;
+                        default:
+                            break;
+                    }
+                }
             }
             finally
             {
-                if (workingFile1.Exists)
-                {
-                    DeleteFileSafety(workingFile1);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile1.FullName}\"", });
-                }
-
-                if (workingFile2.Exists)
-                {
-                    DeleteFileSafety(workingFile2);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile2.FullName}\"", });
-                }
-
                 switch (actionResult)
                 {
                     case ActionResult.Success:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: The movie file was successfully converted.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? ""}\"", });
                         FinalizeLogFile(logFile, "OK");
                         break;
                     case ActionResult.Skipped:
                         CleanUpLogFile(logFile);
                         break;
                     case ActionResult.Failed:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Failed to convert the movie file.: \"{sourceFile.FullName}\"", });
                         FinalizeLogFile(logFile, "NG");
-                        break;
-                    case ActionResult.Cancelled:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Movie file conversion was interrupted by the user.: \"{sourceFile.FullName}\"", });
                         break;
                     default:
                         break;
@@ -396,307 +377,306 @@ namespace MatroskaBatchToolBox
             var videoEncoder = localSettings.FfmpegVideoEncoder;
             var logFile = new FilePath(sourceFile.FullName + ".log");
             CleanUpLogFile(logFile);
-            var calculateVmafScore = localSettings.CalculateVmafScore;
-            if (calculateVmafScore && (localSettings.Cropping is not null || localSettings.Trimming is not null))
-            {
-                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: WARNING: The \"calculate_vmaf_score\" property is set to true, but the \"cropping\" or \"trimming\" option is specified, so the VMAF score is not calculated." });
-                calculateVmafScore = false;
-            }
-
-            var (isParsedSuccessfully, resolutionSpec, aspectRatioSpec, aspectRatioSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
-            if (!isParsedSuccessfully || resolutionSpec is null || aspectRatioSpec is null)
-            {
-                // 親ディレクトの名前が解像度(およびアスペクト比の指定)ではないので、何もせず復帰する。
-                return ActionResult.Skipped;
-            }
-
-            var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRatioSpecOnFileSystem, $"{videoEncoder.ToFormatName()} CRF");
-            var destinationFile = sourceFile.Directory.GetFile(destinationFileName);
-            var workingFile1 = sourceFile.Directory.GetFile($".work.resize-resolution-1.{sourceFile.Name}.mkv");
-            var workingFile2 = sourceFile.Directory.GetFile($".work.resize-resolution-2.{sourceFile.Name}.mkv");
-            DeleteFileSafety(workingFile1);
-            DeleteFileSafety(workingFile2);
             var actionResult = ActionResult.Failed;
-            FilePath? actualDestinationFilePath = null;
             try
             {
-                if (_encodedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                using var logWriter = logFile.AppendText().AsValidationLogger();
+                var calculateVmafScore = localSettings.CalculateVmafScore;
+                if (calculateVmafScore && (localSettings.Cropping is not null || localSettings.Trimming is not null))
                 {
-                    // ファイル名に既にエンコードされているマーク文字列があるので、何もせずに復帰する。
+                    logWriter.WriteLog(LogCategory.Warning, "The \"calculate_vmaf_score\" property is set to true, but the \"cropping\" or \"trimming\" option is specified, so the VMAF score is not calculated.");
+                    calculateVmafScore = false;
+                }
+
+                var (isParsedSuccessfully, resolutionSpec, aspectRatioSpec, aspectRatioSpecOnFileSystem) = ParseConversionSpecText(conversionSpec);
+                if (!isParsedSuccessfully || resolutionSpec is null || aspectRatioSpec is null)
+                {
+                    // 親ディレクトの名前が解像度(およびアスペクト比の指定)ではないので、何もせず復帰する。
                     return actionResult = ActionResult.Skipped;
                 }
 
-                if (string.Equals(destinationFileName, sourceFile.Name, StringComparison.InvariantCultureIgnoreCase))
+                var destinationFileName = ReplaceResolutionSpecInFileName(sourceFile.Name, resolutionSpec, aspectRatioSpecOnFileSystem, $"{videoEncoder.ToFormatName()} CRF");
+                var destinationFile = sourceFile.Directory.GetFile(destinationFileName);
+                var workingFile1 = sourceFile.Directory.GetFile($".work.resize-resolution-1.{sourceFile.Name}.mkv");
+                var workingFile2 = sourceFile.Directory.GetFile($".work.resize-resolution-2.{sourceFile.Name}.mkv");
+                DeleteFileSafety(workingFile1);
+                DeleteFileSafety(workingFile2);
+                var actualDestinationFilePath = (FilePath?)null;
+                try
                 {
-                    // 入力ファイルと出力ファイルのファイル名が一致しているので、何もせず復帰する。
-                    return actionResult = ActionResult.Skipped;
-                }
+                    if (GetEncodedFileNamePattern().IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                    {
+                        // ファイル名に既にエンコードされているマーク文字列があるので、何もせずに復帰する。
+                        return actionResult = ActionResult.Skipped;
+                    }
 
-                if (destinationFile.Exists)
-                {
-                    // 出力先ファイルが既に存在しているので、何もせず復帰する。
-                    return actionResult = ActionResult.Skipped;
-                }
+                    if (string.Equals(destinationFileName, sourceFile.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 入力ファイルと出力ファイルのファイル名が一致しているので、何もせず復帰する。
+                        return actionResult = ActionResult.Skipped;
+                    }
 
-                if (_duplicatedFileNamePattern.IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                    if (destinationFile.Exists)
+                    {
+                        // 出力先ファイルが既に存在しているので、何もせず復帰する。
+                        return actionResult = ActionResult.Skipped;
+                    }
+
+                    if (GetDuplicatedFileNamePattern().IsMatch(Path.GetFileNameWithoutExtension(sourceFile.Name)))
+                    {
+                        // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
+                        logWriter.WriteLog(LogCategory.Error, $"Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"");
+                        return actionResult = ActionResult.Failed;
+                    }
+
+                    var movieInfo =
+                        Command.GetMovieInformation(
+                            null,
+                            sourceFile,
+                            MovieInformationType.Streams | MovieInformationType.Chapters,
+                            logWriter.WriteLog);
+
+                    if (CheckingForNeedToDoMultiStepConversion(localSettings, movieInfo))
+                    {
+                        if (calculateVmafScore)
+                        {
+                            var stepWeight1 = 1.0;
+                            var stepWeight2 = 0.1;
+                            var stepWeight3 = 1.0;
+                            var totalWeight = stepWeight1 + stepWeight2 + stepWeight3;
+
+                            // 第1段階: エンコードとメタデータの削除 (progress の重みづけ: 1)
+                            var commandResult1 =
+                                ExternalCommand.ConvertMovieFile(
+                                    localSettings,
+                                    logWriter,
+                                    sourceFile,
+                                    movieInfo,
+                                    resolutionSpec,
+                                    aspectRatioSpec,
+                                    videoEncoder,
+                                    true,
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    workingFile2,
+                                    new Progress<double>(progress => progressReporter.Report((0.0 + progress * stepWeight1) / totalWeight)));
+                            if (commandResult1 == CommandResultCode.Cancelled)
+                                return actionResult = ActionResult.Cancelled;
+
+                            // 第2段階: ストリームの単純コピーと最低限のメタデータ(チャプタータイトル含む)の付加 (progress の重みづけ: 0.1)
+                            var commandResult2 =
+                                ExternalCommand.ConvertMovieFile(
+                                    localSettings,
+                                    logWriter,
+                                    workingFile2,
+                                    movieInfo,
+                                    null,
+                                    null,
+                                    VideoEncoderType.Copy,
+                                    false,
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    workingFile1,
+                                    new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress * stepWeight2) / totalWeight)));
+                            if (commandResult2 == CommandResultCode.Cancelled)
+                                return actionResult = ActionResult.Cancelled;
+
+                            // 第3段階: VMAFスコアの計算 (progress の重みづけ: 1)
+                            var commandResult3 =
+                                ExternalCommand.CalculateVmafScoreFromMovieFile(
+                                    logWriter,
+                                    sourceFile,
+                                    workingFile1,
+                                    resolutionSpec,
+                                    out var vmafScore,
+                                    new Progress<double>(progress => progressReporter.Report((stepWeight1 + stepWeight2 + progress * stepWeight3) / totalWeight)));
+                            if (commandResult3 == CommandResultCode.Cancelled)
+                                return actionResult = ActionResult.Cancelled;
+
+                            logWriter.WriteLog(LogCategory.Information, $"VMAF Score: {vmafScore:F6}");
+                        }
+                        else
+                        {
+                            var stepWeight1 = 1.0;
+                            var stepWeight2 = 0.1;
+                            var totalWeight = stepWeight1 + stepWeight2;
+
+                            // 第1段階: エンコードとメタデータの削除 (progress の重みづけ: 1)
+                            var commandResult1 =
+                                ExternalCommand.ConvertMovieFile(
+                                    localSettings,
+                                    logWriter,
+                                    sourceFile,
+                                    movieInfo,
+                                    resolutionSpec,
+                                    aspectRatioSpec,
+                                    videoEncoder,
+                                    true,
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    workingFile2,
+                                    new Progress<double>(progress => progressReporter.Report((0.0 + progress * stepWeight1) / totalWeight)));
+                            if (commandResult1 == CommandResultCode.Cancelled)
+                                return actionResult = ActionResult.Cancelled;
+
+                            // 第2段階: ストリームの単純コピーと最低限のメタデータ(チャプタータイトル含む)の付加 (progress の重みづけ: 0.1)
+                            var commandResult2 =
+                                ExternalCommand.ConvertMovieFile(
+                                    localSettings,
+                                    logWriter,
+                                    workingFile2,
+                                    movieInfo,
+                                    null,
+                                    null,
+                                    VideoEncoderType.Copy,
+                                    false,
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    workingFile1,
+                                    new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress * stepWeight2) / totalWeight)));
+                            if (commandResult2 == CommandResultCode.Cancelled)
+                                return actionResult = ActionResult.Cancelled;
+                        }
+                    }
+                    else
+                    {
+                        // このルートでは以下の理由によりチャプタータイトルの再設定はしない。
+                        //   a) チャプターそのものを削除する指定がされている、または
+                        //   b) メタデータを削除する指定がされていない、または
+                        //   c) チャプタータイトルを保持しない指定がされている、または
+                        //   d) チャプタータイトルが元々全く存在しない。
+                        if (calculateVmafScore)
+                        {
+                            var stepWeight1 = 1.0;
+                            var stepWeight2 = 1.0;
+                            var totalWeight = stepWeight1 + stepWeight2;
+
+                            // 第1段階: エンコード (progress の重みづけ: 1.0)
+                            var commandResult1 =
+                                ExternalCommand.ConvertMovieFile(
+                                    localSettings,
+                                    logWriter,
+                                    sourceFile,
+                                    movieInfo,
+                                    resolutionSpec,
+                                    aspectRatioSpec,
+                                    videoEncoder,
+                                    localSettings.DeleteMetadata,
+                                    true,
+                                    true,
+                                    false,
+                                    false,
+                                    workingFile1,
+                                    new Progress<double>(progress => progressReporter.Report((0.0 + progress) / totalWeight)));
+                            if (commandResult1 == CommandResultCode.Cancelled)
+                                return actionResult = ActionResult.Cancelled;
+
+                            // 第2段階: VMAFスコアの計算 (progress の重みづけ: 1)
+                            var commandResult2 =
+                                ExternalCommand.CalculateVmafScoreFromMovieFile(
+                                    logWriter,
+                                    sourceFile,
+                                    workingFile1,
+                                    resolutionSpec,
+                                    out var vmafScore,
+                                    new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress) / totalWeight)));
+                            if (commandResult2 == CommandResultCode.Cancelled)
+                                return actionResult = ActionResult.Cancelled;
+                            logWriter.WriteLog(LogCategory.Information, $"VMAF Score: {vmafScore:F6}");
+                        }
+                        else
+                        {
+                            var commandResult1 =
+                                ExternalCommand.ConvertMovieFile(
+                                    localSettings,
+                                    logWriter,
+                                    sourceFile,
+                                    movieInfo,
+                                    resolutionSpec,
+                                    aspectRatioSpec,
+                                    videoEncoder,
+                                    localSettings.DeleteMetadata,
+                                    true,
+                                    true,
+                                    false,
+                                    false,
+                                    workingFile1,
+                                    progressReporter);
+                            if (commandResult1 == CommandResultCode.Cancelled)
+                                return actionResult = ActionResult.Cancelled;
+                        }
+                    }
+
+                    actualDestinationFilePath = MoveToDestinationFile(workingFile1, destinationFile);
+                    logWriter.WriteLog(LogCategory.Information, $"File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\".");
+                    return actionResult = ActionResult.Success;
+                }
+                catch (Exception ex)
                 {
-                    // 入力ファイル名の末尾が " (<数字列>)" で終わっているので、ログを残した後にエラーで復帰する。
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Movie files with file names ending with \" (<digits>)\" will not be converted.: \"{sourceFile.FullName}\"", });
+                    if (destinationFile.Exists)
+                    {
+                        DeleteFileSafety(destinationFile);
+                        logWriter.WriteLog(LogCategory.Information, $"File was deleted: \"{destinationFile.FullName}\"");
+                    }
+
+                    logWriter.WriteLog(ex);
                     return actionResult = ActionResult.Failed;
                 }
-
-                var movieInfo =
-                    Command.GetMovieInformation(
-                        null,
-                        sourceFile,
-                        MovieInformationType.Streams | MovieInformationType.Chapters,
-                        (level, message) =>
-                            ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: {level}: {message}" }));
-
-                if (CheckingForNeedToDoMultiStepConversion(localSettings, movieInfo))
+                finally
                 {
-                    if (calculateVmafScore)
+                    if (workingFile1.Exists)
                     {
-                        var stepWeight1 = 1.0;
-                        var stepWeight2 = 0.1;
-                        var stepWeight3 = 1.0;
-                        var totalWeight = stepWeight1 + stepWeight2 + stepWeight3;
-
-                        // 第1段階: エンコードとメタデータの削除 (progress の重みづけ: 1)
-                        var commandResult1 =
-                            ExternalCommand.ConvertMovieFile(
-                                localSettings,
-                                logFile,
-                                sourceFile,
-                                movieInfo,
-                                resolutionSpec,
-                                aspectRatioSpec,
-                                videoEncoder,
-                                true,
-                                false,
-                                false,
-                                false,
-                                false,
-                                workingFile2,
-                                new Progress<double>(progress => progressReporter.Report((0.0 + progress * stepWeight1) / totalWeight)));
-                        if (commandResult1 == CommandResultCode.Cancelled)
-                            return actionResult = ActionResult.Cancelled;
-
-                        // 第2段階: ストリームの単純コピーと最低限のメタデータ(チャプタータイトル含む)の付加 (progress の重みづけ: 0.1)
-                        var commandResult2 =
-                            ExternalCommand.ConvertMovieFile(
-                                localSettings,
-                                logFile,
-                                workingFile2,
-                                movieInfo,
-                                null,
-                                null,
-                                VideoEncoderType.Copy,
-                                false,
-                                true,
-                                true,
-                                true,
-                                true,
-                                workingFile1,
-                                new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress * stepWeight2) / totalWeight)));
-                        if (commandResult2 == CommandResultCode.Cancelled)
-                            return actionResult = ActionResult.Cancelled;
-
-                        // 第3段階: VMAFスコアの計算 (progress の重みづけ: 1)
-                        var commandResult3 =
-                            ExternalCommand.CalculateVmafScoreFromMovieFile(
-                                logFile,
-                                sourceFile,
-                                workingFile1,
-                                resolutionSpec,
-                                out double vmafScore,
-                                new Progress<double>(progress => progressReporter.Report((stepWeight1 + stepWeight2 + progress * stepWeight3) / totalWeight)));
-                        if (commandResult3 == CommandResultCode.Cancelled)
-                            return actionResult = ActionResult.Cancelled;
-
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: VMAF Score: {vmafScore:F6}" });
+                        DeleteFileSafety(workingFile1);
+                        logWriter.WriteLog(LogCategory.Information, $"File was deleted: \"{workingFile1.FullName}\"");
                     }
-                    else
+
+                    if (workingFile2.Exists)
                     {
-                        var stepWeight1 = 1.0;
-                        var stepWeight2 = 0.1;
-                        var totalWeight = stepWeight1 + stepWeight2;
+                        DeleteFileSafety(workingFile2);
+                        logWriter.WriteLog(LogCategory.Information, $"File was deleted: \"{workingFile2.FullName}\"");
+                    }
 
-                        // 第1段階: エンコードとメタデータの削除 (progress の重みづけ: 1)
-                        var commandResult1 =
-                            ExternalCommand.ConvertMovieFile(
-                                localSettings,
-                                logFile,
-                                sourceFile,
-                                movieInfo,
-                                resolutionSpec,
-                                aspectRatioSpec,
-                                videoEncoder,
-                                true,
-                                false,
-                                false,
-                                false,
-                                false,
-                                workingFile2,
-                                new Progress<double>(progress => progressReporter.Report((0.0 + progress * stepWeight1) / totalWeight)));
-                        if (commandResult1 == CommandResultCode.Cancelled)
-                            return actionResult = ActionResult.Cancelled;
-
-                        // 第2段階: ストリームの単純コピーと最低限のメタデータ(チャプタータイトル含む)の付加 (progress の重みづけ: 0.1)
-                        var commandResult2 =
-                            ExternalCommand.ConvertMovieFile(
-                                localSettings,
-                                logFile,
-                                workingFile2,
-                                movieInfo,
-                                null,
-                                null,
-                                VideoEncoderType.Copy,
-                                false,
-                                true,
-                                true,
-                                true,
-                                true,
-                                workingFile1,
-                                new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress * stepWeight2) / totalWeight)));
-                        if (commandResult2 == CommandResultCode.Cancelled)
-                            return actionResult = ActionResult.Cancelled;
+                    switch (actionResult)
+                    {
+                        case ActionResult.Success:
+                            logWriter.WriteLog(LogCategory.Information, $"The video resolution of the movie fie was successfully changed.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? "<???>"}\"");
+                            logWriter.WriteLog(LogCategory.Information, $"Source file: \"{sourceFile.FullName}\"");
+                            logWriter.WriteLog(LogCategory.Information, $"Source file size: {sourceFile.Length:N0}[bytes]");
+                            logWriter.WriteLog(LogCategory.Information, $"Destination file: \"{actualDestinationFilePath?.FullName ?? "<???>"}\"");
+                            logWriter.WriteLog(LogCategory.Information, $"Destination file size: {actualDestinationFilePath?.Length ?? 0:N0}[bytes]");
+                            logWriter.WriteLog(LogCategory.Information, $"Compression ratio (<Destination file size> / <Source file size>): {(actualDestinationFilePath is not null ? (100.0 * actualDestinationFilePath.Length / sourceFile.Length).ToString("F2", CultureInfo.InvariantCulture) : "<???>")}%");
+                            break;
+                        case ActionResult.Failed:
+                            logWriter.WriteLog(LogCategory.Error, $"Failed to change the video resolution of the movie file.: \"{sourceFile.FullName}\"");
+                            break;
+                        case ActionResult.Cancelled:
+                            logWriter.WriteLog(LogCategory.Information, $"Changing the video resolution of the movie file was interrupted by the user.: \"{sourceFile.FullName}\"");
+                            break;
+                        default:
+                            break;
                     }
                 }
-                else
-                {
-                    // このルートでは以下の理由によりチャプタータイトルの再設定はしない。
-                    //   a) チャプターそのものを削除する指定がされている、または
-                    //   b) メタデータを削除する指定がされていない、または
-                    //   c) チャプタータイトルを保持しない指定がされている、または
-                    //   d) チャプタータイトルが元々全く存在しない。
-                    if (calculateVmafScore)
-                    {
-                        var stepWeight1 = 1.0;
-                        var stepWeight2 = 1.0;
-                        var totalWeight = stepWeight1 + stepWeight2;
-
-                        // 第1段階: エンコード (progress の重みづけ: 1.0)
-                        var commandResult1 =
-                            ExternalCommand.ConvertMovieFile(
-                                localSettings,
-                                logFile,
-                                sourceFile,
-                                movieInfo,
-                                resolutionSpec,
-                                aspectRatioSpec,
-                                videoEncoder,
-                                localSettings.DeleteMetadata,
-                                true,
-                                true,
-                                false,
-                                false,
-                                workingFile1,
-                                new Progress<double>(progress => progressReporter.Report((0.0 + progress) / totalWeight)));
-                        if (commandResult1 == CommandResultCode.Cancelled)
-                            return actionResult = ActionResult.Cancelled;
-
-                        // 第2段階: VMAFスコアの計算 (progress の重みづけ: 1)
-                        var commandResult2 =
-                            ExternalCommand.CalculateVmafScoreFromMovieFile(
-                                logFile,
-                                sourceFile,
-                                workingFile1,
-                                resolutionSpec,
-                                out double vmafScore,
-                                new Progress<double>(progress => progressReporter.Report((stepWeight1 + progress) / totalWeight)));
-                        if (commandResult2 == CommandResultCode.Cancelled)
-                            return actionResult = ActionResult.Cancelled;
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: VMAF Score: {vmafScore:F6}" });
-                    }
-                    else
-                    {
-                        var commandResult1 =
-                            ExternalCommand.ConvertMovieFile(
-                                localSettings,
-                                logFile,
-                                sourceFile,
-                                movieInfo,
-                                resolutionSpec,
-                                aspectRatioSpec,
-                                videoEncoder,
-                                localSettings.DeleteMetadata,
-                                true,
-                                true,
-                                false,
-                                false,
-                                workingFile1,
-                                progressReporter);
-                        if (commandResult1 == CommandResultCode.Cancelled)
-                            return actionResult = ActionResult.Cancelled;
-                    }
-                }
-
-                actualDestinationFilePath = MoveToDestinationFile(workingFile1, destinationFile);
-                ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File moved from \"{workingFile1.FullName}\" to \"{actualDestinationFilePath.FullName}\"." });
-                return actionResult = ActionResult.Success;
-            }
-            catch (AggregateException ex)
-            {
-                if (destinationFile.Exists)
-                {
-                    DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"" });
-                }
-
-                ExternalCommand.ReportAggregateException(logFile, ex);
-                return actionResult = ActionResult.Failed;
-            }
-            catch (Exception ex)
-            {
-                if (destinationFile.Exists)
-                {
-                    DeleteFileSafety(destinationFile);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{destinationFile.FullName}\"" });
-                }
-
-                ExternalCommand.ReportException(logFile, ex);
-                return actionResult = ActionResult.Failed;
             }
             finally
             {
-                if (workingFile1.Exists)
-                {
-                    DeleteFileSafety(workingFile1);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile1.FullName}\"", });
-                }
-
-                if (workingFile2.Exists)
-                {
-                    DeleteFileSafety(workingFile2);
-                    ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: File was deleted: \"{workingFile2.FullName}\"", });
-                }
-
                 switch (actionResult)
                 {
                     case ActionResult.Success:
-                        ExternalCommand.Log(
-                            logFile,
-                            new[]
-                            {
-                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: The video resolution of the movie fie was successfully changed.: from \"{sourceFile.FullName}\" to \"{actualDestinationFilePath?.FullName ?? "<???>"}\"",
-                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Source file: \"{sourceFile.FullName}\"",
-                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Source file size: {sourceFile.Length:N0}[bytes]",
-                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Destination file: \"{actualDestinationFilePath?.FullName ?? "<???>"}\"",
-                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Destination file size: {actualDestinationFilePath?.Length ?? 0:N0}[bytes]",
-                                $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Compression ratio (<Destination file size> / <Source file size>): {(actualDestinationFilePath is not null ? (100.0 * actualDestinationFilePath.Length / sourceFile.Length).ToString("F2") : "<???>" )}%",
-                            });
                         FinalizeLogFile(logFile, "OK");
                         break;
                     case ActionResult.Skipped:
                         CleanUpLogFile(logFile);
                         break;
                     case ActionResult.Failed:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}: ERROR: Failed to change the video resolution of the movie file.: \"{sourceFile.FullName}\"", });
                         FinalizeLogFile(logFile, "NG");
-                        break;
-                    case ActionResult.Cancelled:
-                        ExternalCommand.Log(logFile, new[] { $"{nameof(MatroskaBatchToolBox)}:INFORMATION: Changing the video resolution of the movie file was interrupted by the user.: \"{sourceFile.FullName}\"", });
                         break;
                     default:
                         break;
@@ -706,7 +686,7 @@ namespace MatroskaBatchToolBox
 
         private static (bool success, string? resolutionSpec, string? aspectRatioSpec, string? aspectRatioSpecOnFileSystem) ParseConversionSpecText(string conversionSpec)
         {
-            var resolutionSpecMatch = _startsWithResolutionSpecPattern.Match(conversionSpec);
+            var resolutionSpecMatch = GetStartsWithResolutionSpecPattern().Match(conversionSpec);
             if (conversionSpec.Length <= 0)
                 return (true, null, null, null);
             if (!resolutionSpecMatch.Success)
@@ -720,7 +700,7 @@ namespace MatroskaBatchToolBox
             var resolutionWidth = resolutionSpecMatch.Groups["resolutionWidth"].Value.ParseAsInt32();
             var resolutionHeight = resolutionSpecMatch.Groups["resolutionHeight"].Value.ParseAsInt32();
             conversionSpec = conversionSpec[resolutionSpecMatch.Length..];
-            if (conversionSpec.Length <= 0 || _startsWithCommentPattern.IsMatch(conversionSpec))
+            if (conversionSpec.Length <= 0 || GetStartsWithCommentPattern().IsMatch(conversionSpec))
             {
                 // 解像度指定で終わっている、または次がコメントである場合
 
@@ -732,7 +712,7 @@ namespace MatroskaBatchToolBox
             }
 
             // 解像度指定の後に続きがある場合
-            var separaterMatch = _startsWithSeparaterBetweenResolutionSpecAndAspectRatioPattern.Match(conversionSpec);
+            var separaterMatch = GetStartsWithSeparaterBetweenResolutionSpecAndAspectRatioPattern().Match(conversionSpec);
             if (!separaterMatch.Success)
             {
                 // 解像度指定の後がセパレータではない場合(構文ミス)
@@ -742,7 +722,7 @@ namespace MatroskaBatchToolBox
 
             // 解像度指定の後にセパレータがある場合
             conversionSpec = conversionSpec[separaterMatch.Length..];
-            var matchAspectRatioSpecMatch = _startsWithAspectRatioSpecPattern.Match(conversionSpec);
+            var matchAspectRatioSpecMatch = GetStartsWithAspectRatioSpecPattern().Match(conversionSpec);
             if (!matchAspectRatioSpecMatch.Success)
             {
                 // セパレータの後がアスペクト比ではない場合(構文ミス)
@@ -751,7 +731,7 @@ namespace MatroskaBatchToolBox
             }
             // セパレータの後がアスペクト比である場合
             conversionSpec = conversionSpec[matchAspectRatioSpecMatch.Length..];
-            if (conversionSpec.Length > 0 && !_startsWithCommentPattern.IsMatch(conversionSpec))
+            if (conversionSpec.Length > 0 && !GetStartsWithCommentPattern().IsMatch(conversionSpec))
             {
                 // アスペクト比の後にコメント以外の続きがある場合(構文ミス)
 
@@ -785,7 +765,8 @@ namespace MatroskaBatchToolBox
             }
             else
             {
-                throw Validation.GetFailErrorException("_startsWithAspectRatioSpecPattern.Match(conversionSpec).Success == true なので、このルートには到達しないはず");
+                // GetStartsWithAspectRatioSpecPattern().Match(conversionSpec).Success == true なので、このルートには到達しないはず
+                throw Validation.GetFailErrorException();
             }
         }
 
@@ -802,14 +783,14 @@ namespace MatroskaBatchToolBox
                     : $"{Path.GetFileNameWithoutExtension(sourceFileName)} [{encoderDescription}].mkv";
             }
 
-            var matches = _resolutionAndAspectRatioSpecInFileNamePattern.Matches(sourceFileName);
+            var matches = GetResolutionAndAspectRatioSpecInFileNamePattern().Matches(sourceFileName);
             if (matches.Count == 1)
             {
                 // 入力元ファイル名に解像度・アスペクト比指定がただ一つだけある場合
 
                 // 入力ファイル名のの解像度・アスペクト比指定を変換先の解像度・アスペクト比指定に置き換える
                 var replacedFileName =
-                    _resolutionAndAspectRatioSpecInFileNamePattern.Replace(
+                    GetResolutionAndAspectRatioSpecInFileNamePattern().Replace(
                         Path.GetFileNameWithoutExtension(sourceFileName),
                         match =>
                         {
@@ -892,7 +873,7 @@ namespace MatroskaBatchToolBox
                 }
                 catch (FileNotFoundException ex)
                 {
-                    throw new Exception("The source file was lost for some reason.", ex);
+                    throw new ApplicationException("The source file was lost for some reason.", ex);
                 }
                 catch (IOException)
                 {
@@ -932,5 +913,32 @@ namespace MatroskaBatchToolBox
 
         private static FilePath ConstructLogFilePath(FilePath logFile, string result)
             => logFile.Directory.GetFile($"{Path.GetFileNameWithoutExtension(logFile.Name)}.{result}{logFile.Extension}");
+
+        [GeneratedRegex(@" \(\d+\)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetDuplicatedFileNamePattern();
+
+        [GeneratedRegex(@"(?<prefix>\[([^\]]*? )?)audio-normalized(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetNormalizedFileNamePattern();
+
+        [GeneratedRegex(@"(?<prefix>\[([^\]]*? )?)(H\.264|x264|MPEG\-4|AVC|H\.265|x265|HEVC|AV1) (CRF|crf)(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetEncodedFileNamePattern();
+
+        [GeneratedRegex("^((?<convertMode>==))", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetStartsWithConvertModeSymbolPattern();
+
+        [GeneratedRegex(@"^((?<resolutionWidth>\d+)x(?<resolutionHeight>\d+))", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetStartsWithResolutionSpecPattern();
+
+        [GeneratedRegex(@"^( +|\-|_)", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetStartsWithSeparaterBetweenResolutionSpecAndAspectRatioPattern();
+
+        [GeneratedRegex(@"^(((?<aspectRatioWidth>\d+)(?<aspectRatioSeparater>to|：|:)(?<aspectRatioHeight>\d+))|(?<aspectRatioValue>\d+\.\d+))", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetStartsWithAspectRatioSpecPattern();
+
+        [GeneratedRegex("^ *#", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetStartsWithCommentPattern();
+
+        [GeneratedRegex(@"(?<prefix>\[([^\]]*? )?)(?<resolutionAndAspectRatioSpec>((\d+)x(\d+))( (((\d+)(to|：|:)(\d+))|(\d+\.\d+)))?)(?<suffix>( [^\]]*)?\])", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetResolutionAndAspectRatioSpecInFileNamePattern();
     }
 }

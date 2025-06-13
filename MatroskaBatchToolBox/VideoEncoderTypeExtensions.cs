@@ -15,7 +15,7 @@ namespace MatroskaBatchToolBox
                 VideoEncoderType.Libx264 => "H.264",
                 VideoEncoderType.Libx265 => "H.265",
                 VideoEncoderType.LibaomAv1 => "AV1",
-                _ => throw new Exception($"Unsupported video codec.: \"{videoEncoderType}\""),
+                _ => throw new ApplicationException($"Unsupported video codec.: \"{videoEncoderType}\""),
             };
 
         public static IEnumerable<string> GetEncoderOptions(this VideoEncoderType videoEncoderType, Settings localSettings, int outputStreamIndexWithinVideoStreams)
@@ -52,7 +52,7 @@ namespace MatroskaBatchToolBox
                         options.Add(localSettings.FfmpegLibx265EncoderOption);
                     break;
                 default:
-                    throw new Exception($"Unsupported video codec.: \"{videoEncoderType}\"");
+                    throw new ApplicationException($"Unsupported video codec.: \"{videoEncoderType}\"");
             }
 
             return options;

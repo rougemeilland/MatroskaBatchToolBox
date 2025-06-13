@@ -5,7 +5,7 @@ namespace MatroskaBatchToolBox.Model.Json
     [JsonSourceGenerationOptions(WriteIndented = true)]
     [JsonSerializable(typeof(GlobalSettingsContainer))]
     [JsonSerializable(typeof(LocalSettingsContainer))]
-    internal partial class SettingsSourceGenerator
+    internal sealed partial class SettingsSourceGenerator
         : JsonSerializerContext
     {
     }

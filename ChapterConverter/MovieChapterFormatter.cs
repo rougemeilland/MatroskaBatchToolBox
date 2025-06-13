@@ -7,7 +7,7 @@ using Palmtree.IO;
 
 namespace ChapterConverter
 {
-    internal class MovieChapterFormatter
+    internal sealed class MovieChapterFormatter
          : ChapterFormatter
     {
         public MovieChapterFormatter(ChapterFormatterParameter parameter)
@@ -25,7 +25,7 @@ namespace ChapterConverter
                     MovieInformationType.Chapters,
                     (level, message) =>
                     {
-                        if (level != "INFORMATION")
+                        if (level != Palmtree.LogCategory.Information)
                             Parameter.ReportWarningMessage(message);
                     });
             return

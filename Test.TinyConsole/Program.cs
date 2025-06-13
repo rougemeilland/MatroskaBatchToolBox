@@ -5,16 +5,10 @@ using Palmtree;
 
 namespace Test.TinyConsole
 {
-    internal static class Program
+    internal static partial class Program
     {
-        private static readonly Regex _testNumberRegionPattern;
-        private static readonly Func<int, TestItemDirection>[] _testActions;
-
-        static Program()
-        {
-            _testNumberRegionPattern = new Regex(@"^((?<start0>\d+)|(?<start1>\d+)-|(?<start2>\d+)-(?<end1>\d+)|-(?<end2>\d+))$", RegexOptions.Compiled);
-            _testActions = new Func<int, TestItemDirection>[]
-            {
+        private static readonly Func<int, TestItemDirection>[] _testActions =
+            [
                 TestActions.Test_前景色の変更,
                 TestActions.Test_背景色の変更,
                 TestActions.Test_カーソル可視の変更,
@@ -30,12 +24,11 @@ namespace Test.TinyConsole
                 TestActions.Test_画面部分消去_FromBeggingOfScreenToCursor,
                 TestActions.Test_画面部分消去_FromCursorToEndOfLine,
                 TestActions.Test_画面部分消去_FromCursorToEndOfScreen,
-            };
-        }
+            ];
 
         private static int Main(string[] args)
         {
-            var match = _testNumberRegionPattern.Match(args.Length >= 1 ? args[0] : "1-");
+            var match = GetTestNumberRegionPattern().Match(args.Length >= 1 ? args[0] : "1-");
             if (!match.Success)
                 return 1;
 
@@ -44,23 +37,23 @@ namespace Test.TinyConsole
 
             if (match.Groups["start0"].Success)
             {
-                start = int.Parse(match.Groups["start0"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                start = int.Parse(match.Groups["start0"].Value, NumberStyles.None, CultureInfo.InvariantCulture);
                 end = start;
             }
             else if (match.Groups["start1"].Success)
             {
-                start = int.Parse(match.Groups["start1"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                start = int.Parse(match.Groups["start1"].Value, NumberStyles.None, CultureInfo.InvariantCulture);
                 end = _testActions.Length;
             }
             else if (match.Groups["start2"].Success)
             {
-                start = int.Parse(match.Groups["start2"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
-                end = int.Parse(match.Groups["end1"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                start = int.Parse(match.Groups["start2"].Value, NumberStyles.None, CultureInfo.InvariantCulture);
+                end = int.Parse(match.Groups["end1"].Value, NumberStyles.None, CultureInfo.InvariantCulture);
             }
             else if (match.Groups["end2"].Success)
             {
                 start = 1;
-                end = int.Parse(match.Groups["end2"].Value, NumberStyles.None, CultureInfo.InvariantCulture.NumberFormat);
+                end = int.Parse(match.Groups["end2"].Value, NumberStyles.None, CultureInfo.InvariantCulture);
             }
             else
             {
@@ -94,5 +87,8 @@ namespace Test.TinyConsole
 
             return 0;
         }
+
+        [GeneratedRegex(@"^((?<start0>\d+)|(?<start1>\d+)-|(?<start2>\d+)-(?<end1>\d+)|-(?<end2>\d+))$", RegexOptions.ExplicitCapture | RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetTestNumberRegionPattern();
     }
 }

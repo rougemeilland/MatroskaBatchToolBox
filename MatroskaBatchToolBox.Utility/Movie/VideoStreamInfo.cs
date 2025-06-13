@@ -16,10 +16,10 @@ namespace MatroskaBatchToolBox.Utility.Movie
             IndexWithinVideoStream = indexWithinVideoStream;
             Width =
                 stream.Width
-                ?? throw new Exception($"Video stream #{indexWithinVideoStream} has no \"width\" property.");
+                ?? throw new ApplicationException($"Video stream #{indexWithinVideoStream} has no \"width\" property.");
             Height =
                 stream.Height
-                ?? throw new Exception($"Video stream #{indexWithinVideoStream} has no \"height\" property.");
+                ?? throw new ApplicationException($"Video stream #{indexWithinVideoStream} has no \"height\" property.");
             DisplayAspectRatio = stream.DisplayAspectRatio;
             Resolution = $"{Width}x{Height}";
             IsImageVideoStream =

@@ -1,19 +1,20 @@
 ﻿using System;
+using Palmtree;
 
 namespace ChapterConverter
 {
-    internal class ChapterFormatterParameter
+    internal sealed class ChapterFormatterParameter
     {
-        private readonly Action<string> _warningMessageReporter;
+        private readonly Action<LogCategory, string> _messageReporter;
 
-        public ChapterFormatterParameter(TimeSpan maximumDuration, Action<string> wainingMessageReporter)
+        public ChapterFormatterParameter(TimeSpan maximumDuration, Action<LogCategory, string> messageReporter)
         {
             MaximumDuration = maximumDuration;
-            _warningMessageReporter = wainingMessageReporter;
+            _messageReporter = messageReporter;
         }
 
         public TimeSpan MaximumDuration { get; }
 
-        public void ReportWarningMessage(string warningMessage) => _warningMessageReporter(warningMessage);
+        public void ReportWarningMessage(string warningMessage) => _messageReporter(LogCategory.Warning, warningMessage);
     }
 }
