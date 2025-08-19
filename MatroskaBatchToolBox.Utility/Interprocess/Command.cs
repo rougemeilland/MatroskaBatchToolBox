@@ -310,24 +310,24 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             Action<LogCategory, string> messageReporter,
             IChildProcessCancellable? childProcessCcanceller)
         {
-            standardInputRedirector ??= new TextInputRedirector(TinyConsole.ReadLine);
             standardOutputRedirector ??= new TextOutputRedirector(TinyConsole.WriteLine);
             standardErrorRedirector ??= new TextOutputRedirector(TinyConsole.WriteLine);
-            Validation.Assert(standardInputRedirector is not null);
+
             Validation.Assert(standardOutputRedirector is not null);
             Validation.Assert(standardErrorRedirector is not null);
+
             var processStartInfo =
                 new ProcessStartInfo
                 {
                     Arguments = args,
                     FileName = programFile.FullName,
                     CreateNoWindow = false,
-                    RedirectStandardError = true,
-                    RedirectStandardInput = true,
+                    RedirectStandardInput = standardInputRedirector is not null,
                     RedirectStandardOutput = true,
-                    StandardErrorEncoding = intpuEncoding ?? _defaultInputOutputEncoding,
-                    StandardInputEncoding = outputEncoding ?? _defaultInputOutputEncoding,
+                    RedirectStandardError = true,
+                    StandardInputEncoding = standardInputRedirector is not null ? ( intpuEncoding ?? _defaultInputOutputEncoding) : null,
                     StandardOutputEncoding = outputEncoding ?? _defaultInputOutputEncoding,
+                    StandardErrorEncoding = outputEncoding ?? _defaultInputOutputEncoding,
                     UseShellExecute = false,
                 };
             var process =
@@ -376,15 +376,24 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                         }
                     });
 
-                var standardInputRedirectorTask = Task.Run(standardInputRedirector.GetInputRedirector(process.StandardInput));
-                var standardOutputRedirectorTask = Task.Run(standardOutputRedirector.GetOutputRedirector(process.StandardOutput));
-                var standardErrorRedirectorTask = Task.Run(standardErrorRedirector.GetOutputRedirector(process.StandardError));
+                var standardInputRedirectorTask =
+                    standardInputRedirector is not null
+                    ? Task.Run(standardInputRedirector.GetInputRedirector(process.StandardInput))
+                    : null;
+                try
+                {
+                    using var standardOutputRedirectorTask = Task.Run(standardOutputRedirector.GetOutputRedirector(process.StandardOutput));
+                    using var standardErrorRedirectorTask = Task.Run(standardErrorRedirector.GetOutputRedirector(process.StandardError));
+                    standardInputRedirectorTask?.Wait();
+                    standardOutputRedirectorTask.Wait();
+                    standardErrorRedirectorTask.Wait();
+                    process.WaitForExit();
+                }
+                finally
+                {
+                    standardInputRedirectorTask?.Dispose();
+                }
 
-                standardInputRedirectorTask.Wait();
-                standardOutputRedirectorTask.Wait();
-                standardErrorRedirectorTask.Wait();
-
-                process.WaitForExit();
                 messageReporter(LogCategory.Information, $"Child process exited.: id={process.Id}, process-total-time={process.TotalProcessorTime.TotalSeconds:F2}[sec], \"{process.StartInfo.FileName}\" {process.StartInfo.Arguments}");
 
                 return

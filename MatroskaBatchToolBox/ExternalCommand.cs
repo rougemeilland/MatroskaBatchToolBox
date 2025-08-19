@@ -109,7 +109,7 @@ namespace MatroskaBatchToolBox
                             else
                             {
                                 // 上記以外のテキストの場合
-                                logWriter.WriteLog("", LogCategory.None, lineText);
+                                logWriter.WriteLog(null, LogCategory.None, lineText);
                             }
                         }),
                         logWriter.WriteLog,
@@ -365,8 +365,8 @@ namespace MatroskaBatchToolBox
                             string.Join(" ", commandParameters),
                             null,
                             null,
-                            lineText => logWriter.WriteLog("", LogCategory.None, lineText),
-                            logWriter.WriteLog,
+                            lineText => logWriter.WriteLog("ffmpeg", LogCategory.None, lineText),
+                            (category, lineText) => logWriter.WriteLog(null, category, lineText),
                             progressReporter);
                     logWriter.WriteLog(LogCategory.Information, $"ffmpeg exited with exit code {exitCode}.");
                     return
@@ -417,7 +417,7 @@ namespace MatroskaBatchToolBox
                         null,
                         lineText =>
                         {
-                            logWriter.WriteLog("", LogCategory.None, lineText);
+                            logWriter.WriteLog(null, LogCategory.None, lineText);
                             var vmafSoreMatch = GetFfmpegVmafScoreCalculationResultPattern().Match(lineText);
                             if (vmafSoreMatch.Success)
                             {
@@ -425,7 +425,7 @@ namespace MatroskaBatchToolBox
                                 vmafScoreValue = vmafSoreMatch.Groups["vmafScoreValue"].Value.ParseAsDouble();
                             }
                         },
-                        logWriter.WriteLog,
+                        (category, lineText) => logWriter.WriteLog(null, category, lineText),
                         progressReporter);
                 logWriter.WriteLog(LogCategory.Information, $"ffmpeg exited with exit code {exitCode}.");
                 if (exitCode != 0)
@@ -453,7 +453,7 @@ namespace MatroskaBatchToolBox
 
             if (!lineText.StartsWith("frame=", StringComparison.InvariantCulture))
             {
-                logWriter.WriteLog("", LogCategory.None, lineText);
+                logWriter.WriteLog(null, LogCategory.None, lineText);
 
                 var durationMatch = GetFfmpegConversionDurationPattern().Match(lineText);
                 if (durationMatch.Success)
