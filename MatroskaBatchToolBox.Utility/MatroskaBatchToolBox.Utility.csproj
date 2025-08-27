@@ -18,10 +18,4 @@
     <PackageReference Include="Palmtree.Numerics" Version="1.2.13-alpha" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="ffprobe.exe">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>

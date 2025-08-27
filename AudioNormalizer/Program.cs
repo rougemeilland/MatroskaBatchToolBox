@@ -133,6 +133,7 @@ namespace AudioNormalizer
                             new ID3MusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null) as IMusicFileMetadataProvider,
                             new FlacMusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null),
                             new OggMusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null),
+                            new Mp4MusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null),
                         }
                         .FirstOrDefault(provider => provider.Supported);
 
@@ -143,14 +144,15 @@ namespace AudioNormalizer
                             new ID3MusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null) as IMusicFileMetadataProvider,
                             new FlacMusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null),
                             new OggMusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null),
+                            new Mp4MusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null),
                         }
                         .FirstOrDefault(provider => provider.Supported);
 
                     // 入力の準備をする (入力元が標準入力である場合は一時ファイルにコピーする)
-                    var (inputFormat, inputFile, temporaryInputFile) = GetInputMovieFile(commandOptions);
+                    var (inputFormat, inputFile, temporaryInputFile) = GetInputMovieFile(commandOptions, inputMusicFileProvider);
 
                     // 出力の準備をする (出力先が標準出力である場合は一時ファイルを作成する)
-                    var (outputFormat, outputFile, temporaryOutputFile) = GetOutputMovieFile(commandOptions);
+                    var (outputFormat, outputFile, temporaryOutputFile) = GetOutputMovieFile(commandOptions, outputMusicFileProvider);
 
                     try
                     {
@@ -247,7 +249,7 @@ namespace AudioNormalizer
             }
         }
 
-        private static (string? inputFormat, FilePath inputFilePath, FilePath? inputTemporaryFilePath) GetInputMovieFile(CommandParameter commandParameters)
+        private static (string? inputFormat, FilePath inputFilePath, FilePath? inputTemporaryFilePath) GetInputMovieFile(CommandParameter commandParameters, IMusicFileMetadataProvider? musicFileMetadataProvider)
         {
             if (commandParameters.Input is not null)
             {
@@ -261,7 +263,7 @@ namespace AudioNormalizer
             {
                 // -i オプションが指定されていない場合 (入力元が標準入力である場合)
 
-                var temporaryInputFile = new FilePath(Path.GetTempFileName());
+                var temporaryInputFile = FilePath.CreateTemporaryFile(suffix: musicFileMetadataProvider?.DefaultExtension ?? ".tmp");
                 if (commandParameters.Verbose)
                 {
                     TinyConsole.WriteLog(LogCategory.Information, "Read from standard input.");
@@ -302,7 +304,7 @@ namespace AudioNormalizer
             }
         }
 
-        private static (string? outputFormat, FilePath outputFilePath, FilePath? outputTemporaryFilePath) GetOutputMovieFile(CommandParameter commandParameters)
+        private static (string? outputFormat, FilePath outputFilePath, FilePath? outputTemporaryFilePath) GetOutputMovieFile(CommandParameter commandParameters, IMusicFileMetadataProvider? musicFileMetadataProvider)
         {
             if (commandParameters.Output is not null)
             {
@@ -316,7 +318,7 @@ namespace AudioNormalizer
             {
                 // -o オプションが指定されていない場合 (出力先が標準出力である場合)
 
-                var temporaryOutputFile = new FilePath(Path.GetTempFileName());
+                var temporaryOutputFile = FilePath.CreateTemporaryFile(suffix: musicFileMetadataProvider?.DefaultExtension ?? ".tmp");
                 if (commandParameters.Verbose)
                 {
                     TinyConsole.WriteLog(LogCategory.Information, "Write to standard output.");

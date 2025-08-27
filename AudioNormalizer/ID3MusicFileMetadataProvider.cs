@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
 
@@ -21,11 +22,34 @@ namespace AudioNormalizer
                 ? "wav"
                 : (fileFormat is null || fileFormat == "mp3") && (fileExtension is null || fileExtension == ".mp3")
                 ? "mp3"
+                : (fileFormat is null || fileFormat == "aac") && (fileExtension is null || fileExtension == ".aac") && direction == TransferDirection.Input
+                ? "aac"
+                : (fileFormat is null || fileFormat == "adts") && (fileExtension is null || fileExtension == ".aac") && direction == TransferDirection.Output
+                ? "adts"
                 : null;
         }
 
-        public override bool Supported
-            => _fileFormat is not null;
+        public override bool Supported => _fileFormat is not null;
+
+        public override string DefaultExtension
+        {
+            get
+            {
+                if (_fileFormat is null)
+                    throw Validation.GetFailErrorException();
+                return
+                    _fileFormat switch
+                    {
+                        "wav" => ".wav",
+                        "mp3" => ".mp3",
+                        "aac" => ".aac",
+                        "adts" => ".aac",
+                        _ => throw Validation.GetFailErrorException(),
+                    };
+            }
+        }
+
+        public override string Format => _fileFormat ?? throw new InvalidOperationException();
 
         public override MusicFileMetadata GetMetadata(MovieInformation sourceMusicFileInfo)
         {
@@ -43,54 +67,49 @@ namespace AudioNormalizer
                 Date = sourceMusicFileInfo.Format.Tags["date"],
                 Disc = sourceMusicFileInfo.Format.Tags["disc"],
                 Genre = sourceMusicFileInfo.Format.Tags["genre"],
-                Lyricist = sourceMusicFileInfo.Format.Tags["text"],
+                Lyricist = sourceMusicFileInfo.Format.Tags["TEXT"],
                 Title = sourceMusicFileInfo.Format.Tags["title"],
                 Track = sourceMusicFileInfo.Format.Tags["track"],
             };
         }
 
-        public override string? FormatMetadataFile(MusicFileMetadata metadata)
+        public override IEnumerable<(string metadataName, string metadataValue)> EnumerateFormatMetadata(MusicFileMetadata metadata)
         {
             if (_direction != TransferDirection.Output)
                 throw new InvalidOperationException();
 
-            var metadataTexts = new List<string>
-            {
-                ";FFMETADATA1"
-            };
             if (metadata.Album is not null)
-                metadataTexts.Add($"album={EncodeFfmetadataValue(metadata.Album)}");
+                yield return ("album", metadata.Album);
             if (metadata.AlbumArtist is not null)
-                metadataTexts.Add($"album_artist={EncodeFfmetadataValue(metadata.AlbumArtist)}");
+                yield return ("album_artist", metadata.AlbumArtist);
             if (metadata.Artist is not null)
-                metadataTexts.Add($"artist={EncodeFfmetadataValue(metadata.Artist)}");
+                yield return ("artist", metadata.Artist);
             if (metadata.Comment is not null)
-                metadataTexts.Add($"comment={EncodeFfmetadataValue(metadata.Comment)}");
+                yield return ("comment", metadata.Comment);
             if (metadata.Composer is not null)
-                metadataTexts.Add($"composer={EncodeFfmetadataValue(metadata.Composer)}");
+                yield return ("composer", metadata.Composer);
             if (metadata.Copyright is not null)
-                metadataTexts.Add($"copyright={EncodeFfmetadataValue(metadata.Copyright)}");
+                yield return ("copyright", metadata.Copyright);
             if (metadata.Date is not null)
-                metadataTexts.Add($"date={EncodeFfmetadataValue(metadata.Date)}");
+                yield return ("date", metadata.Date);
             if (metadata.Disc is not null)
-                metadataTexts.Add($"disc={EncodeFfmetadataValue(metadata.Disc)}");
+                yield return ("disc", metadata.Disc);
             if (metadata.Genre is not null)
-                metadataTexts.Add($"genre={EncodeFfmetadataValue(metadata.Genre)}");
+                yield return ("genre", metadata.Genre);
             if (metadata.Lyricist is not null)
-                metadataTexts.Add($"text={EncodeFfmetadataValue(metadata.Lyricist)}");
+                yield return ("TEXT", metadata.Lyricist);
             if (metadata.Title is not null)
-                metadataTexts.Add($"title={EncodeFfmetadataValue(metadata.Title)}");
+                yield return ("title", metadata.Title);
             if (metadata.Track is not null)
-                metadataTexts.Add($"track={EncodeFfmetadataValue(metadata.Track)}");
-            return $"{string.Join("\n", metadataTexts)}\n";
+                yield return ("track", metadata.Track);
         }
 
-        public override IEnumerable<(string metadataName, string metadatavalue)> GetStreamMetadata(MusicFileMetadata metadata)
+        public override IEnumerable<(string metadataName, string metadataValue)> EnumerateStreamMetadata(MusicFileMetadata metadata)
         {
             if (_direction != TransferDirection.Output)
                 throw new InvalidOperationException();
 
-            return Array.Empty<(string metadataName, string metadatavalue)>();
+            yield break;
         }
 
         public override (string encoder, IEnumerable<string> encoderOptions) GuessDefaultEncoderSpec(AudioStreamInfo sourceAudioStream)
@@ -102,17 +121,10 @@ namespace AudioNormalizer
             {
                 null => throw new InvalidOperationException(),
                 "wav" => (MapPcmEncoder(sourceAudioStream.SampleFormat, sourceAudioStream.BitsPerRawSample), MapPcmEncoderOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.BitsPerRawSample)),
-                "mp3" => ("libmp3lame", ["-q:a 0"]),
+                "mp3" => ("libmp3lame", [$"-compression_level:a 0 -q:a 0 -b:a {(128 * sourceAudioStream.Channels).Maximum(320)}k"]),
+                "adts" => ("aac", new[] { $"-aac_coder twoloop -ab {CalculateBitRateForAac(sourceAudioStream.Channels) / 1000:F0}k" }.Append(MapAacSampleFormatOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.SampleFormat))),
                 _ => throw Validation.GetFailErrorException(),
             };
-        }
-
-        public override string GuessFileFormat()
-        {
-            if (_direction != TransferDirection.Output)
-                throw new InvalidOperationException();
-
-            return _fileFormat ?? throw new InvalidOperationException();
         }
 
         private static string MapPcmEncoder(AudioSampleFormat sampleFormat, int? bitsPerRawSample)
@@ -134,5 +146,22 @@ namespace AudioNormalizer
             else
                 return [$"-bits_per_raw_sample:a:{index} {bitsPerRawSample.Value}"];
         }
+
+        private static double CalculateBitRateForAac(int channels)
+        {
+            if (channels <= 1)
+                return 128000;
+            else if (channels <= 2)
+                return 384000;
+            else
+                return 512000;
+        }
+
+        private static string MapAacSampleFormatOptions(int index, AudioSampleFormat sampleFormat)
+            => sampleFormat switch
+            {
+                _ => $"-sample_fmt:a:{index} fltp",
+            };
+
     }
 }

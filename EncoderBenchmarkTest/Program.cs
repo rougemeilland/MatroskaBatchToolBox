@@ -75,7 +75,7 @@ namespace EncoderBenchmarkTest
                         if (sourceFile.Exists)
                         {
                             var sourceFileLength = sourceFile.Length;
-                            var encodedFile = new FilePath(Path.GetTempFileName());
+                            var encodedFile = FilePath.CreateTemporaryFile();
                             encodedFile.MoveTo(encodedFile.Directory.GetFile(Path.GetFileNameWithoutExtension(encodedFile.Name) + ".mkv"));
                             try
                             {

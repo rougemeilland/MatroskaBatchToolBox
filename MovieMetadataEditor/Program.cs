@@ -360,7 +360,7 @@ namespace MovieMetadataEditor
             }
             else
             {
-                var temporaryInputFile = new FilePath(Path.GetTempFileName());
+                var temporaryInputFile = FilePath.CreateTemporaryFile();
                 if (commandParameters.Verbose)
                 {
                     TinyConsole.WriteLog(LogCategory.Information, "Read from standard input.");
@@ -411,7 +411,7 @@ namespace MovieMetadataEditor
             }
             else
             {
-                var temporaryOutputFile = new FilePath(Path.GetTempFileName());
+                var temporaryOutputFile = FilePath.CreateTemporaryFile();
                 if (commandParameters.Verbose)
                 {
                     TinyConsole.WriteLog(LogCategory.Information, "Write to standard output.");

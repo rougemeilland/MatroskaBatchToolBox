@@ -95,8 +95,16 @@ namespace AudioNormalizer
             }
         }
 
-        public override bool Supported
-            => estimatedCodec is not null && _fileFormat is not null;
+        public override bool Supported => estimatedCodec is not null && _fileFormat is not null;
+
+        public override string DefaultExtension
+            => _fileFormat is null
+                ? throw new InvalidOperationException()
+                : _fileFormat == "opus"
+                ? ".opus"
+                : ".ogg";
+
+        public override string Format => _fileFormat ?? throw new InvalidOperationException();
 
         public override MusicFileMetadata GetMetadata(MovieInformation musicFileInfo)
         {
@@ -126,15 +134,15 @@ namespace AudioNormalizer
                 };
         }
 
-        public override string? FormatMetadataFile(MusicFileMetadata metadata)
+        public override IEnumerable<(string metadataName, string metadataValue)> EnumerateFormatMetadata(MusicFileMetadata metadata)
         {
             if (_direction != TransferDirection.Output)
                 throw new InvalidOperationException();
 
-            return null;
+            yield break;
         }
 
-        public override IEnumerable<(string metadataName, string metadatavalue)> GetStreamMetadata(MusicFileMetadata metadata)
+        public override IEnumerable<(string metadataName, string metadataValue)> EnumerateStreamMetadata(MusicFileMetadata metadata)
         {
             if (_direction != TransferDirection.Output)
                 throw new InvalidOperationException();
@@ -174,12 +182,12 @@ namespace AudioNormalizer
                 estimatedCodec switch
                 {
                     null => throw new InvalidOperationException(),
-                    "opus" => GetOpusEncoder(sourceAudioStream),
-                    "vorbis" => GetVorbisEncoder(sourceAudioStream),
+                    "opus" => GetDefaultOpusEncoderSpec(sourceAudioStream),
+                    "vorbis" => GetDefaultVorbisEncoderSpec(sourceAudioStream),
                     _ => throw Validation.GetFailErrorException(),
                 };
 
-            static (string encoder, IEnumerable<string> encoderOptions) GetOpusEncoder(AudioStreamInfo sourceStreamInfo)
+            static (string encoder, IEnumerable<string> encoderOptions) GetDefaultOpusEncoderSpec(AudioStreamInfo sourceStreamInfo)
             {
                 return
                     sourceStreamInfo.ChannelLayout is null || sourceStreamInfo.ChannelLayout.IsNoneOf("5.0(side)", "5.1(side)")
@@ -187,18 +195,10 @@ namespace AudioNormalizer
                     : throw new NotSupportedException($"The input music file cannot be converted to opus format. Because opus does not support channel layout \"{sourceStreamInfo.ChannelLayout}\".");
             }
 
-            static (string encoder, IEnumerable<string> encoderOptions) GetVorbisEncoder(AudioStreamInfo sourceStreamInfo)
+            static (string encoder, IEnumerable<string> encoderOptions) GetDefaultVorbisEncoderSpec(AudioStreamInfo sourceStreamInfo)
             {
-                return ("libvirbis", new[] { $"-q:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateLibVorbisQualityByBitRate(sourceStreamInfo.Channels * _bitratePerChannelForLibVorbis):F1}" }.Append(MapLibvorbisSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)));
+                return ("libvorbis", new[] { $"-q:a:{sourceStreamInfo.IndexWithinAudioStream} {CalculateLibVorbisQualityByBitRate(sourceStreamInfo.Channels * _bitratePerChannelForLibVorbis):F1}" }.Append(MapLibvorbisSampleFormatOptions(sourceStreamInfo.IndexWithinAudioStream, sourceStreamInfo.SampleFormat)));
             }
-        }
-
-        public override string GuessFileFormat()
-        {
-            if (_direction != TransferDirection.Output)
-                throw new InvalidOperationException();
-
-            return _fileFormat ?? throw new InvalidOperationException();
         }
 
         private static string MapLibopusSampleFormatOptions(int index, AudioSampleFormat sampleFormat)

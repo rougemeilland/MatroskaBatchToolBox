@@ -6,26 +6,41 @@ using Palmtree;
 
 namespace AudioNormalizer
 {
-    internal sealed class FlacMusicFileMetadataProvider
+    internal sealed class Mp4MusicFileMetadataProvider
         : MusicFileMetadataProvider
     {
         private readonly TransferDirection _direction;
         private readonly string? _fileFormat;
 
-        public FlacMusicFileMetadataProvider(TransferDirection direction, string? fileFormat, string? fileExtension)
+        public Mp4MusicFileMetadataProvider(TransferDirection direction, string? fileFormat, string? fileExtension)
         {
             _direction = direction;
             _fileFormat =
                 fileFormat is null && fileExtension is null
                 ? null
-                : fileFormat is null or "flac" && fileExtension is null or ".flac"
-                ? "flac"
+                : (fileFormat is null || fileFormat.IsAnyOf("mov", "mp4", "m4a", "3gp", "3g2", "mj2")) && (fileExtension is null || fileExtension.IsAnyOf(".m4a", ".mp4"))
+                ? "mp4"
                 : null;
         }
 
         public override bool Supported => _fileFormat is not null;
-        public override string DefaultExtension => ".flac";
-        public override string Format => _fileFormat ?? throw Validation.GetFailErrorException();
+
+        public override string DefaultExtension
+        {
+            get
+            {
+                if (_fileFormat is null)
+                    throw Validation.GetFailErrorException();
+                return
+                    _fileFormat switch
+                    {
+                        "mp4" => ".m4a",
+                        _ => throw Validation.GetFailErrorException(),
+                    };
+            }
+        }
+
+        public override string Format => _fileFormat ?? throw new InvalidOperationException();
 
         public override MusicFileMetadata GetMetadata(MovieInformation sourceMusicFileInfo)
         {
@@ -43,7 +58,7 @@ namespace AudioNormalizer
                 Date = sourceMusicFileInfo.Format.Tags["date"],
                 Disc = sourceMusicFileInfo.Format.Tags["disc"],
                 Genre = sourceMusicFileInfo.Format.Tags["genre"],
-                Lyricist = sourceMusicFileInfo.Format.Tags["lyricist"],
+                Lyricist = sourceMusicFileInfo.Format.Tags["LYRICIST"],
                 Title = sourceMusicFileInfo.Format.Tags["title"],
                 Track = sourceMusicFileInfo.Format.Tags["track"],
             };
@@ -53,6 +68,10 @@ namespace AudioNormalizer
         {
             if (_direction != TransferDirection.Output)
                 throw new InvalidOperationException();
+
+            yield return ("major_brand", "M4A");
+            yield return ("minor_version", "512");
+            yield return ("compatible_brands", "M4A isomiso2");
 
             if (metadata.Album is not null)
                 yield return ("album", metadata.Album);
@@ -96,49 +115,26 @@ namespace AudioNormalizer
             return _fileFormat switch
             {
                 null => throw new InvalidOperationException(),
-                "flac" => ("flac", new[] { $"-compression_level:a:{sourceAudioStream.IndexWithinAudioStream} 12" }.Concat(MapEncoderOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.SampleFormat, sourceAudioStream.BitsPerRawSample))),
+                "mp4" => ("aac", new[] { $"-aac_coder twoloop -ab {CalculateBitRateForAac(sourceAudioStream.Channels) / 1000:F0}k" }.Append(MapAacSampleFormatOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.SampleFormat))),
                 _ => throw Validation.GetFailErrorException(),
             };
         }
 
-        private static IEnumerable<string> MapEncoderOptions(int index, AudioSampleFormat sampleFormat, int? bitsPerRawSample)
+        private static double CalculateBitRateForAac(int channels)
         {
-            if (sampleFormat is AudioSampleFormat.S64 or AudioSampleFormat.S64P or AudioSampleFormat.DBL or AudioSampleFormat.DBLP ||
-                bitsPerRawSample is not null and > 24)
-            {
-                yield return $"-strict:a:{index} experimental";
-            }
-
-            switch (sampleFormat)
-            {
-                case AudioSampleFormat.U8:
-                case AudioSampleFormat.U8P:
-                case AudioSampleFormat.S16:
-                case AudioSampleFormat.S16P:
-                    yield return $"-sample_fmt:a:{index} s16";
-                    break;
-                case AudioSampleFormat.S32:
-                case AudioSampleFormat.S32P:
-                case AudioSampleFormat.S64:
-                case AudioSampleFormat.S64P:
-                case AudioSampleFormat.FLT:
-                case AudioSampleFormat.FLTP:
-                case AudioSampleFormat.DBL:
-                case AudioSampleFormat.DBLP:
-                    yield return $"-sample_fmt:a:{index} s32";
-                    break;
-                default:
-                    if (bitsPerRawSample is null or > 16)
-                        yield return $"-sample_fmt:a:{index} s32";
-                    else
-                        yield return $"-sample_fmt:a:{index} s16";
-                    break;
-            }
-
-            if (sampleFormat is AudioSampleFormat.FLT or AudioSampleFormat.FLTP)
-                yield return $" -bits_per_raw_sample:a:{index} 24";
-            else if (bitsPerRawSample != null)
-                yield return $" -bits_per_raw_sample:a:{index} {bitsPerRawSample}";
+            if (channels <= 1)
+                return 128000;
+            else if (channels <= 2)
+                return 384000;
+            else
+                return 512000;
         }
+
+        private static string MapAacSampleFormatOptions(int index, AudioSampleFormat sampleFormat)
+            => sampleFormat switch
+            {
+                _ => $"-sample_fmt:a:{index} fltp",
+            };
+
     }
 }
