@@ -253,6 +253,7 @@ namespace MovieMetadataEditor
                     // 出力の準備をする (出力先が標準出力である場合は一時ファイルを作成する)
                     var (outputFormat, outputFile, temporaryOutputFile) = GetOutputMovieFile(commandOptions);
 
+                    var success = false;
                     try
                     {
                         var movieInformation = GetMovieInformation(commandOptions, inputFormat, inputFile);
@@ -292,34 +293,32 @@ namespace MovieMetadataEditor
                                 TinyConsole.WriteLog(LogCategory.Information, "Copy finished.");
                         }
 
+                        success = true;
                         return 0;
                     }
                     finally
                     {
+                        // 一時ファイルが作成されていた場合は削除する
                         if (temporaryInputFile is not null)
                         {
-                            try
-                            {
-                                File.Delete(temporaryInputFile.FullName);
-                                if (commandOptions.Verbose)
-                                    TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
-                            }
-                            catch (Exception)
-                            {
-                            }
+                            temporaryInputFile.SafetyDelete();
+                            if (commandOptions.Verbose)
+                                TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                         }
 
                         if (temporaryOutputFile is not null)
                         {
-                            try
-                            {
-                                File.Delete(temporaryOutputFile.FullName);
-                                if (commandOptions.Verbose)
-                                    TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryOutputFile.FullName}\"");
-                            }
-                            catch (Exception)
-                            {
-                            }
+                            temporaryOutputFile.SafetyDelete();
+                            if (commandOptions.Verbose)
+                                TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryOutputFile.FullName}\"");
+                        }
+
+                        // 正常に出力できなかった場合は出力先ファイルを削除する。
+                        if (!success && outputFile is not null && outputFile.Exists)
+                        {
+                            outputFile.SafetyDelete();
+                            if (commandOptions.Verbose)
+                                TinyConsole.WriteLog(LogCategory.Information, $"Output is not successful, so output file will be deleted.: \"{outputFile.FullName}\"");
                         }
                     }
                 }

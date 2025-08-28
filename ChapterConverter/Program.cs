@@ -432,6 +432,18 @@ namespace ChapterConverter
             catch (Exception ex)
             {
                 TinyConsole.WriteLog(LogCategory.Error, ex.Message);
+                if (outputFilePath is not null)
+                {
+                    try
+                    {
+                        if (File.Exists(outputFilePath))
+                            File.Delete(outputFilePath);
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+
                 return false;
             }
         }

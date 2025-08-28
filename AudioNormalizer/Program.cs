@@ -124,6 +124,8 @@ namespace AudioNormalizer
 
                 if (commandOptions.Verbose)
                     TinyConsole.WriteLog(LogCategory.Information, "Start processing.");
+
+                var success = false;
                 try
                 {
                     // 入力のフォーマットを調べる
@@ -189,43 +191,38 @@ namespace AudioNormalizer
                         }
 
                         // 終了する
+                        success = true;
                         return 0;
                     }
                     finally
                     {
                         // 一時ファイルが作成されていた場合は削除する
-
                         if (temporaryInputFile is not null)
                         {
-                            try
-                            {
-                                File.Delete(temporaryInputFile.FullName);
-                                if (commandOptions.Verbose)
-                                    TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
-                            }
-                            catch (Exception)
-                            {
-                            }
+                            temporaryInputFile.SafetyDelete();
+                            if (commandOptions.Verbose)
+                                TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                         }
 
                         if (temporaryOutputFile is not null)
                         {
-                            try
-                            {
-                                File.Delete(temporaryOutputFile.FullName);
-                                if (commandOptions.Verbose)
-                                    TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryOutputFile.FullName}\"");
-                            }
-                            catch (Exception)
-                            {
-                            }
+                            temporaryOutputFile.SafetyDelete();
+                            if (commandOptions.Verbose)
+                                TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryOutputFile.FullName}\"");
+                        }
+
+                        // 正常に出力できなかった場合は出力先ファイルを削除する。
+                        if (!success && outputFile is not null && outputFile.Exists)
+                        {
+                            outputFile.SafetyDelete();
+                            if (commandOptions.Verbose)
+                                TinyConsole.WriteLog(LogCategory.Information, $"Output is not successful, so output file will be deleted.: \"{outputFile.FullName}\"");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    for (var e = ex; e is not null; e = e.InnerException)
-                        TinyConsole.WriteLog(e);
+                    TinyConsole.WriteLog(ex);
                     return 1;
                 }
             }
