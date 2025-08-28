@@ -384,16 +384,9 @@ namespace MovieMetadataEditor
                 }
                 catch (Exception ex)
                 {
-                    try
-                    {
-                        File.Delete(temporaryInputFile.FullName);
-                        if (commandParameters.Verbose)
-                            TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
-                    }
-                    catch (Exception)
-                    {
-                    }
-
+                    temporaryInputFile.SafetyDelete();
+                    if (commandParameters.Verbose)
+                        TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                     throw new ApplicationException("An error occurred while preparing the input file.", ex);
                 }
             }
@@ -543,7 +536,7 @@ namespace MovieMetadataEditor
                 })
                 .ToList();
 
-            var metadataFilePath = (string?)null;
+            var metadataFilePath = (FilePath?)null;
             try
             {
                 var ffmpegCommandParameters =
@@ -558,11 +551,11 @@ namespace MovieMetadataEditor
                 ffmpegCommandParameters.Add($"-i {inputFile.FullName.EncodeCommandLineArgument()}");
                 if (!commandOptions.ClearChapters)
                 {
-                    metadataFilePath = Path.GetTempFileName();
+                    metadataFilePath = FilePath.CreateTemporaryFile();
                     if (commandOptions.Verbose)
-                        TinyConsole.WriteLog(LogCategory.Information, $"Temprary file is created.: \"{metadataFilePath}\"");
-                    File.WriteAllText(metadataFilePath, GetFfmetadataText(commandOptions, movieInformation.Chapters), Encoding.UTF8);
-                    ffmpegCommandParameters.Add($"-f ffmetadata -i {metadataFilePath.EncodeCommandLineArgument()}");
+                        TinyConsole.WriteLog(LogCategory.Information, $"Temprary file is created.: \"{metadataFilePath.FullName}\"");
+                    metadataFilePath.WriteAllText(GetFfmetadataText(commandOptions, movieInformation.Chapters), Encoding.UTF8);
+                    ffmpegCommandParameters.Add($"-f ffmetadata -i {metadataFilePath.FullName.EncodeCommandLineArgument()}");
                 }
 
                 ffmpegCommandParameters.Add("-c copy -map 0");
@@ -640,15 +633,9 @@ namespace MovieMetadataEditor
             {
                 if (metadataFilePath is not null)
                 {
-                    try
-                    {
-                        File.Delete(metadataFilePath);
-                        if (commandOptions.Verbose)
-                            TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{metadataFilePath}\"");
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    metadataFilePath.SafetyDelete();
+                    if (commandOptions.Verbose)
+                        TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{metadataFilePath.FullName}\"");
                 }
             }
         }

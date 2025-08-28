@@ -286,16 +286,9 @@ namespace AudioNormalizer
                 }
                 catch (Exception ex)
                 {
-                    try
-                    {
-                        File.Delete(temporaryInputFile.FullName);
-                        if (commandParameters.Verbose)
-                            TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
-                    }
-                    catch (Exception)
-                    {
-                    }
-
+                    temporaryInputFile.SafetyDelete();
+                    if (commandParameters.Verbose)
+                        TinyConsole.WriteLog(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryInputFile.FullName}\"");
                     throw new ApplicationException("An error occurred while preparing the input file.", ex);
                 }
             }

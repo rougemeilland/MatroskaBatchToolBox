@@ -9,8 +9,8 @@ namespace Experiment
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:未使用のパラメーターを削除します", Justification = "<保留中>")]
         public static int Main(string[] args)
         {
-            if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
-                TinyConsole.WriteLog(LogCategory.Warning, "The encoding of standard input or standard output is not UTF8.");
+            var s = "She said, \"Don't make others suffer for you personal hatred.\"";
+            TinyConsole.WriteLine(s.EncodeCommandLineArgument());
 
             TinyConsole.WriteLine("OK");
             TinyConsole.Beep();

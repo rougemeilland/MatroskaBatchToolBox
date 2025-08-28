@@ -219,15 +219,9 @@ namespace AudioNormalizer
                 {
                     if (temporaryIntermediateFile is not null)
                     {
-                        try
-                        {
-                            File.Delete(temporaryIntermediateFile.FullName);
-                            if (_verbose)
-                                _messageReporter(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryIntermediateFile.FullName}\"");
-                        }
-                        catch (Exception)
-                        {
-                        }
+                        temporaryIntermediateFile.SafetyDelete();
+                        if (_verbose)
+                            _messageReporter(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryIntermediateFile.FullName}\"");
                     }
                 }
             }
@@ -324,15 +318,9 @@ namespace AudioNormalizer
             {
                 if (temporaryIntermediateFile is not null)
                 {
-                    try
-                    {
-                        File.Delete(temporaryIntermediateFile.FullName);
-                        if (_verbose)
-                            _messageReporter(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryIntermediateFile.FullName}\"");
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    temporaryIntermediateFile.SafetyDelete();
+                    if (_verbose)
+                        _messageReporter(LogCategory.Information, $"Temporary file is deleted.: \"{temporaryIntermediateFile.FullName}\"");
                 }
             }
         }

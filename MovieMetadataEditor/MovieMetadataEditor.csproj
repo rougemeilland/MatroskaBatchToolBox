@@ -31,10 +31,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Palmtree.Core" Version="1.19.1-alpha" />
-    <PackageReference Include="Palmtree.IO" Version="1.19.2-alpha" />
-    <PackageReference Include="Palmtree.IO.Console" Version="1.7.2-alpha" />
-    <PackageReference Include="Palmtree.Numerics" Version="1.2.13-alpha" />
+    <PackageReference Include="Palmtree.Core" Version="1.19.2-alpha" />
+    <PackageReference Include="Palmtree.IO" Version="1.19.3-alpha" />
+    <PackageReference Include="Palmtree.IO.Console" Version="1.7.3-alpha" />
+    <PackageReference Include="Palmtree.Numerics" Version="1.2.14-alpha" />
   </ItemGroup>
 
   <ItemGroup>

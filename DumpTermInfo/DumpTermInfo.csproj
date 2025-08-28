@@ -31,8 +31,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Palmtree.IO.Console" Version="1.7.2-alpha" />
-    <PackageReference Include="Palmtree.IO.Console.TerminalInfo" Version="1.1.19-alpha" />
+    <PackageReference Include="Palmtree.IO.Console" Version="1.7.3-alpha" />
+    <PackageReference Include="Palmtree.IO.Console.TerminalInfo" Version="1.1.20-alpha" />
   </ItemGroup>
 
 </Project>
