@@ -273,14 +273,14 @@ namespace ConcatMovie
                 metadataFilePath.WriteAllText(GetMetadataText(inputFileInfos), Encoding.UTF8);
                 ffmpegCommandParameters.Add($"-f ffmetadata -i {metadataFilePath.FullName.EncodeCommandLineArgument()}");
                 ffmpegCommandParameters.Add($"-filter_complex {GetComlexFilterSpec(inputFileInfos).EncodeCommandLineArgument()}");
-                ffmpegCommandParameters.Add($"-map_chapters {inputFileInfos.Length}");
                 for (var index = 0; index < ffmpegOptions.Length; ++index)
                     ffmpegCommandParameters.Add(ffmpegOptions.Span[index].EncodeCommandLineArgument());
-
+                ffmpegCommandParameters.Add("-fflags +genpts");
                 foreach (var stream in inputFileInfos.Span[0].MovieInfo.VideoStreams)
                     ffmpegCommandParameters.Add($"-map {$"[outv{stream.IndexWithinVideoStream}]".EncodeCommandLineArgument()}");
                 foreach (var stream in inputFileInfos.Span[0].MovieInfo.VideoStreams)
                     ffmpegCommandParameters.Add($"-map {$"[outa{stream.IndexWithinVideoStream}]".EncodeCommandLineArgument()}");
+                ffmpegCommandParameters.Add($"-map_chapters {inputFileInfos.Length}");
 
                 if (outputFormat is not null)
                     ffmpegCommandParameters.Add($"-f {outputFormat.EncodeCommandLineArgument()}");
