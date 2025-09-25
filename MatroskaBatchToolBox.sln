@@ -38,6 +38,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LyricsChecker", "LyricsChec
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DumpMusicMetadata", "DumpMusicMetadata\DumpMusicMetadata.csproj", "{CDEE2B5E-F6D7-4310-9E04-A3B13E3717D2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConcatMovie", "ConcatMovie\ConcatMovie.csproj", "{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -352,6 +354,26 @@ Global
 		{CDEE2B5E-F6D7-4310-9E04-A3B13E3717D2}.Release|x64.Build.0 = Release|Any CPU
 		{CDEE2B5E-F6D7-4310-9E04-A3B13E3717D2}.Release|x86.ActiveCfg = Release|Any CPU
 		{CDEE2B5E-F6D7-4310-9E04-A3B13E3717D2}.Release|x86.Build.0 = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|ARM.ActiveCfg = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|ARM.Build.0 = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|x64.Build.0 = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Debug|x86.Build.0 = Debug|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|ARM.ActiveCfg = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|ARM.Build.0 = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|ARM64.Build.0 = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|x64.ActiveCfg = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|x64.Build.0 = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|x86.ActiveCfg = Release|Any CPU
+		{CB152D2E-9B65-4077-A78C-84FCA6FF7BC2}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

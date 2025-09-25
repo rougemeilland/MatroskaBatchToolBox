@@ -2,6 +2,7 @@
 using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Palmtree;
 using Palmtree.Numerics;
 
 namespace MatroskaBatchToolBox.Utility
@@ -72,6 +73,65 @@ namespace MatroskaBatchToolBox.Utility
                     }
 
                     return TimeSpan.FromSeconds(totalSeconds);
+                }
+                case TimeParsingMode.Expression:
+                {
+                    var result = TimeSpan.Zero;
+                    var offset = 0;
+                    while (offset < s.Length)
+                    {
+                        var op = '\0';
+                        if (offset > 0)
+                        {
+                            op = s[offset];
+                            if (op is not '+' and not '-')
+                                throw new FormatException($"Time string is expected.: \"{s}\"");
+
+                            ++offset;
+                            if (offset >= s.Length)
+                                throw new FormatException($"Time string is expected.: \"{s}\"");
+                        }
+
+                        var match = GetPartialLazyTimePattern().Match(s[offset..]);
+                        if (!match.Success)
+                            throw new FormatException($"Time string is expected.: \"{s}\"");
+
+                        var totalSeconds = match.Groups["second"].Value.ParseAsDouble();
+
+                        if (match.Groups["minute"].Success)
+                        {
+                            var minute = match.Groups["minute"].Value.ParseAsInt32();
+                            totalSeconds += minute * 60;
+                        }
+
+                        if (match.Groups["hour"].Success)
+                        {
+                            var hour = match.Groups["hour"].Value.ParseAsInt32();
+                            totalSeconds += hour * (60 * 60);
+                        }
+
+                        switch (op)
+                        {
+                            case '\0':
+                                Validation.Assert(offset <= 0);
+                                result = TimeSpan.FromSeconds(totalSeconds);
+                                break;
+                            case '+':
+                                Validation.Assert(offset > 0);
+                                result += TimeSpan.FromSeconds(totalSeconds);
+                                break;
+                            case '-':
+                                Validation.Assert(offset > 0);
+                                result -= TimeSpan.FromSeconds(totalSeconds);
+                                break;
+                            default:
+                                break;
+                        }
+
+                        offset += match.Length;
+                    }
+
+                    return result;
                 }
                 default:
                     throw new ArgumentException($"Invalid {nameof(parsingMode)} value.: \"{parsingMode}\"", nameof(parsingMode));
@@ -170,6 +230,75 @@ namespace MatroskaBatchToolBox.Utility
                     value = TimeSpan.FromSeconds(totalSeconds);
                     return true;
                 }
+                case TimeParsingMode.Expression:
+                {
+                    var result = TimeSpan.Zero;
+                    var offset = 0;
+                    while (offset < s.Length)
+                    {
+                        var op = '\0';
+                        if (offset > 0)
+                        {
+                            op = s[offset];
+                            if (op is not '+' and not '-')
+                            {
+                                value = TimeSpan.Zero;
+                                return false;
+                            }
+
+                            ++offset;
+                            if (offset >= s.Length)
+                            {
+                                value = TimeSpan.Zero;
+                                return false;
+                            }
+                        }
+
+                        var match = GetPartialLazyTimePattern().Match(s[offset..]);
+                        if (!match.Success)
+                        {
+                            value = TimeSpan.Zero;
+                            return false;
+                        }
+
+                        var totalSeconds = match.Groups["second"].Value.ParseAsDouble();
+
+                        if (match.Groups["minute"].Success)
+                        {
+                            var minute = match.Groups["minute"].Value.ParseAsInt32();
+                            totalSeconds += minute * 60;
+                        }
+
+                        if (match.Groups["hour"].Success)
+                        {
+                            var hour = match.Groups["hour"].Value.ParseAsInt32();
+                            totalSeconds += hour * (60 * 60);
+                        }
+
+                        switch (op)
+                        {
+                            case '\0':
+                                Validation.Assert(offset <= 0);
+                                result = TimeSpan.FromSeconds(totalSeconds);
+                                break;
+                            case '+':
+                                Validation.Assert(offset > 0);
+                                result += TimeSpan.FromSeconds(totalSeconds);
+                                break;
+                            case '-':
+                                Validation.Assert(offset > 0);
+                                result -= TimeSpan.FromSeconds(totalSeconds);
+                                break;
+                            default:
+                                break;
+                        }
+
+                        offset += match.Length;
+                    }
+
+                    value = result;
+                    return true;
+                }
                 default:
                     throw new ArgumentException($"Invalid {nameof(parsingMode)} value.: \"{parsingMode}\"", nameof(parsingMode));
             }
@@ -265,5 +394,8 @@ namespace MatroskaBatchToolBox.Utility
 
         [GeneratedRegex(@"^(((?<hour>\d+):)?(?<minute>\d+):)?(?<second>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
         private static partial Regex GetLazyTimePattern();
+
+        [GeneratedRegex(@"^(((?<hour>\d+):)?(?<minute>\d+):)?(?<second>\d+(\.\d+)?)", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+        private static partial Regex GetPartialLazyTimePattern();
     }
 }

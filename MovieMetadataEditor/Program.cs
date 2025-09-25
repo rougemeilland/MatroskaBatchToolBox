@@ -551,7 +551,7 @@ namespace MovieMetadataEditor
                 ffmpegCommandParameters.Add($"-i {inputFile.FullName.EncodeCommandLineArgument()}");
                 if (!commandOptions.ClearChapters)
                 {
-                    metadataFilePath = FilePath.CreateTemporaryFile();
+                    metadataFilePath = FilePath.CreateTemporaryFile(suffix: ".txt");
                     if (commandOptions.Verbose)
                         TinyConsole.WriteLog(LogCategory.Information, $"Temprary file is created.: \"{metadataFilePath.FullName}\"");
                     metadataFilePath.WriteAllText(GetFfmetadataText(commandOptions, movieInformation.Chapters), Encoding.UTF8);

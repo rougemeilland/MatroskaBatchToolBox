@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
@@ -21,8 +20,8 @@ namespace AudioNormalizer
 
         private readonly IMusicFileMetadataProvider? _inputFlleProvider;
         private readonly IMusicFileMetadataProvider? _outputFlleProvider;
-        private readonly string? _musicFileEncoder;
-        private readonly string? _musicFileEncoderOption;
+        private readonly string? _audioEncoder;
+        private readonly string? _audioEncoderOption;
         private readonly bool _doOverwrite;
         private readonly bool _verbose;
         private readonly bool _disableVideoStream;
@@ -40,8 +39,8 @@ namespace AudioNormalizer
         public NormalizationState(
             IMusicFileMetadataProvider? inputFlleProvider,
             IMusicFileMetadataProvider? outputFlleProvider,
-            string? musicFileEncoder,
-            string? musicFileEncoderOption,
+            string? audioEncoder,
+            string? audioEncoderOption,
             bool doOverwrite,
             bool verbose,
             bool disableVideoStream,
@@ -57,8 +56,8 @@ namespace AudioNormalizer
             _streamCopier = streamCopier;
             _messageReporter = messageReporter;
             _messageReporter2 = messageReporter2;
-            _musicFileEncoder = musicFileEncoder;
-            _musicFileEncoderOption = musicFileEncoderOption;
+            _audioEncoder = audioEncoder;
+            _audioEncoderOption = audioEncoderOption;
         }
 
         public void NormalizeFile(string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
@@ -97,9 +96,9 @@ namespace AudioNormalizer
             // 出力先に単純コピーする
 
             _messageReporter(LogCategory.Information, "Since the video file does not contain an audio track, simply copy it.");
-            if (!string.IsNullOrEmpty(_musicFileEncoder))
+            if (!string.IsNullOrEmpty(_audioEncoder))
                 _messageReporter(LogCategory.Warning, "The \"--encoder\" option is ignored for files that do not have an audio stream.");
-            if (!string.IsNullOrEmpty(_musicFileEncoderOption))
+            if (!string.IsNullOrEmpty(_audioEncoderOption))
                 _messageReporter(LogCategory.Warning, "The \"--encoder_option\" option is ignored for files that do not have an audio stream.");
 
             if (_verbose)
@@ -130,18 +129,14 @@ namespace AudioNormalizer
             //   * ストリームの disposition (default/force/title/attached_pic)
             // - 上記以外のメタデータを消去する。
 
-            if (!string.IsNullOrEmpty(_musicFileEncoder))
-                _messageReporter(LogCategory.Warning, "The \"--encoder\" option is ignored for movie file normalization.");
-            if (!string.IsNullOrEmpty(_musicFileEncoderOption))
-                _messageReporter(LogCategory.Warning, "The \"--encoder_option\" option is ignored for movie file normalization.");
             if (_disableVideoStream)
                 _messageReporter(LogCategory.Warning, "The \"--video_disable\" option is ignored for movie file normalization.");
 
             // 中間一時ファイルを作成する
-            var temporaryIntermediateFile1 = FilePath.CreateTemporaryFile();
-            var temporaryIntermediateFileFormat1 = outputFormat ?? "matroska";
-            var temporaryIntermediateFile2 = FilePath.CreateTemporaryFile();
-            var temporaryIntermediateFileFormat2 = outputFormat ?? "matroska";
+            var temporaryIntermediateFile1 = FilePath.CreateTemporaryFile(suffix: ".mkv");
+            var temporaryIntermediateFileFormat1 = (string?)null;
+            var temporaryIntermediateFile2 = FilePath.CreateTemporaryFile(suffix: ".mkv");
+            var temporaryIntermediateFileFormat2 = (string?)null;
             if (_verbose)
             {
                 _messageReporter(LogCategory.Information, $"Temprary file is created.: \"{temporaryIntermediateFile2.FullName}\"");
@@ -248,7 +243,6 @@ namespace AudioNormalizer
 
             // 中間一時ファイルを作成する
             var temporaryIntermediateFile = FilePath.CreateTemporaryFile(suffix: _outputFlleProvider.DefaultExtension);
-            //var temporaryIntermediateFileFormat = outputFormat ?? _outputFlleProvider.GuessFileFormat();
             if (_verbose)
             {
                 _messageReporter(LogCategory.Information, $"Temprary file is created.: \"{temporaryIntermediateFile.FullName}\"");
@@ -396,46 +390,63 @@ namespace AudioNormalizer
 
         private void NormalizeAudioStreamOfMovieFile(MovieInformation movieFileInformation, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile)
         {
-            // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームを抽出する
-            var audioStreamsNotSupportedByLibOpus =
-                movieFileInformation.AudioStreams
-                .Where(stream => stream.ChannelLayout is not null && stream.ChannelLayout.IsAnyOf("5.0(side)", "5.1(side)"))
-                .ToList();
+            var (audioEncoder, defaultAudioEncoderOptions) = SelectAudioEncoder(movieFileInformation, _audioEncoder, _verbose, _messageReporter);
+            if (_verbose)
+                _messageReporter(LogCategory.Information, $"\"{audioEncoder}\" is selected as the audio encoder.");
 
-            if (audioStreamsNotSupportedByLibOpus.Count > 0)
+            ExecuteFfpegNormaize(
+                inputFormat,
+                inputFile,
+                outputFormat,
+                outputFile,
+                audioEncoder,
+                string.IsNullOrEmpty(_audioEncoderOption)
+                    ? defaultAudioEncoderOptions
+                    : new[] { _audioEncoderOption },
+                false);
+
+            static (string audioEncoder, IEnumerable<string> audioEncoderDefaultOptions) SelectAudioEncoder(MovieInformation movieFileInformation, string? specifiedEncoder, bool verbose, Action<LogCategory, string> messageReporter)
             {
-                // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームが存在する場合
-
-                if (_verbose)
-                    _messageReporter(LogCategory.Information, $"Normalize the audio stream and encode it with \"libvorbis\". Because some audio stream channel layouts are not supported by \"libopus\".: {string.Join(", ", audioStreamsNotSupportedByLibOpus.Select(stream => $"a:{stream.IndexWithinAudioStream}(\"{stream.ChannelLayout}\")"))}");
-
-                var audioEncoder = "libvorbis";
-
-                // libvorbis のエンコーダオプションを作成する
-                var provider = new OggMusicFileMetadataProvider(TransferDirection.Output, "ogg", ".ogg");
-                var audioEncoderOptions =
+                if (specifiedEncoder == "aac")
+                {
+                    var provider = new ID3MusicFileMetadataProvider(TransferDirection.Output, "aac", null);
+                    return ("adts", movieFileInformation.AudioStreams.SelectMany(stream => provider.GuessDefaultEncoderSpec(stream).encoderOptions).ToArray());
+                }
+                else if (specifiedEncoder == "flac")
+                {
+                    var provider = new FlacMusicFileMetadataProvider(TransferDirection.Output, "flac", null);
+                    return ("flac", movieFileInformation.AudioStreams.SelectMany(stream => provider.GuessDefaultEncoderSpec(stream).encoderOptions).ToArray());
+                }
+                else if (specifiedEncoder == "vorbis")
+                {
+                    var provider = new OggMusicFileMetadataProvider(TransferDirection.Output, "ogg", null);
+                    return ("libvorbis", movieFileInformation.AudioStreams.SelectMany(stream => provider.GuessDefaultEncoderSpec(stream).encoderOptions).ToArray());
+                }
+                else if (specifiedEncoder is "opus" or null)
+                {
+                    // チャンネルレイアウトが libopus によってサポートされていないオーディオストリームを抽出する
+                    var audioStreamsNotSupportedByLibOpus =
                         movieFileInformation.AudioStreams
-                        .SelectMany(stream => provider.GuessDefaultEncoderSpec(stream).encoderOptions)
+                        .Where(stream => stream.ChannelLayout is not null && stream.ChannelLayout.IsAnyOf("5.0(side)", "5.1(side)"))
                         .ToList();
 
-                ExecuteFfpegNormaize(inputFormat, inputFile, outputFormat, outputFile, audioEncoder, audioEncoderOptions, false);
-            }
-            else
-            {
-                // すべてのオーディオストリームのチャンネルレイアウトが libopus によってサポートされている場合
-
-                if (_verbose)
-                    _messageReporter(LogCategory.Information, "Normalize the audio stream and encode it by \"libopus\".");
-
-                var audioEncoder = "libopus";
-                // libopus のエンコーダオプションを作成する
-                var provider = new OggMusicFileMetadataProvider(TransferDirection.Output, "opus", ".opus");
-                var audioEncoderOptions =
-                        movieFileInformation.AudioStreams
-                        .SelectMany(stream => provider.GuessDefaultEncoderSpec(stream).encoderOptions)
-                        .ToList();
-
-                ExecuteFfpegNormaize(inputFormat, inputFile, outputFormat, outputFile, audioEncoder, audioEncoderOptions, false);
+                    if (audioStreamsNotSupportedByLibOpus.Count > 0)
+                    {
+                        if (verbose)
+                            messageReporter(LogCategory.Warning, "Some audio streams contain a channel layout that is not supported by \"opus\", so \"vorbis\" will be used instead.");
+                        var provider = new OggMusicFileMetadataProvider(TransferDirection.Output, "ogg", null);
+                        return ("libvorbis", movieFileInformation.AudioStreams.SelectMany(stream => provider.GuessDefaultEncoderSpec(stream).encoderOptions).ToArray());
+                    }
+                    else
+                    {
+                        var provider = new OggMusicFileMetadataProvider(TransferDirection.Output, "opus", null);
+                        return ("libopus", movieFileInformation.AudioStreams.SelectMany(stream => provider.GuessDefaultEncoderSpec(stream).encoderOptions).ToArray());
+                    }
+                }
+                else
+                {
+                    throw new ApplicationException($"Audio encoder \"{specifiedEncoder}\" is not supported.");
+                }
             }
         }
 
@@ -447,8 +458,8 @@ namespace AudioNormalizer
 
             var sourceAudioStream = musicFileInformation.AudioStreams.First();
             var defaultEncoderSpec = _outputFlleProvider.GuessDefaultEncoderSpec(sourceAudioStream);
-            var encoder = _musicFileEncoder ?? defaultEncoderSpec.encoder;
-            var encoderOptions = _musicFileEncoderOption is not null ? new[] { _musicFileEncoderOption } : defaultEncoderSpec.encoderOptions;
+            var encoder = _audioEncoder ?? defaultEncoderSpec.encoder;
+            var encoderOptions = _audioEncoderOption is not null ? new[] { _audioEncoderOption } : defaultEncoderSpec.encoderOptions;
             ExecuteFfpegNormaize(inputFormat, inputFile, outputFormat, outputFile, encoder, encoderOptions, true);
         }
 
@@ -621,6 +632,10 @@ namespace AudioNormalizer
             metaeditCommandParameters.Add($"-o {outputFile.FullName.EncodeCommandLineArgument()}");
 
             var metaeditCommandParameterText = string.Join(" ", metaeditCommandParameters);
+
+            if (_verbose)
+                _messageReporter(LogCategory.Information, $"Execute: {_metaeditCommandFile} {metaeditCommandParameterText}");
+
             var exitCode =
                 Command.ExecuteCommand(
                     _metaeditCommandFile,
@@ -638,6 +653,9 @@ namespace AudioNormalizer
                     null);
             if (exitCode != 0)
                 throw new ApplicationException($"An error occurred in the \"{Path.GetFileNameWithoutExtension(_metaeditCommandFile.Name)}\" command. : exit-code={exitCode}");
+
+            if (_verbose)
+                _messageReporter(LogCategory.Information, $"\"metaedit\" finished successfully.");
         }
 
         private void SetMetadataOfMusicFile(MovieInformation musicFileInfo, MovieInformation normalizedMusicFileInfo, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile, MusicFileMetadata metadata)

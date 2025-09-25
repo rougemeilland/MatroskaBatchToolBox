@@ -26,5 +26,10 @@
         /// </list>
         /// </summary>
         LazyMode,
+
+        /// <summary>
+        /// This describes the <see cref="LazyMode"/> format and the format of expressions that add or subtract values ​​in <see cref="LazyMode"/> format.
+        /// </summary>
+        Expression,
     }
 }

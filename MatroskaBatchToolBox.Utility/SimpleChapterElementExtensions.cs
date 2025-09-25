@@ -62,7 +62,7 @@ namespace MatroskaBatchToolBox.Utility
             {
                 if (timeSpec.StartsWith('+'))
                 {
-                    if (!timeSpec[1..].TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
+                    if (!timeSpec[1..].TryParse(TimeParsingMode.LazyMode, out var time))
                         throw new ApplicationException($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                     if (previousTime is null)
                         throw new ApplicationException($"Do not prefix the start time of the first chapter with a plus sign (+).: \"{timeSpec}\" in \"{rawText}\"");
@@ -72,7 +72,7 @@ namespace MatroskaBatchToolBox.Utility
                 }
                 else
                 {
-                    if (!timeSpec.TryParse(TimeParsingMode.LazyMode, out TimeSpan time))
+                    if (!timeSpec.TryParse(TimeParsingMode.LazyMode, out var time))
                         throw new ApplicationException($"The chapter start time is in an invalid format.: \"{timeSpec}\" in \"{rawText}\"");
                     if (previousTime is not null && time < previousTime.Value)
                         throw new ApplicationException($"The list of start times is not in ascending order.: {rawText}");
@@ -138,7 +138,7 @@ namespace MatroskaBatchToolBox.Utility
             {
                 var firstChapterNode = trimmedChapters.First;
                 var secondChapterNode = trimmedChapters.First.Next;
-                if (firstChapterNode.Value.Duration >= filterParameter.MinimumDuration)
+                if (filterParameter.KeepEmptyChapter || firstChapterNode.Value.Duration >= filterParameter.MinimumDuration)
                     break;
                 var newChapter = MergeChapter(firstChapterNode.Value, secondChapterNode.Value, filterParameter);
                 _ = trimmedChapters.AddFirst(newChapter);
@@ -150,7 +150,7 @@ namespace MatroskaBatchToolBox.Utility
             for (var currentChapterNode = trimmedChapters.First; currentChapterNode is not null && currentChapterNode.Next is not null;)
             {
                 var nextChapterNode = currentChapterNode.Next;
-                if (nextChapterNode.Value.Duration < filterParameter.MinimumDuration)
+                if (!filterParameter.KeepEmptyChapter && nextChapterNode.Value.Duration < filterParameter.MinimumDuration)
                 {
                     var newChapter = MergeChapter(currentChapterNode.Value, nextChapterNode.Value, filterParameter);
                     _ = trimmedChapters.AddAfter(nextChapterNode, newChapter);
@@ -175,16 +175,9 @@ namespace MatroskaBatchToolBox.Utility
                 trimmedChapters.AddLast(new LinkedListNode<SimpleChapterElement>(newLastChapter));
             }
 
-            var invalidTitle =
-                filterParameter.Titles
-                .Where(item => item.Key >= trimmedChapters.Count)
-                .Select(item => new { chapterNumber = item.Key, chapterTitle = item.Value })
-                .FirstOrDefault();
             return
-                invalidTitle is null
-                    ? trimmedChapters
-                        .Select((chapter, chapterNumber) => new SimpleChapterElement(chapter.StartTime, chapter.EndTime, filterParameter.Titles.TryGetValue(chapterNumber, out var chapterTitle) ? chapterTitle : chapter.Title))
-                    : throw new ApplicationException($"A chapter title was specified with the '--set_title:{invalidTitle.chapterNumber} \"{invalidTitle.chapterTitle}\"' option, but there is no corresponding chapter #{invalidTitle.chapterNumber}.");
+                trimmedChapters
+                .Select((chapter, chapterNumber) => new SimpleChapterElement(chapter.StartTime, chapter.EndTime, filterParameter.Titles.TryGetValue(chapterNumber, out var chapterTitle) ? chapterTitle : chapter.Title));
         }
 
         private static SimpleChapterElement MergeChapter(SimpleChapterElement firstHalf, SimpleChapterElement secondHalf, ChapterFilterParameter filterParameter)
