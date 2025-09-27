@@ -18,11 +18,12 @@ namespace Palmtree.Movie.Ffmpeg
 {
     public static class Program
     {
-        private static readonly string _thisCommandName = typeof(Program).Assembly.GetName().Name ?? "???";
         private static readonly string _ffmpegCommandPath = ProcessUtility.WhereIs("ffmpeg") ?? "ffmpeg";
 
         public static int Main(string[] args)
         {
+            ProcessUtility.SetupCurrentProcessPriority();
+
             if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
             {
                 if (OperatingSystem.IsWindows())

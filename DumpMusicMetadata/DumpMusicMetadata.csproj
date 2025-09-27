@@ -34,7 +34,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Palmtree.IO.Console" Version="1.7.3-alpha" />
+    <PackageReference Include="Palmtree.IO.Console" Version="1.7.4-alpha" />
   </ItemGroup>
 
   <ItemGroup>

@@ -12,10 +12,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Palmtree.Core" Version="1.19.2-alpha" />
-    <PackageReference Include="Palmtree.IO" Version="1.19.3-alpha" />
-    <PackageReference Include="Palmtree.IO.Console" Version="1.7.3-alpha" />
-    <PackageReference Include="Palmtree.Numerics" Version="1.2.14-alpha" />
+    <PackageReference Include="Palmtree.Core" Version="1.20.1-alpha" />
+    <PackageReference Include="Palmtree.IO" Version="1.19.4-alpha" />
+    <PackageReference Include="Palmtree.IO.Console" Version="1.7.4-alpha" />
+    <PackageReference Include="Palmtree.Numerics" Version="1.2.15-alpha" />
   </ItemGroup>
 
 </Project>

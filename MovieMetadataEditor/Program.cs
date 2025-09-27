@@ -171,6 +171,8 @@ namespace MovieMetadataEditor
 
         public static int Main(string[] args)
         {
+            ProcessUtility.SetupCurrentProcessPriority();
+
             if (TinyConsole.InputEncoding.CodePage != Encoding.UTF8.CodePage || TinyConsole.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
             {
                 if (OperatingSystem.IsWindows())

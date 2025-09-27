@@ -114,10 +114,67 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             Action IChildProcessOutputRedirectable.GetOutputRedirector(StreamReader reader)
                 => () =>
                 {
-                    while (true)
+                    var endOfStream = false;
+                    while (!endOfStream)
                     {
-                        var textLine = reader.ReadLine();
-                        if (textLine is null)
+                        var endOfLine = false;
+                        var textLine = "";
+                        var buffer = new StringBuilder();
+                        while (!endOfLine)
+                        {
+                            var c = reader.Read();
+                            if (c < 0)
+                            {
+                                endOfStream = true;
+                                endOfLine = true;
+                                textLine = buffer.ToString();
+                                _ = buffer.Clear();
+                                break;
+                            }
+                            else if (c == '\n')
+                            {
+                                endOfLine = true;
+                                _ = buffer.Append((char)c);
+                                textLine = buffer.ToString();
+                                _ = buffer.Clear();
+                                break;
+                            }
+                            else if (c == '\r')
+                            {
+                                _ = buffer.Append((char)c);
+                                c = reader.Read();
+                                if (c == -1)
+                                {
+                                    endOfStream = true;
+                                    endOfLine = true;
+                                    textLine = buffer.ToString();
+                                    _ = buffer.Clear();
+                                    break;
+                                }
+                                else if (c == '\n')
+                                {
+                                    endOfLine = true;
+                                    _ = buffer.Append((char)c);
+                                    textLine = buffer.ToString();
+                                    _ = buffer.Clear();
+                                    break;
+                                }
+                                else
+                                {
+                                    endOfLine = true;
+                                    textLine = buffer.ToString();
+                                    _ = buffer.Clear();
+                                    _ = buffer.Append((char)c);
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                _ = buffer.Append((char)c);
+                            }
+                        }
+
+                        if (endOfStream)
                             break;
                         _textReader(textLine);
                     }
@@ -193,7 +250,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                     null,
                     null,
                     null,
-                    GetTextOutputRedirector(standardOutputTextLines.Add),
+                    GetTextOutputRedirector(rawTextLine => standardOutputTextLines.Add(rawTextLine.TrimEnd())),
                     null,
                     logger,
                     null);
@@ -233,8 +290,9 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                     null,
                     standardInputRedirector,
                     standardOutputRedirector,
-                    GetTextOutputRedirector(lineText =>
+                    GetTextOutputRedirector(rawLineText =>
                     {
+                        var lineText = rawLineText.TrimEnd(); // 末尾の改行コードを削除
                         if (lineText.StartsWith("[q] command received. Exiting.", StringComparison.Ordinal))
                         {
                             // ffmpeg が q の入力を検出して終了ログである場合
@@ -310,8 +368,8 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
             Action<LogCategory, string> messageReporter,
             IChildProcessCancellable? childProcessCcanceller)
         {
-            standardOutputRedirector ??= new TextOutputRedirector(TinyConsole.WriteLine);
-            standardErrorRedirector ??= new TextOutputRedirector(TinyConsole.WriteLine);
+            standardOutputRedirector ??= new TextOutputRedirector(TinyConsole.Write);
+            standardErrorRedirector ??= new TextOutputRedirector(TinyConsole.Write);
 
             Validation.Assert(standardOutputRedirector is not null);
             Validation.Assert(standardErrorRedirector is not null);
@@ -325,7 +383,7 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
                     RedirectStandardInput = standardInputRedirector is not null,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
-                    StandardInputEncoding = standardInputRedirector is not null ? ( intpuEncoding ?? _defaultInputOutputEncoding) : null,
+                    StandardInputEncoding = standardInputRedirector is not null ? (intpuEncoding ?? _defaultInputOutputEncoding) : null,
                     StandardOutputEncoding = outputEncoding ?? _defaultInputOutputEncoding,
                     StandardErrorEncoding = outputEncoding ?? _defaultInputOutputEncoding,
                     UseShellExecute = false,
