@@ -1,0 +1,50 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    <AssemblyName>chkdur</AssemblyName>
+    <Trimming>full</Trimming>
+    <PublishAot>True</PublishAot>
+    <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0|AnyCPU'">
+    <WarningsNotAsErrors>IL3000</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0|AnyCPU'">
+    <WarningsNotAsErrors>IL3000</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0|AnyCPU'">
+    <WarningsNotAsErrors>IL3000</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0|AnyCPU'">
+    <WarningsNotAsErrors>IL3000</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Palmtree.Core" Version="1.20.1-alpha" />
+    <PackageReference Include="Palmtree.IO" Version="1.19.4-alpha" />
+    <PackageReference Include="Palmtree.IO.Console" Version="1.7.4-alpha" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MatroskaBatchToolBox.Utility\MatroskaBatchToolBox.Utility.csproj" />
+  </ItemGroup>
+
+</Project>
