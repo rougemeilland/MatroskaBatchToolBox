@@ -280,8 +280,8 @@ namespace ConcatMovie
                 ffmpegCommandParameters.Add("-fflags +genpts");
                 foreach (var stream in inputFileInfos.Span[0].MovieInfo.VideoStreams)
                     ffmpegCommandParameters.Add($"-map {$"[outv{stream.IndexWithinVideoStream}]".EncodeCommandLineArgument()}");
-                foreach (var stream in inputFileInfos.Span[0].MovieInfo.VideoStreams)
-                    ffmpegCommandParameters.Add($"-map {$"[outa{stream.IndexWithinVideoStream}]".EncodeCommandLineArgument()}");
+                foreach (var stream in inputFileInfos.Span[0].MovieInfo.AudioStreams)
+                    ffmpegCommandParameters.Add($"-map {$"[outa{stream.IndexWithinAudioStream}]".EncodeCommandLineArgument()}");
                 ffmpegCommandParameters.Add($"-map_chapters {inputFileInfos.Length}");
 
                 if (outputFormat is not null)
