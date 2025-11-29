@@ -6,20 +6,22 @@ using Palmtree;
 
 namespace AudioNormalizer
 {
-    internal sealed class Mp4MusicFileMetadataProvider
+    internal sealed class AacMusicFileMetadataProvider
         : MusicFileMetadataProvider
     {
         private readonly TransferDirection _direction;
         private readonly string? _fileFormat;
 
-        public Mp4MusicFileMetadataProvider(TransferDirection direction, string? fileFormat, string? fileExtension)
+        public AacMusicFileMetadataProvider(TransferDirection direction, string? fileFormat, string? fileExtension)
         {
             _direction = direction;
             _fileFormat =
                 fileFormat is null && fileExtension is null
                 ? null
-                : (fileFormat is null || fileFormat.IsAnyOf("mov", "mp4", "m4a", "3gp", "3g2", "mj2")) && (fileExtension is null || fileExtension.IsAnyOf(".m4a", ".mp4"))
-                ? "mp4"
+                : (fileFormat is null || fileFormat == "aac") && (fileExtension is null || fileExtension == ".aac") && direction == TransferDirection.Input
+                ? "aac"
+                : (fileFormat is null || fileFormat == "adts") && (fileExtension is null || fileExtension == ".aac") && direction == TransferDirection.Output
+                ? "adts"
                 : null;
         }
 
@@ -34,7 +36,8 @@ namespace AudioNormalizer
                 return
                     _fileFormat switch
                     {
-                        "mp4" => ".m4a",
+                        "aac" => ".aac",
+                        "adts" => ".aac",
                         _ => throw Validation.GetFailErrorException(),
                     };
             }
@@ -58,7 +61,7 @@ namespace AudioNormalizer
                 Date = sourceMusicFileInfo.Format.Tags["date"],
                 Disc = sourceMusicFileInfo.Format.Tags["disc"],
                 Genre = sourceMusicFileInfo.Format.Tags["genre"],
-                Lyricist = sourceMusicFileInfo.Format.Tags["LYRICIST"],
+                Lyricist = sourceMusicFileInfo.Format.Tags["TEXT"],
                 Title = sourceMusicFileInfo.Format.Tags["title"],
                 Track = sourceMusicFileInfo.Format.Tags["track"],
             };
@@ -69,36 +72,7 @@ namespace AudioNormalizer
             if (_direction != TransferDirection.Output)
                 throw new InvalidOperationException();
 
-            yield return ("major_brand", "M4A");
-            yield return ("minor_version", "512");
-            yield return ("compatible_brands", "M4A isomiso2");
-
-            if (metadata.Album is not null)
-                yield return ("album", metadata.Album);
-            if (metadata.AlbumArtist is not null)
-                yield return ("album_artist", metadata.AlbumArtist);
-            if (metadata.Artist is not null)
-                yield return ("artist", metadata.Artist);
-            if (metadata.Comment is not null)
-                yield return ("comment", metadata.Comment);
-            if (metadata.Composer is not null)
-                yield return ("composer", metadata.Composer);
-            if (metadata.Copyright is not null)
-                yield return ("copyright", metadata.Copyright);
-            if (metadata.Date is not null)
-                yield return ("date", metadata.Date);
-            if (metadata.Disc is not null)
-                yield return ("disc", metadata.Disc);
-            if (metadata.Genre is not null)
-                yield return ("genre", metadata.Genre);
-#if false // m4a および mp4 では ffmpeg によって lyricist タグを正しく設定できないため、この行は無効化
-            if (metadata.Lyricist is not null)
-                yield return ("lyricist", metadata.Lyricist);
-#endif
-            if (metadata.Title is not null)
-                yield return ("title", metadata.Title);
-            if (metadata.Track is not null)
-                yield return ("track", metadata.Track);
+            yield break;
         }
 
         public override IEnumerable<(string metadataName, string metadataValue)> EnumerateStreamMetadata(MusicFileMetadata metadata)
@@ -114,8 +88,30 @@ namespace AudioNormalizer
             if (_direction != TransferDirection.Output)
                 throw new InvalidOperationException();
 
+            if (metadata.Album is not null)
+                yield return ("album", metadata.Album);
+            if (metadata.AlbumArtist is not null)
+                yield return ("albumartist", metadata.AlbumArtist);
+            if (metadata.Artist is not null)
+                yield return ("artist", metadata.Artist);
+            if (metadata.Comment is not null)
+                yield return ("Comment", metadata.Comment);
+            if (metadata.Composer is not null)
+                yield return ("composer", metadata.Composer);
+            if (metadata.Copyright is not null)
+                yield return ("copyright", metadata.Copyright);
+            if (metadata.Date is not null)
+                yield return ("date", metadata.Date);
+            if (metadata.Disc is not null)
+                yield return ("discnumber", metadata.Disc);
+            if (metadata.Genre is not null)
+                yield return ("genre", metadata.Genre);
             if (metadata.Lyricist is not null)
                 yield return ("lyricist", metadata.Lyricist);
+            if (metadata.Title is not null)
+                yield return ("title", metadata.Title);
+            if (metadata.Track is not null)
+                yield return ("track", metadata.Track);
         }
 
         public override (string encoder, IEnumerable<string> encoderOptions) GuessDefaultEncoderSpec(AudioStreamInfo sourceAudioStream)
@@ -126,7 +122,7 @@ namespace AudioNormalizer
             return _fileFormat switch
             {
                 null => throw new InvalidOperationException(),
-                "mp4" => ("aac", new[] { $"-aac_coder twoloop -ab {CalculateBitRateForAac(sourceAudioStream.Channels) / 1000:F0}k" }.Append(MapAacSampleFormatOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.SampleFormat))),
+                "adts" => ("aac", new[] { $"-aac_coder twoloop -ab {CalculateBitRateForAac(sourceAudioStream.Channels) / 1000:F0}k" }.Append(MapAacSampleFormatOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.SampleFormat))),
                 _ => throw Validation.GetFailErrorException(),
             };
         }
@@ -146,6 +142,5 @@ namespace AudioNormalizer
             {
                 _ => $"-sample_fmt:a:{index} fltp",
             };
-
     }
 }

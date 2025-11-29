@@ -17,6 +17,7 @@ namespace AudioNormalizer
         private const string _ffmpegPathEnvironmentVariableName = "FFMPEG_PATH";
         private static readonly FilePath _ffmpegCommandFile;
         private static readonly FilePath _metaeditCommandFile;
+        private static readonly Lazy<FilePath?> _kid3ConsoleCommandFile;
 
         private readonly IMusicFileMetadataProvider? _inputFlleProvider;
         private readonly IMusicFileMetadataProvider? _outputFlleProvider;
@@ -34,6 +35,13 @@ namespace AudioNormalizer
             _ffmpegCommandFile = new FilePath(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException($"ffmpeg is not installed."));
             var metaeditCommandName = "metaedit";
             _metaeditCommandFile = new FilePath(ProcessUtility.WhereIs(metaeditCommandName) ?? throw new FileNotFoundException($"{metaeditCommandName} is not installed."));
+            _kid3ConsoleCommandFile =
+                new Lazy<FilePath?>(
+                    () =>
+                    {
+                        var kid3ConsoleCommandFilePath = ProcessUtility.WhereIs("kid3-cli");
+                        return kid3ConsoleCommandFilePath is not null ? new FilePath(kid3ConsoleCommandFilePath) : null;
+                    });
         }
 
         public NormalizationState(
@@ -330,7 +338,11 @@ namespace AudioNormalizer
                         inputFormat,
                         inputFile,
                         MovieInformationType.Chapters | MovieInformationType.Streams | MovieInformationType.Format,
-                        (level, message) => _messageReporter2("ffprobe", level, message));
+                        (level, message) =>
+                        {
+                            if (level != LogCategory.Information || _verbose)
+                                _messageReporter2("ffprobe", level, message);
+                        });
             }
             catch (Exception ex)
             {
@@ -409,7 +421,7 @@ namespace AudioNormalizer
             {
                 if (specifiedEncoder == "aac")
                 {
-                    var provider = new ID3MusicFileMetadataProvider(TransferDirection.Output, "aac", null);
+                    var provider = new AacMusicFileMetadataProvider(TransferDirection.Output, "aac", null);
                     return ("adts", movieFileInformation.AudioStreams.SelectMany(stream => provider.GuessDefaultEncoderSpec(stream).encoderOptions).ToArray());
                 }
                 else if (specifiedEncoder == "flac")
@@ -665,81 +677,145 @@ namespace AudioNormalizer
             Validation.Assert(normalizedMusicFileInfo.VideoStreams.None());
             Validation.Assert(normalizedMusicFileInfo.AudioStreams.Take(2).Count() == 1);
 
-            var ffmpegCommandParameters =
-                new List<string>
-                {
+            ExecuteFfmpegCommand(musicFileInfo, normalizedMusicFileInfo, _outputFlleProvider, inputFormat, inputFile, outputFormat, outputFile, metadata, _doOverwrite, _verbose, _messageReporter);
+            ExecuteKid3ConsoleCommad(musicFileInfo, _outputFlleProvider, metadata, inputFile, outputFile, _disableVideoStream, _messageReporter);
+
+            static void ExecuteFfmpegCommand(MovieInformation musicFileInfo, MovieInformation normalizedMusicFileInfo, IMusicFileMetadataProvider outputFlleProvider, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile, MusicFileMetadata metadata, bool doOverwrite, bool verbose, Action<LogCategory, string> messageReporter)
+            {
+                var ffmpegCommandParameters =
+                    new List<string>
+                    {
                         "-hide_banner",
-                };
-            if (_doOverwrite)
-                ffmpegCommandParameters.Add("-y");
-            ffmpegCommandParameters.Add($"-f {musicFileInfo.Format.FormatName.EncodeCommandLineArgument()}");
-            ffmpegCommandParameters.Add($"-i {musicFileInfo.Format.File.FullName.EncodeCommandLineArgument()}");
-            if (inputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {inputFormat.EncodeCommandLineArgument()}");
-            ffmpegCommandParameters.Add($"-i {inputFile.FullName.EncodeCommandLineArgument()}");
+                    };
+                if (doOverwrite)
+                    ffmpegCommandParameters.Add("-y");
+                if (inputFormat is not null)
+                    ffmpegCommandParameters.Add($"-f {inputFormat.EncodeCommandLineArgument()}");
+                ffmpegCommandParameters.Add($"-i {inputFile.FullName.EncodeCommandLineArgument()}");
 
-            {
-                var tags =
-                    normalizedMusicFileInfo.Format.Tags.EnumerateTagNames()
-                    .ToDictionary(tagName => tagName, tagName => string.Equals(tagName, "encoder", StringComparison.OrdinalIgnoreCase) ? normalizedMusicFileInfo.Format.Tags[tagName] ?? "" : "", StringComparer.OrdinalIgnoreCase);
-                foreach (var (metadataName, metadataValue) in _outputFlleProvider.EnumerateFormatMetadata(metadata))
-                    tags[metadataName] = metadataValue;
-                foreach (var metadataSetElement in tags)
-                    ffmpegCommandParameters.Add($"-metadata {metadataSetElement.Key}={metadataSetElement.Value.EncodeCommandLineArgument()}");
-            }
-
-            ffmpegCommandParameters.Add("-c copy");
-            foreach (var stream in normalizedMusicFileInfo.AudioStreams)
-            {
-                ffmpegCommandParameters.Add($"-map 1:a:{stream.IndexWithinAudioStream}");
-                var tags =
-                    stream.Tags.EnumerateTagNames()
-                    .ToDictionary(tagName => tagName, tagName => string.Equals(tagName, "encoder", StringComparison.OrdinalIgnoreCase) ? stream.Tags[tagName] ?? "" : "", StringComparer.OrdinalIgnoreCase);
-                foreach ((var metadataName, var metadataValue) in _outputFlleProvider.EnumerateStreamMetadata(metadata))
-                    tags[metadataName] = metadataValue;
-                foreach (var tag in tags)
-                    ffmpegCommandParameters.Add($"-metadata:s:a:{stream.IndexWithinAudioStream} {tag.Key}={tag.Value.EncodeCommandLineArgument()}");
-            }
-
-            if (!_disableVideoStream)
-            {
-                foreach (var stream in musicFileInfo.VideoStreams)
                 {
-                    ffmpegCommandParameters.Add($"-map 0:v:{stream.IndexWithinVideoStream}");
-                    ffmpegCommandParameters.Add($"-disposition:v:{stream.IndexWithinVideoStream} +attached_pic");
+                    var tags =
+                        normalizedMusicFileInfo.Format.Tags.EnumerateTagNames()
+                        .ToDictionary(tagName => tagName, tagName => string.Equals(tagName, "encoder", StringComparison.OrdinalIgnoreCase) ? normalizedMusicFileInfo.Format.Tags[tagName] ?? "" : "", StringComparer.OrdinalIgnoreCase);
+                    foreach (var (metadataName, metadataValue) in outputFlleProvider.EnumerateFormatMetadata(metadata))
+                        tags[metadataName] = metadataValue;
+                    foreach (var metadataSetElement in tags)
+                        ffmpegCommandParameters.Add($"-metadata {metadataSetElement.Key}={metadataSetElement.Value.EncodeCommandLineArgument()}");
+                }
+
+                ffmpegCommandParameters.Add("-c copy");
+                foreach (var stream in normalizedMusicFileInfo.AudioStreams)
+                {
+                    ffmpegCommandParameters.Add($"-map 0:a:{stream.IndexWithinAudioStream}");
                     var tags =
                         stream.Tags.EnumerateTagNames()
-                        .ToDictionary(tagName => tagName, tagName => string.Equals(tagName, "encoder", StringComparison.OrdinalIgnoreCase) ? stream.Tags[tagName] ?? "" : "");
-                    tags["comment"] = "Cover (front)";
+                        .ToDictionary(tagName => tagName, tagName => string.Equals(tagName, "encoder", StringComparison.OrdinalIgnoreCase) ? stream.Tags[tagName] ?? "" : "", StringComparer.OrdinalIgnoreCase);
+                    foreach ((var metadataName, var metadataValue) in outputFlleProvider.EnumerateStreamMetadata(metadata))
+                        tags[metadataName] = metadataValue;
                     foreach (var tag in tags)
-                        ffmpegCommandParameters.Add($"-metadata:s:v:{stream.IndexWithinVideoStream} {tag.Key}={tag.Value.EncodeCommandLineArgument()}");
+                        ffmpegCommandParameters.Add($"-metadata:s:a:{stream.IndexWithinAudioStream} {tag.Key}={tag.Value.EncodeCommandLineArgument()}");
+                }
+
+                if (outputFormat is not null)
+                    ffmpegCommandParameters.Add($"-f {outputFormat.EncodeCommandLineArgument()}");
+                ffmpegCommandParameters.Add($"{outputFile.FullName.EncodeCommandLineArgument()}");
+
+                var ffmpegCommandParameterText = string.Join(" ", ffmpegCommandParameters);
+                if (verbose)
+                    messageReporter(LogCategory.Information, $"Execute: ffmpeg {ffmpegCommandParameterText}");
+                ExecuteCommand(_ffmpegCommandFile, ffmpegCommandParameterText, messageReporter);
+            }
+
+            static void ExecuteKid3ConsoleCommad(MovieInformation musicFileInfo, IMusicFileMetadataProvider outputFlleProvider, MusicFileMetadata metadata, FilePath inputFile, FilePath outputFile, bool disableVideoStream, Action<LogCategory, string> messageReporter)
+            {
+                var coverArtImageFile = (FilePath?)null;
+                try
+                {
+                    var kid3SetCommandParameters = new List<string>();
+
+                    // 出力先ファイルにカバーアート画像をコピーする
+                    if (!disableVideoStream)
+                    {
+                        // コマンドオプションでカバーアート画像のコピーが抑止されていない場合
+
+                        var pictures = musicFileInfo.VideoStreams.ToList();
+                        if (pictures.Any(stream => stream.Disposition.AttachedPic == false))
+                            throw new ApplicationException($"There is a video stream that is not a cover image.: \"{inputFile.FullName}\"");
+                        if (pictures.Count > 1)
+                            throw new ApplicationException($"Multiple cover images are not supported.: \"{inputFile.FullName}\"");
+
+                        Validation.Assert(pictures.Count is 0 or 1);
+                        Validation.Assert(pictures.Count == 0 || pictures[0].Disposition.AttachedPic == true);
+
+                        if (pictures.Count > 0)
+                        {
+                            // 入力元ファイルにカバーアート画像が存在する場合
+
+                            // カバーアート画像を保存するための一時ファイルのファイル名を決定する
+                            if (pictures[0].CodecName == "mjpeg")
+                                coverArtImageFile = FilePath.CreateTemporaryFile(suffix: ".jpg");
+                            else if (pictures[0].CodecName == "png")
+                                coverArtImageFile = FilePath.CreateTemporaryFile(suffix: ".png");
+                            else
+                                throw new ApplicationException($"Cover image for codec \"{pictures[0].CodecName}\" is not supported.: \"{inputFile.FullName}\"");
+
+                            // カバーアート画像を一時ファイルに保存する (入力元ファイルの拡張子が必ずしも画像を意味するものではないため、kid3-cli ではなく ffmpeg を使用する)
+                            ExecuteCommand(_ffmpegCommandFile, $"-hide_banner -y -f {musicFileInfo.Format.FormatName.EncodeCommandLineArgument()} -i {musicFileInfo.Format.File.FullName.EncodeCommandLineArgument()} -an -c:v copy -update 1 {coverArtImageFile.FullName.EncodeCommandLineArgument()}", messageReporter);
+
+                            // 出力先ファイルに適用する kid3-cli のコマンドラインに、カバーアート画像を付加するパラメタを追加する
+                            kid3SetCommandParameters.Add($"-c {$"set picture:{coverArtImageFile.FullName.EncodeKid3CommandLineArgument(quoteAlways: true)} {"Cover (front)".EncodeKid3CommandLineArgument()}".EncodeCommandLineArgument()}");
+                        }
+                    }
+
+                    // kid3-cli を使用して出力先ファイルに付加するべきメタデータを収集する
+                    var tags = outputFlleProvider.EnumerateKid3Metadata(metadata).ToList();
+                    if (tags.Count > 0)
+                    {
+                        // 出力先に付加するために kid3-cli を使用しなければならないメタデータが存在する
+
+                        if (_kid3ConsoleCommandFile.Value is null)
+                            throw new ApplicationException("\"kid3-cli\" is not installed correctly.");
+
+                        foreach (var (metadataName, metadataValue) in tags)
+                            kid3SetCommandParameters.Add($"-c {$"set {metadataName.EncodeKid3CommandLineArgument()} {metadataValue.EncodeKid3CommandLineArgument()}".EncodeCommandLineArgument()}");
+                    }
+
+                    if (kid3SetCommandParameters.Count > 0)
+                    {
+                        // kid3-cli を使用しなければならない場合
+
+                        if (_kid3ConsoleCommandFile.Value is null)
+                            throw new ApplicationException("\"kid3-cli\" is not installed correctly.");
+
+                        ExecuteCommand(_kid3ConsoleCommandFile.Value, $"{string.Join(" ", kid3SetCommandParameters)} {outputFile.FullName.EncodeCommandLineArgument()}", messageReporter);
+                    }
+                }
+                finally
+                {
+                    coverArtImageFile?.SafetyDelete();
                 }
             }
 
-            if (outputFormat is not null)
-                ffmpegCommandParameters.Add($"-f {outputFormat.EncodeCommandLineArgument()}");
-            ffmpegCommandParameters.Add($"{outputFile.FullName.EncodeCommandLineArgument()}");
-
-            var ffmpegCommandParameterText = string.Join(" ", ffmpegCommandParameters);
-            if (_verbose)
-                _messageReporter(LogCategory.Information, $"Execute: ffmpeg {ffmpegCommandParameterText}");
-            var exitCode =
-                Command.ExecuteCommand(
-                    _ffmpegCommandFile,
-                    ffmpegCommandParameterText,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    (level, message) =>
-                    {
-                        if (level != LogCategory.Information)
-                            _messageReporter(level, message);
-                    },
-                    null);
-            if (exitCode != 0)
-                throw new ApplicationException($"An error occurred in the \"ffmpeg\" command. : exit-code={exitCode}");
+            static void ExecuteCommand(FilePath commandFile, string commandParameterText, Action<LogCategory, string> messageReporter)
+            {
+                var exitCode =
+                    Command.ExecuteCommand(
+                        commandFile,
+                        commandParameterText,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        (level, message) =>
+                        {
+                            if (level != LogCategory.Information)
+                                messageReporter(level, message);
+                        },
+                        null);
+                if (exitCode != 0)
+                    throw new ApplicationException($"An error occurred in the \"{commandFile.FullName}\" command. : exit-code={exitCode}");
+            }
         }
 
         private static string? AlternativeFormatForInput(string? format)

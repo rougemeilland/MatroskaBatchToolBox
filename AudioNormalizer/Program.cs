@@ -135,6 +135,7 @@ namespace AudioNormalizer
                         new[]
                         {
                             new ID3MusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null) as IMusicFileMetadataProvider,
+                            new AacMusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null),
                             new FlacMusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null),
                             new OggMusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null),
                             new Mp4MusicFileMetadataProvider(TransferDirection.Input, commandOptions.InputFormat, commandOptions.Input is not null ? Path.GetExtension(commandOptions.Input).ToLowerInvariant() : null),
@@ -146,6 +147,7 @@ namespace AudioNormalizer
                         new[]
                         {
                             new ID3MusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null) as IMusicFileMetadataProvider,
+                            new AacMusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null),
                             new FlacMusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null),
                             new OggMusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null),
                             new Mp4MusicFileMetadataProvider(TransferDirection.Output, commandOptions.OutputFormat, commandOptions.Output is not null ? Path.GetExtension(commandOptions.Output).ToLowerInvariant() : null),

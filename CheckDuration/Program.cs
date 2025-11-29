@@ -189,7 +189,7 @@ namespace CheckDuration
                         MovieInformationType.Chapters | MovieInformationType.Streams | MovieInformationType.Format,
                         (level, message) =>
                         {
-                            if (_verbose)
+                            if (level != LogCategory.Information || _verbose)
                                 TinyConsole.WriteLog("ffprobe", level, message);
                         });
             }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
 
@@ -22,10 +21,6 @@ namespace AudioNormalizer
                 ? "wav"
                 : (fileFormat is null || fileFormat == "mp3") && (fileExtension is null || fileExtension == ".mp3")
                 ? "mp3"
-                : (fileFormat is null || fileFormat == "aac") && (fileExtension is null || fileExtension == ".aac") && direction == TransferDirection.Input
-                ? "aac"
-                : (fileFormat is null || fileFormat == "adts") && (fileExtension is null || fileExtension == ".aac") && direction == TransferDirection.Output
-                ? "adts"
                 : null;
         }
 
@@ -42,8 +37,6 @@ namespace AudioNormalizer
                     {
                         "wav" => ".wav",
                         "mp3" => ".mp3",
-                        "aac" => ".aac",
-                        "adts" => ".aac",
                         _ => throw Validation.GetFailErrorException(),
                     };
             }
@@ -84,8 +77,10 @@ namespace AudioNormalizer
                 yield return ("album_artist", metadata.AlbumArtist);
             if (metadata.Artist is not null)
                 yield return ("artist", metadata.Artist);
+#if false // mp3 では ffmpeg によって comment タグを正しく設定できないため、この行は無効化
             if (metadata.Comment is not null)
                 yield return ("comment", metadata.Comment);
+#endif
             if (metadata.Composer is not null)
                 yield return ("composer", metadata.Composer);
             if (metadata.Copyright is not null)
@@ -96,8 +91,10 @@ namespace AudioNormalizer
                 yield return ("disc", metadata.Disc);
             if (metadata.Genre is not null)
                 yield return ("genre", metadata.Genre);
+#if false // mp3 では ffmpeg によって lyricist タグを正しく設定できないため、この行は無効化
             if (metadata.Lyricist is not null)
                 yield return ("TEXT", metadata.Lyricist);
+#endif
             if (metadata.Title is not null)
                 yield return ("title", metadata.Title);
             if (metadata.Track is not null)
@@ -112,6 +109,17 @@ namespace AudioNormalizer
             yield break;
         }
 
+        public override IEnumerable<(string metadataName, string metadataValue)> EnumerateKid3Metadata(MusicFileMetadata metadata)
+        {
+            if (_direction != TransferDirection.Output)
+                throw new InvalidOperationException();
+
+            if (metadata.Comment is not null)
+                yield return ("comment", metadata.Comment);
+            if (metadata.Lyricist is not null)
+                yield return ("lyricist", metadata.Lyricist);
+        }
+
         public override (string encoder, IEnumerable<string> encoderOptions) GuessDefaultEncoderSpec(AudioStreamInfo sourceAudioStream)
         {
             if (_direction != TransferDirection.Output)
@@ -122,7 +130,6 @@ namespace AudioNormalizer
                 null => throw new InvalidOperationException(),
                 "wav" => (MapPcmEncoder(sourceAudioStream.SampleFormat, sourceAudioStream.BitsPerRawSample), MapPcmEncoderOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.BitsPerRawSample)),
                 "mp3" => ("libmp3lame", [$"-compression_level:a 0 -q:a 0 -b:a {(128 * sourceAudioStream.Channels).Maximum(320)}k"]),
-                "adts" => ("aac", new[] { $"-aac_coder twoloop -ab {CalculateBitRateForAac(sourceAudioStream.Channels) / 1000:F0}k" }.Append(MapAacSampleFormatOptions(sourceAudioStream.IndexWithinAudioStream, sourceAudioStream.SampleFormat))),
                 _ => throw Validation.GetFailErrorException(),
             };
         }
@@ -146,22 +153,5 @@ namespace AudioNormalizer
             else
                 return [$"-bits_per_raw_sample:a:{index} {bitsPerRawSample.Value}"];
         }
-
-        private static double CalculateBitRateForAac(int channels)
-        {
-            if (channels <= 1)
-                return 128000;
-            else if (channels <= 2)
-                return 384000;
-            else
-                return 512000;
-        }
-
-        private static string MapAacSampleFormatOptions(int index, AudioSampleFormat sampleFormat)
-            => sampleFormat switch
-            {
-                _ => $"-sample_fmt:a:{index} fltp",
-            };
-
     }
 }

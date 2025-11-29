@@ -14,6 +14,7 @@ namespace AudioNormalizer
         public abstract MusicFileMetadata GetMetadata(MovieInformation sourceMusicFileInfo);
         public abstract IEnumerable<(string metadataName, string metadataValue)> EnumerateFormatMetadata(MusicFileMetadata metadata);
         public abstract IEnumerable<(string metadataName, string metadataValue)> EnumerateStreamMetadata(MusicFileMetadata metadata);
+        public abstract IEnumerable<(string metadataName, string metadataValue)> EnumerateKid3Metadata(MusicFileMetadata metadata);
         public abstract (string encoder, IEnumerable<string> encoderOptions) GuessDefaultEncoderSpec(AudioStreamInfo sourceAudioStreamInfo);
 
         protected static string EncodeFfmetadataValue(string metadataValue)

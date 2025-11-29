@@ -60,8 +60,10 @@ namespace AudioNormalizer
                 yield return ("album_artist", metadata.AlbumArtist);
             if (metadata.Artist is not null)
                 yield return ("artist", metadata.Artist);
+#if false // flac では ffmpeg によって comment タグを正しく設定できないため、この行は無効化
             if (metadata.Comment is not null)
                 yield return ("comment", metadata.Comment);
+#endif
             if (metadata.Composer is not null)
                 yield return ("composer", metadata.Composer);
             if (metadata.Copyright is not null)
@@ -86,6 +88,15 @@ namespace AudioNormalizer
                 throw new InvalidOperationException();
 
             yield break;
+        }
+
+        public override IEnumerable<(string metadataName, string metadataValue)> EnumerateKid3Metadata(MusicFileMetadata metadata)
+        {
+            if (_direction != TransferDirection.Output)
+                throw new InvalidOperationException();
+
+            if (metadata.Comment is not null)
+                yield return ("comment", metadata.Comment);
         }
 
         public override (string encoder, IEnumerable<string> encoderOptions) GuessDefaultEncoderSpec(AudioStreamInfo sourceAudioStream)
