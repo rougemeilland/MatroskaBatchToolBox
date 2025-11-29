@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using MatroskaBatchToolBox.Utility.Interprocess;
 using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
 using Palmtree.IO;
-using Palmtree.IO.Console;
 using Palmtree.Linq;
+using Palmtree.Text;
 
 namespace AudioNormalizer
 {
@@ -17,7 +18,37 @@ namespace AudioNormalizer
         private const string _ffmpegPathEnvironmentVariableName = "FFMPEG_PATH";
         private static readonly FilePath _ffmpegCommandFile;
         private static readonly FilePath _metaeditCommandFile;
-        private static readonly Lazy<FilePath?> _kid3ConsoleCommandFile;
+        private static readonly Lazy<FilePath?> _kid3ConsoleCommandFile =
+                new(() =>
+                    {
+                        var kid3ConsoleCommandFilePath = ProcessUtility.WhereIs("kid3-cli");
+                        return kid3ConsoleCommandFilePath is not null ? new FilePath(kid3ConsoleCommandFilePath) : null;
+                    });
+        private static readonly Dictionary<string, int> _coverArtPictureTypes =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Other", 0 },
+                { "32x32 pixels 'file icon'", 1 },
+                { "Other file icon", 2 },
+                { "Cover (front)", 3 },
+                { "Cover (back)", 4 },
+                { "Leaflet page", 5 },
+                { "Media (e.g. label side of CD)", 6 },
+                { "Lead artist/lead performer/soloist", 7 },
+                { "Artist/performer", 8 },
+                { "Conductor", 9 },
+                { "Band/Orchestra", 10 },
+                { "Composer", 11 },
+                { "Lyricist/text writer", 12 },
+                { "Recording Location", 13 },
+                { "During recording", 14 },
+                { "During performance", 15 },
+                { "Movie/video screen capture", 16 },
+                { "A bright coloured fish", 17 },
+                { "Illustration", 18 },
+                { "Band/artist logotype", 19 },
+                { "Publisher/Studio logotype", 20 }
+            };
 
         private readonly IMusicFileMetadataProvider? _inputFlleProvider;
         private readonly IMusicFileMetadataProvider? _outputFlleProvider;
@@ -26,6 +57,7 @@ namespace AudioNormalizer
         private readonly bool _doOverwrite;
         private readonly bool _verbose;
         private readonly bool _disableVideoStream;
+        private readonly bool _allowDuplicateCoverArtPictureType;
         private readonly Action<ISequentialInputByteStream, ISequentialOutputByteStream, ulong> _streamCopier;
         private readonly Action<LogCategory, string> _messageReporter;
         private readonly Action<string, LogCategory, string> _messageReporter2;
@@ -35,13 +67,6 @@ namespace AudioNormalizer
             _ffmpegCommandFile = new FilePath(ProcessUtility.WhereIs("ffmpeg") ?? throw new FileNotFoundException($"ffmpeg is not installed."));
             var metaeditCommandName = "metaedit";
             _metaeditCommandFile = new FilePath(ProcessUtility.WhereIs(metaeditCommandName) ?? throw new FileNotFoundException($"{metaeditCommandName} is not installed."));
-            _kid3ConsoleCommandFile =
-                new Lazy<FilePath?>(
-                    () =>
-                    {
-                        var kid3ConsoleCommandFilePath = ProcessUtility.WhereIs("kid3-cli");
-                        return kid3ConsoleCommandFilePath is not null ? new FilePath(kid3ConsoleCommandFilePath) : null;
-                    });
         }
 
         public NormalizationState(
@@ -52,6 +77,7 @@ namespace AudioNormalizer
             bool doOverwrite,
             bool verbose,
             bool disableVideoStream,
+            bool allowDuplicateCoverArtPictureType,
             Action<ISequentialInputByteStream, ISequentialOutputByteStream, ulong> streamCopier,
             Action<LogCategory, string> messageReporter,
             Action<string, LogCategory, string> messageReporter2)
@@ -61,6 +87,7 @@ namespace AudioNormalizer
             _doOverwrite = doOverwrite;
             _verbose = verbose;
             _disableVideoStream = disableVideoStream;
+            _allowDuplicateCoverArtPictureType = allowDuplicateCoverArtPictureType;
             _streamCopier = streamCopier;
             _messageReporter = messageReporter;
             _messageReporter2 = messageReporter2;
@@ -295,23 +322,14 @@ namespace AudioNormalizer
                         null,
                         temporaryIntermediateFile);
 
-                try
-                {
-                    SetMetadataOfMusicFile(
-                        musicFileInfo,
-                        normalizedMusicFileInfo,
-                        null,
-                        temporaryIntermediateFile,
-                        null,
-                        outputFile,
-                        metadata);
-                }
-                catch (Exception)
-                {
-                    if (musicFileInfo.VideoStreams.Any())
-                        TinyConsole.WriteLog(LogCategory.Information, "The destination file format may not support \"picture attachment\", or \"ffmpeg\" may not support \"picture attachment\" for that destination format.");
-                    throw;
-                }
+                SetMetadataOfMusicFile(
+                    musicFileInfo,
+                    normalizedMusicFileInfo,
+                    null,
+                    temporaryIntermediateFile,
+                    null,
+                    outputFile,
+                    metadata);
 
                 if (_verbose)
                     _messageReporter(LogCategory.Information, "Audio normalization finished.");
@@ -678,7 +696,7 @@ namespace AudioNormalizer
             Validation.Assert(normalizedMusicFileInfo.AudioStreams.Take(2).Count() == 1);
 
             ExecuteFfmpegCommand(musicFileInfo, normalizedMusicFileInfo, _outputFlleProvider, inputFormat, inputFile, outputFormat, outputFile, metadata, _doOverwrite, _verbose, _messageReporter);
-            ExecuteKid3ConsoleCommad(musicFileInfo, _outputFlleProvider, metadata, inputFile, outputFile, _disableVideoStream, _messageReporter);
+            ExecuteKid3ConsoleCommad(musicFileInfo, _outputFlleProvider, metadata, inputFile, outputFile, _disableVideoStream, _allowDuplicateCoverArtPictureType, _messageReporter);
 
             static void ExecuteFfmpegCommand(MovieInformation musicFileInfo, MovieInformation normalizedMusicFileInfo, IMusicFileMetadataProvider outputFlleProvider, string? inputFormat, FilePath inputFile, string? outputFormat, FilePath outputFile, MusicFileMetadata metadata, bool doOverwrite, bool verbose, Action<LogCategory, string> messageReporter)
             {
@@ -726,11 +744,15 @@ namespace AudioNormalizer
                 ExecuteCommand(_ffmpegCommandFile, ffmpegCommandParameterText, messageReporter);
             }
 
-            static void ExecuteKid3ConsoleCommad(MovieInformation musicFileInfo, IMusicFileMetadataProvider outputFlleProvider, MusicFileMetadata metadata, FilePath inputFile, FilePath outputFile, bool disableVideoStream, Action<LogCategory, string> messageReporter)
+            static void ExecuteKid3ConsoleCommad(MovieInformation musicFileInfo, IMusicFileMetadataProvider outputFlleProvider, MusicFileMetadata metadata, FilePath inputFile, FilePath outputFile, bool disableVideoStream, bool allowDuplicateCoverArtPictureType, Action<LogCategory, string> messageReporter)
             {
-                var coverArtImageFile = (FilePath?)null;
+                var coverArtImageFiles = new List<FilePath>();
                 try
                 {
+                    // カバーアート画像を入力ファイルから抽出するために ffmpeg を使用している。
+                    // その理由は、入力元ファイルの拡張子がミュージックなどを意味するものと保証されていないことにより kid3-cli を使用することが出来ないため。
+
+                    var ffmpegCommandParameters = new List<string>();
                     var kid3SetCommandParameters = new List<string>();
 
                     // 出力先ファイルにカバーアート画像をコピーする
@@ -738,47 +760,73 @@ namespace AudioNormalizer
                     {
                         // コマンドオプションでカバーアート画像のコピーが抑止されていない場合
 
-                        var pictures = musicFileInfo.VideoStreams.ToList();
-                        if (pictures.Any(stream => stream.Disposition.AttachedPic == false))
+                        var coverArtStreams = musicFileInfo.VideoStreams.ToList();
+                        if (coverArtStreams.Any(stream => stream.Disposition.AttachedPic == false))
                             throw new ApplicationException($"There is a video stream that is not a cover image.: \"{inputFile.FullName}\"");
-                        if (pictures.Count > 1)
-                            throw new ApplicationException($"Multiple cover images are not supported.: \"{inputFile.FullName}\"");
 
-                        Validation.Assert(pictures.Count is 0 or 1);
-                        Validation.Assert(pictures.Count == 0 || pictures[0].Disposition.AttachedPic == true);
+                        Validation.Assert(coverArtStreams.All(stream => stream.Disposition.AttachedPic == true));
 
-                        if (pictures.Count > 0)
+                        var coverArtIndexForKid3 = 0;
+                        var coverArtTypes = new List<(string? coverArtTypeName, int coverArtTypeId)>();
+                        foreach (var (coverArtStream, coverArtType) in coverArtStreams.Select(coverArtStream => (coverArtStream, coverArtType: GetCoverType(coverArtStream, messageReporter))).OrderBy(item => item.coverArtType.coverArtTypeId == 3 ? -2 : item.coverArtType.coverArtTypeId == 4 ? -1 : item.coverArtType.coverArtTypeId))
                         {
-                            // 入力元ファイルにカバーアート画像が存在する場合
+                            // Cover (front), Cover (back), その他, の順に処理する。
 
                             // カバーアート画像を保存するための一時ファイルのファイル名を決定する
-                            if (pictures[0].CodecName == "mjpeg")
-                                coverArtImageFile = FilePath.CreateTemporaryFile(suffix: ".jpg");
-                            else if (pictures[0].CodecName == "png")
-                                coverArtImageFile = FilePath.CreateTemporaryFile(suffix: ".png");
-                            else
-                                throw new ApplicationException($"Cover image for codec \"{pictures[0].CodecName}\" is not supported.: \"{inputFile.FullName}\"");
+                            var coverArtImageFile =
+                                coverArtStream.CodecName == "mjpeg"
+                                ? FilePath.CreateTemporaryFile(suffix: ".jpg")
+                                : coverArtStream.CodecName == "png"
+                                ? FilePath.CreateTemporaryFile(suffix: ".png")
+                                : throw new ApplicationException($"Cover image for codec \"{coverArtStreams[0].CodecName}\" is not supported.: \"{inputFile.FullName}\"");
+                            coverArtImageFiles.Add(coverArtImageFile);
 
-                            // カバーアート画像を一時ファイルに保存する (入力元ファイルの拡張子が必ずしも画像を意味するものではないため、kid3-cli ではなく ffmpeg を使用する)
-                            ExecuteCommand(_ffmpegCommandFile, $"-hide_banner -y -f {musicFileInfo.Format.FormatName.EncodeCommandLineArgument()} -i {musicFileInfo.Format.File.FullName.EncodeCommandLineArgument()} -an -c:v copy -update 1 {coverArtImageFile.FullName.EncodeCommandLineArgument()}", messageReporter);
+                            // カバーアート画像を一時ファイルに保存する ffmpeg パラメタを追加する
+                            ffmpegCommandParameters.Add($"-c:v copy -update 1 -map 0:v:{coverArtStream.IndexWithinVideoStream} {coverArtImageFile.FullName.EncodeCommandLineArgument()}");
+
+                            coverArtTypes.Add(coverArtType);
 
                             // 出力先ファイルに適用する kid3-cli のコマンドラインに、カバーアート画像を付加するパラメタを追加する
-                            kid3SetCommandParameters.Add($"-c {$"set picture:{coverArtImageFile.FullName.EncodeKid3CommandLineArgument(quoteAlways: true)} {"Cover (front)".EncodeKid3CommandLineArgument()}".EncodeCommandLineArgument()}");
+                            kid3SetCommandParameters.Add($"-c {$"set picture[{coverArtIndexForKid3}]:{coverArtImageFile.FullName.EncodeKid3CommandLineArgument(quoteAlways: true)} \"\"".EncodeCommandLineArgument()}");
+                            kid3SetCommandParameters.Add($"-c {$"set picture[{coverArtIndexForKid3}].picturetype {coverArtType.coverArtTypeId}".EncodeCommandLineArgument()}");
+
+                            ++coverArtIndexForKid3;
+                        }
+
+                        for (var index1 = 0; index1 < coverArtTypes.Count; ++index1)
+                        {
+                            var (coverArtTypeName1, coverArtTypeId1) = coverArtTypes[index1];
+                            for (var index2 = index1 + 1; index2 < coverArtTypes.Count; ++index2)
+                            {
+                                var (coverArtTypeName2, coverArtTypeId2) = coverArtTypes[index2];
+                                if (coverArtTypeId1 == coverArtTypeId2)
+                                {
+                                    if (string.Equals(coverArtTypeName1, coverArtTypeName2, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        if (allowDuplicateCoverArtPictureType)
+                                            messageReporter(LogCategory.Warning, $"Duplicate cover art of type is found. : type=\"{coverArtTypeName1 ?? "<not set>"}\", path=\"{musicFileInfo.Format.File.FullName}\"");
+                                        else
+                                            throw new ApplicationException($"Duplicate cover art of type is found. : type=\"{coverArtTypeName1 ?? "<not set>"}\", path=\"{musicFileInfo.Format.File.FullName}\"");
+                                    }
+                                    else
+                                    {
+                                        if (allowDuplicateCoverArtPictureType)
+                                            messageReporter(LogCategory.Warning, $"Duplicate cover art of type is found. : types=\"{coverArtTypeName1 ?? "<not set>"}\" and \"{coverArtTypeName2 ?? "<not set>"}\", path=\"{musicFileInfo.Format.File.FullName}\"");
+                                        else
+                                            throw new ApplicationException($"Duplicate cover art of type is found. : type=\"{coverArtTypeName1 ?? "<not set>"}\" and \"{coverArtTypeName2 ?? "<not set>"}\", path=\"{musicFileInfo.Format.File.FullName}\"");
+                                    }
+                                }
+                            }
                         }
                     }
 
+                    // 抽出すべきカバーアートがあれば ffmpeg を実行する
+                    if (ffmpegCommandParameters.Count > 0)
+                        ExecuteCommand(_ffmpegCommandFile, $"-hide_banner -y -nostdin -f {musicFileInfo.Format.FormatName.EncodeCommandLineArgument()} -i {musicFileInfo.Format.File.FullName.EncodeCommandLineArgument()} {string.Join(" ", ffmpegCommandParameters)}", messageReporter, executeSilectly: true);
+
                     // kid3-cli を使用して出力先ファイルに付加するべきメタデータを収集する
-                    var tags = outputFlleProvider.EnumerateKid3Metadata(metadata).ToList();
-                    if (tags.Count > 0)
-                    {
-                        // 出力先に付加するために kid3-cli を使用しなければならないメタデータが存在する
-
-                        if (_kid3ConsoleCommandFile.Value is null)
-                            throw new ApplicationException("\"kid3-cli\" is not installed correctly.");
-
-                        foreach (var (metadataName, metadataValue) in tags)
-                            kid3SetCommandParameters.Add($"-c {$"set {metadataName.EncodeKid3CommandLineArgument()} {metadataValue.EncodeKid3CommandLineArgument()}".EncodeCommandLineArgument()}");
-                    }
+                    foreach (var (metadataName, metadataValue) in outputFlleProvider.EnumerateKid3Metadata(metadata))
+                        kid3SetCommandParameters.Add($"-c {$"set {metadataName.EncodeKid3CommandLineArgument()} {metadataValue.EncodeKid3CommandLineArgument()}".EncodeCommandLineArgument()}");
 
                     if (kid3SetCommandParameters.Count > 0)
                     {
@@ -787,26 +835,56 @@ namespace AudioNormalizer
                         if (_kid3ConsoleCommandFile.Value is null)
                             throw new ApplicationException("\"kid3-cli\" is not installed correctly.");
 
-                        ExecuteCommand(_kid3ConsoleCommandFile.Value, $"{string.Join(" ", kid3SetCommandParameters)} {outputFile.FullName.EncodeCommandLineArgument()}", messageReporter);
+                        var kid3CommandParameterText = $"{string.Join(" ", kid3SetCommandParameters)} {outputFile.FullName.EncodeCommandLineArgument()}";
+                        try
+                        {
+                            ExecuteCommand(_kid3ConsoleCommandFile.Value, kid3CommandParameterText, messageReporter);
+                        }
+                        catch (Exception ex)
+                        {
+
+                            throw new ApplicationException($"\"kid-cli\" command terminated abnormally. : parameters=\"{kid3CommandParameterText}\"", ex);
+                        }
                     }
                 }
                 finally
                 {
-                    coverArtImageFile?.SafetyDelete();
+                    foreach (var coverArtImageFile in coverArtImageFiles)
+                        coverArtImageFile.SafetyDelete();
+                }
+
+                static (string? coverArtTypeName, int coverArtTypeId) GetCoverType(VideoStreamInfo coverArtStream, Action<LogCategory, string> messageReporter)
+                {
+                    var coverArtTypeName = coverArtStream.Tags.Comment;
+                    if (coverArtTypeName is null)
+                    {
+                        messageReporter(LogCategory.Warning, "Cover art type is not set, \"Other\" is set instead.");
+                        return (null, 0);
+                    }
+
+                    if (!_coverArtPictureTypes.TryGetValue(coverArtTypeName, out var coverArtTypeId))
+                    {
+                        messageReporter(LogCategory.Warning, $"Unsupported cover art type is found. It will be changed to \"Other\". : \"{coverArtTypeName}\"");
+                        return (coverArtTypeName, 0);
+                    }
+
+                    return (coverArtTypeName, coverArtTypeId);
                 }
             }
 
-            static void ExecuteCommand(FilePath commandFile, string commandParameterText, Action<LogCategory, string> messageReporter)
+            static void ExecuteCommand(FilePath commandFile, string commandParameterText, Action<LogCategory, string> messageReporter, bool executeSilectly = false)
             {
+                var outputEncoding = executeSilectly ? Encoding.UTF8.WithoutPreamble() : null;
+                var outputRedirector = executeSilectly ? Command.GetNullOutputRedirector() : null;
                 var exitCode =
                     Command.ExecuteCommand(
                         commandFile,
                         commandParameterText,
                         null,
+                        outputEncoding,
                         null,
-                        null,
-                        null,
-                        null,
+                        outputRedirector,
+                        outputRedirector,
                         (level, message) =>
                         {
                             if (level != LogCategory.Information)

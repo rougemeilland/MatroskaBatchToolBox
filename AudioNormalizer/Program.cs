@@ -26,6 +26,7 @@ namespace AudioNormalizer
                 IsForceMode = options.Any(option => option.OptionType == OptionType.Force);
                 Verbose = options.Any(option => option.OptionType == OptionType.Verbose);
                 DisableVideoStream = options.Any(option => option.OptionType == OptionType.DisableVideoStream);
+                AllowDuplicateCoverArtPictureType = options.Any(option => option.OptionType == OptionType.AllowDuplicateCoverArtPictureType);
                 IsHelpMode = options.Any(option => option.OptionType == OptionType.Help);
             }
 
@@ -38,6 +39,7 @@ namespace AudioNormalizer
             public bool IsForceMode { get; }
             public bool Verbose { get; }
             public bool DisableVideoStream { get; }
+            public bool AllowDuplicateCoverArtPictureType { get; }
             public bool IsHelpMode { get; }
 
             public static CommandParameter Parse(IEnumerable<CommandOptionDefinition<OptionType>> optionDefinitions, string[] args)
@@ -171,6 +173,7 @@ namespace AudioNormalizer
                                 temporaryOutputFile is not null || commandOptions.IsForceMode,
                                 commandOptions.Verbose,
                                 commandOptions.DisableVideoStream,
+                                commandOptions.AllowDuplicateCoverArtPictureType,
                                 CopyStream,
                                 TinyConsole.WriteLog,
                                 TinyConsole.WriteLog);

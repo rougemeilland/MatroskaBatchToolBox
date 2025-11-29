@@ -12,6 +12,7 @@
         Encoder,
         EncoderOption,
         DisableVideoStream,
+        AllowDuplicateCoverArtPictureType,
         Help,
     }
 }

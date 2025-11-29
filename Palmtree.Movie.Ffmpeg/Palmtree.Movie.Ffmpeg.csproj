@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>pffmpeg</AssemblyName>
     <Trimming>full</Trimming>
-    <PublishAot>True</PublishAot>
+    <PublishAot>False</PublishAot>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>

@@ -213,6 +213,22 @@ namespace AudioNormalizer
                     }),
 
                 new StraightStringCommandOptionDefinition<OptionType>(
+                    OptionType.AllowDuplicateCoverArtPictureType,
+                     // エイリアスも含めたオプション名の配列
+                    "--allow_duplicate_cover_art_type" ,
+                    // 同一オプションの重複のみ NG
+                    (option, otherOpton) => !(otherOpton.OptionType == option.OptionType),
+                    // 常に OK (必須ではない)
+                    (options) => null,
+                    "--allow_duplicate_cover_art_type",
+                    new[]
+                    {
+                        "When normalizing music files, allows duplicate cover art of the same type (for example, \"Cover (front)\" and \"Cover (back)\").",
+                        "By default, if duplicate cover art types are found while normalizing music files, this is considered an error and the process will abort.",
+                        "However, if you specify this option and duplicate cover art types are found, a warning message will be displayed and processing will continue.",
+                    }),
+
+                new StraightStringCommandOptionDefinition<OptionType>(
                     OptionType.Help,
                      // オプション名
                     "-help",

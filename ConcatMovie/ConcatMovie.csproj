@@ -6,7 +6,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Trimming>full</Trimming>
-    <PublishAot>True</PublishAot>
+    <PublishAot>False</PublishAot>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>

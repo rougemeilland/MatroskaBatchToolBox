@@ -8,7 +8,7 @@
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <AssemblyName>chkdur</AssemblyName>
     <Trimming>full</Trimming>
-    <PublishAot>True</PublishAot>
+    <PublishAot>False</PublishAot>
     <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
   </PropertyGroup>

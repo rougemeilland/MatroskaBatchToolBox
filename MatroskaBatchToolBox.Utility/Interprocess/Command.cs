@@ -480,6 +480,9 @@ namespace MatroskaBatchToolBox.Utility.Interprocess
         public static IChildProcessOutputRedirectable GetTextOutputRedirector(Action<string> textReader)
            => new TextOutputRedirector(textReader);
 
+        public static IChildProcessOutputRedirectable GetNullOutputRedirector()
+           => new TextOutputRedirector(_ => { });
+
         public static IChildProcessCancellable GetChildProcessCanceller(Action<Process> childProcessCanceller)
             => new ChildProcessCanceller(childProcessCanceller);
 
