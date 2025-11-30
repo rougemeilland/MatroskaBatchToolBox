@@ -11,6 +11,7 @@ using MatroskaBatchToolBox.Utility.Movie;
 using Palmtree;
 using Palmtree.IO;
 using Palmtree.IO.Console;
+using Palmtree.Linq;
 using Palmtree.Numerics;
 
 namespace LyricsChecker
@@ -241,6 +242,27 @@ namespace LyricsChecker
                     }
                 }
 
+                if (lyricsData.LyricsTexts.None(text => text.Contains("#要タイミング調整")))
+                {
+                    var timeStamp = 0.0;
+                    foreach (var lyricsText in lyricsData.LyricsTexts)
+                    {
+                        var m = GetLyricsTextPattern().Match(lyricsText);
+                        if (!m.Success)
+                            TinyConsole.Out.WriteLine($"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"");
+                        var timeText = m.Groups["lyricsTime"].Value;
+                        var m2 = GetTimeFormatPattern().Match(timeText);
+                        if (!m2.Success)
+                            TinyConsole.Out.WriteLine($"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"");
+                        var minutes = m2.Groups["minutes"].Success ? int.Parse(m2.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture) : 0;
+                        var seconds = double.Parse(m2.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
+                        var newTimeStamp = minutes * 60 + seconds;
+                        if (newTimeStamp < timeStamp)
+                            TinyConsole.Out.WriteLine($"Non-ascending lyric timestamps found: \"[{timeText}]\", \"{lyricsFile.FullName}\"");
+                        timeStamp = newTimeStamp;
+                    }
+                }
+
                 return ok;
             }
             catch (DecoderFallbackException)
@@ -306,6 +328,27 @@ namespace LyricsChecker
                         TinyConsole.Out.WriteLine($"Replace inappropriate lyric text. : Current: \"{lyricsText}\", New: \"{normalizedLyricsText}\", \"{lyricsFile.FullName}\"");
                         modified = true;
                     }
+                }
+            }
+
+            if (lyricsData.LyricsTexts.None(text => text.Contains("#要タイミング調整")))
+            {
+                var timeStamp = 0.0;
+                foreach (var lyricsText in lyricsData.LyricsTexts)
+                {
+                    var m = GetLyricsTextPattern().Match(lyricsText);
+                    if (!m.Success)
+                        TinyConsole.Out.WriteLine($"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"");
+                    var timeText = m.Groups["lyricsTime"].Value;
+                    var m2 = GetTimeFormatPattern().Match(timeText);
+                    if (!m2.Success)
+                        TinyConsole.Out.WriteLine($"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"");
+                    var minutes = m2.Groups["minutes"].Success ? int.Parse(m2.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture) : 0;
+                    var seconds = double.Parse(m2.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
+                    var newTimeStamp = minutes * 60 + seconds;
+                    if (newTimeStamp < timeStamp)
+                        TinyConsole.Out.WriteLine($"Non-ascending lyric timestamps found: \"[{timeText}]\", \"{lyricsFile.FullName}\"");
+                    timeStamp = newTimeStamp;
                 }
             }
 
@@ -884,5 +927,8 @@ namespace LyricsChecker
 
         [GeneratedRegex(@"^\[(?<lyricsTime>(\d+:)?\d+(\.\d+)?)\](?<lyricsText>.*)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
         private static partial Regex GetLyricsTextPattern();
+
+        [GeneratedRegex(@"^((?<minutes>\d+):)?(?<seconds>\d+(\.\d+)?)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture)]
+        private static partial Regex GetTimeFormatPattern();
     }
 }
