@@ -162,15 +162,25 @@ namespace LyricsChecker
                         if (level != LogCategory.Information)
                             TinyConsole.WriteLog(level, message);
                     });
-            var ok = true;
-            ok = CheckFileNameStrictly(musicFileInfo, musicFile) && ok;
-            ok = CheckTag("artist name", "ar", () => GetTagValue(musicFileInfo, _metadataNameArtist), musicFile) && ok;
-            ok = CheckTag("album name", "al", () => GetTagValue(musicFileInfo, _metadataNameAlbum), musicFile) && ok;
-            ok = CheckTag("song title", "ti", () => GetTagValue(musicFileInfo, _metadataNameTitle), musicFile) && ok;
-            ok = CheckTag("lyricist name", "au", () => GetLyricistFromMusicFile(musicFileInfo), musicFile) && ok;
-            ok = CheckTag("song length", "length", () => musicFileInfo.Format.Duration, musicFile) && ok;
 
-            return ok;
+            try
+            {
+                var ok = true;
+                ok = CheckFileNameStrictly(musicFileInfo, musicFile) && ok;
+                ok = CheckTag("artist name", "ar", () => GetTagValue(musicFileInfo, _metadataNameArtist), musicFile) && ok;
+                ok = CheckTag("album name", "al", () => GetTagValue(musicFileInfo, _metadataNameAlbum), musicFile) && ok;
+                ok = CheckTag("song title", "ti", () => GetTagValue(musicFileInfo, _metadataNameTitle), musicFile) && ok;
+                ok = CheckTag("lyricist name", "au", () => GetLyricistFromMusicFile(musicFileInfo), musicFile) && ok;
+                ok = CheckTag("song length", "length", () => musicFileInfo.Format.Duration, musicFile) && ok;
+
+                return ok;
+            }
+            catch (Exception ex)
+            {
+                var message = $"Unexpected Error has occurred.: \"{musicFilePath}\"";
+                TinyConsole.Out.WriteLine(message);
+                throw new ApplicationException(message, ex);
+            }
         }
 
         private static bool CheckLyricsFile(string musicFilePath, string lyricsFilePath)
@@ -265,10 +275,17 @@ namespace LyricsChecker
 
                 return ok;
             }
-            catch (DecoderFallbackException)
+            catch (DecoderFallbackException ex)
             {
-                TinyConsole.Out.WriteLine($"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"");
-                return false;
+                var message = $"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"";
+                TinyConsole.Out.WriteLine(message);
+                throw new ApplicationException(message, ex);
+            }
+            catch (Exception ex)
+            {
+                var message = $"Unexpected Error has occurred.: \"{lyricsFile.FullName}\"";
+                TinyConsole.Out.WriteLine(message);
+                throw new ApplicationException(message, ex);
             }
         }
 
@@ -292,89 +309,105 @@ namespace LyricsChecker
                         if (level != LogCategory.Information)
                             TinyConsole.WriteLog(level, message);
                     });
-            _ = CheckFileNameStrictly(musicFileInfo, musicFile, lyricsFile);
-            var modified = false;
-            modified = ModifyLyricsFile(lyricsFile) || modified;
-            var lyricsData = lyricsFile.Exists ? ReadLyricsFile(lyricsFile) : new LyricsContainer();
-            modified = ModifyTag("artist name", "ar", () => GetTagValue(musicFileInfo, _metadataNameArtist), lyricsData.Tags, lyricsFile) || modified;
-            modified = ModifyTag("album name", "al", () => GetTagValue(musicFileInfo, _metadataNameAlbum), lyricsData.Tags, lyricsFile) || modified;
-            modified = ModifyTag("song title", "ti", () => GetTagValue(musicFileInfo, _metadataNameTitle), lyricsData.Tags, lyricsFile) || modified;
-            modified = ModifyTag("lyricist name", "au", () => GetLyricistFromMusicFile(musicFileInfo), lyricsData.Tags, lyricsFile) || modified;
-            modified = ModifyTag("song length", "length", () => musicFileInfo.Format.Duration, lyricsData.Tags, lyricsFile) || modified;
-            var newLyricsTexts = new List<string>();
-            var modifiedLyricsTimeStamp = false;
-            foreach (var lyricsText in lyricsData.LyricsTexts)
+
+            try
             {
-                if (string.IsNullOrEmpty(lyricsText))
+                _ = CheckFileNameStrictly(musicFileInfo, musicFile, lyricsFile);
+                var modified = false;
+                modified = ModifyLyricsFile(lyricsFile) || modified;
+                var lyricsData = lyricsFile.Exists ? ReadLyricsFile(lyricsFile) : new LyricsContainer();
+                modified = ModifyTag("artist name", "ar", () => GetTagValue(musicFileInfo, _metadataNameArtist), lyricsData.Tags, lyricsFile) || modified;
+                modified = ModifyTag("album name", "al", () => GetTagValue(musicFileInfo, _metadataNameAlbum), lyricsData.Tags, lyricsFile) || modified;
+                modified = ModifyTag("song title", "ti", () => GetTagValue(musicFileInfo, _metadataNameTitle), lyricsData.Tags, lyricsFile) || modified;
+                modified = ModifyTag("lyricist name", "au", () => GetLyricistFromMusicFile(musicFileInfo), lyricsData.Tags, lyricsFile) || modified;
+                modified = ModifyTag("song length", "length", () => musicFileInfo.Format.Duration, lyricsData.Tags, lyricsFile) || modified;
+                var newLyricsTexts = new List<string>();
+                var modifiedLyricsTimeStamp = false;
+                foreach (var lyricsText in lyricsData.LyricsTexts)
                 {
-                    newLyricsTexts.Add("[00:00.00] ");
-                    modified = true;
-                    modifiedLyricsTimeStamp = true;
-                }
-                else
-                {
-                    var (timeStamp, text) = NormalizeLyricsText(lyricsText);
-                    if (string.IsNullOrEmpty(timeStamp) && !text.StartsWith('['))
+                    if (string.IsNullOrEmpty(lyricsText))
                     {
-                        timeStamp = "[00:00.00]";
+                        newLyricsTexts.Add("[00:00.00] ");
                         modified = true;
                         modifiedLyricsTimeStamp = true;
                     }
-
-                    var normalizedLyricsText = $"{timeStamp}{text}";
-                    newLyricsTexts.Add(normalizedLyricsText);
-                    if (normalizedLyricsText != lyricsText)
+                    else
                     {
-                        TinyConsole.Out.WriteLine($"Replace inappropriate lyric text. : Current: \"{lyricsText}\", New: \"{normalizedLyricsText}\", \"{lyricsFile.FullName}\"");
-                        modified = true;
+                        var (timeStamp, text) = NormalizeLyricsText(lyricsText);
+                        if (string.IsNullOrEmpty(timeStamp) && !text.StartsWith('['))
+                        {
+                            timeStamp = "[00:00.00]";
+                            modified = true;
+                            modifiedLyricsTimeStamp = true;
+                        }
+
+                        var normalizedLyricsText = $"{timeStamp}{text}";
+                        newLyricsTexts.Add(normalizedLyricsText);
+                        if (normalizedLyricsText != lyricsText)
+                        {
+                            TinyConsole.Out.WriteLine($"Replace inappropriate lyric text. : Current: \"{lyricsText}\", New: \"{normalizedLyricsText}\", \"{lyricsFile.FullName}\"");
+                            modified = true;
+                        }
                     }
                 }
-            }
 
-            if (lyricsData.LyricsTexts.None(text => text.Contains("#要タイミング調整")))
-            {
-                var timeStamp = 0.0;
-                foreach (var lyricsText in lyricsData.LyricsTexts)
+                if (lyricsData.LyricsTexts.None(text => text.Contains("#要タイミング調整")))
                 {
-                    var m = GetLyricsTextPattern().Match(lyricsText);
-                    if (!m.Success)
-                        TinyConsole.Out.WriteLine($"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"");
-                    var timeText = m.Groups["lyricsTime"].Value;
-                    var m2 = GetTimeFormatPattern().Match(timeText);
-                    if (!m2.Success)
-                        TinyConsole.Out.WriteLine($"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"");
-                    var minutes = m2.Groups["minutes"].Success ? int.Parse(m2.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture) : 0;
-                    var seconds = double.Parse(m2.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
-                    var newTimeStamp = minutes * 60 + seconds;
-                    if (newTimeStamp < timeStamp)
-                        TinyConsole.Out.WriteLine($"Non-ascending lyric timestamps found: \"[{timeText}]\", \"{lyricsFile.FullName}\"");
-                    timeStamp = newTimeStamp;
+                    var timeStamp = 0.0;
+                    foreach (var lyricsText in lyricsData.LyricsTexts)
+                    {
+                        var m = GetLyricsTextPattern().Match(lyricsText);
+                        if (!m.Success)
+                            TinyConsole.Out.WriteLine($"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"");
+                        var timeText = m.Groups["lyricsTime"].Value;
+                        var m2 = GetTimeFormatPattern().Match(timeText);
+                        if (!m2.Success)
+                            TinyConsole.Out.WriteLine($"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"");
+                        var minutes = m2.Groups["minutes"].Success ? int.Parse(m2.Groups["minutes"].Value, NumberStyles.None, CultureInfo.InvariantCulture) : 0;
+                        var seconds = double.Parse(m2.Groups["seconds"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
+                        var newTimeStamp = minutes * 60 + seconds;
+                        if (newTimeStamp < timeStamp)
+                            TinyConsole.Out.WriteLine($"Non-ascending lyric timestamps found: \"[{timeText}]\", \"{lyricsFile.FullName}\"");
+                        timeStamp = newTimeStamp;
+                    }
                 }
-            }
 
-            if (newLyricsTexts.Count > 0 && !newLyricsTexts.First().StartsWith("[00:00.00]", StringComparison.Ordinal))
+                if (newLyricsTexts.Count > 0 && !newLyricsTexts.First().StartsWith("[00:00.00]", StringComparison.Ordinal))
+                {
+                    // 最初の歌詞行がタイムスタンプ [00:00.00] で始まっていない場合
+
+                    // ダミーのタイムスタンプ [00:00.00] を先頭に挿入する。
+                    newLyricsTexts.Insert(0, "[00:00.00] ");
+                    TinyConsole.Out.WriteLine($"Inserts \"[00:00.00] \" because the timestamp of the first lyric is not \"[00:00.00]\".: \"{lyricsFile.FullName}\"");
+                    modified = true;
+                    modifiedLyricsTimeStamp = true;
+                }
+
+                if (modifiedLyricsTimeStamp && !newLyricsTexts.Any(newLyricsText => newLyricsText.Contains("#要タイミング調整")))
+                {
+                    newLyricsTexts.Add("[00:00.00]#要タイミング調整");
+                    modified = true;
+                }
+
+                lyricsData.LyricsTexts.Clear();
+                foreach (var lyricsText in newLyricsTexts)
+                    lyricsData.LyricsTexts.Add(lyricsText);
+                if (modified)
+                    SaveNewLyricsFile(lyricsFile, lyricsData);
+                return modified;
+            }
+            catch (DecoderFallbackException ex)
             {
-                // 最初の歌詞行がタイムスタンプ [00:00.00] で始まっていない場合
-
-                // ダミーのタイムスタンプ [00:00.00] を先頭に挿入する。
-                newLyricsTexts.Insert(0, "[00:00.00] ");
-                TinyConsole.Out.WriteLine($"Inserts \"[00:00.00] \" because the timestamp of the first lyric is not \"[00:00.00]\".: \"{lyricsFile.FullName}\"");
-                modified = true;
-                modifiedLyricsTimeStamp = true;
+                var message = $"The lyrics file contains characters that cannot be decoded by UTF-8.: \"{lyricsFile.FullName}\"";
+                TinyConsole.Out.WriteLine(message);
+                throw new ApplicationException(message, ex);
             }
-
-            if (modifiedLyricsTimeStamp && !newLyricsTexts.Any(newLyricsText => newLyricsText.Contains("#要タイミング調整")))
+            catch (Exception ex)
             {
-                newLyricsTexts.Add("[00:00.00]#要タイミング調整");
-                modified = true;
+                var message = $"Unexpected Error has occurred.: \"{lyricsFile.FullName}\"";
+                TinyConsole.Out.WriteLine(message);
+                throw new ApplicationException(message, ex);
             }
-
-            lyricsData.LyricsTexts.Clear();
-            foreach (var lyricsText in newLyricsTexts)
-                lyricsData.LyricsTexts.Add(lyricsText);
-            if (modified)
-                SaveNewLyricsFile(lyricsFile, lyricsData);
-            return modified;
         }
 
         private static void SaveNewLyricsFile(FilePath lyricsFile, LyricsContainer lyricsData)
