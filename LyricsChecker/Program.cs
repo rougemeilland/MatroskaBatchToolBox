@@ -891,23 +891,35 @@ namespace LyricsChecker
         }
 
         private static string? GetLyricistFromMusicFile(MovieInformation musicFileInfo)
-            => musicFileInfo.Format.FormatName switch
-            {
-                "mp3" or "wav" => GetTagValue(musicFileInfo, _metadataNameText),
-                "flac" or "ogg" => GetTagValue(musicFileInfo, _metadataNameLyricist),
-                _ => throw new ApplicationException($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
-            };
+        {
+            if (musicFileInfo.Format.FormatName.Split(',').Contains("m4a", StringComparer.OrdinalIgnoreCase))
+                return GetTagValue(musicFileInfo, _metadataNameLyricist);
+            return
+                musicFileInfo.Format.FormatName switch
+                {
+                    "mp3" or "wav" => GetTagValue(musicFileInfo, _metadataNameText),
+                    "flac" or "ogg" => GetTagValue(musicFileInfo, _metadataNameLyricist),
+                    _ => throw new ApplicationException($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
+                };
+        }
 
         private static string GetTagValue(MovieInformation musicFileInfo, string tagName)
-            => musicFileInfo.Format.FormatName switch
-            {
-                "wav" or "mp3" or "flac" => musicFileInfo.Format.Tags[tagName] ?? "",
-                "ogg" => musicFileInfo.AudioStreams.FirstOrDefault()?.Tags[tagName] ?? "",
-                _ => throw new ApplicationException($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
-            };
+        {
+            if (musicFileInfo.Format.FormatName.Split(',').Contains("m4a", StringComparer.OrdinalIgnoreCase))
+                return musicFileInfo.Format.Tags[tagName] ?? "";
+            return
+                musicFileInfo.Format.FormatName switch
+                {
+                    "wav" or "mp3" or "flac" => musicFileInfo.Format.Tags[tagName] ?? "",
+                    "ogg" => musicFileInfo.AudioStreams.FirstOrDefault()?.Tags[tagName] ?? "",
+                    _ => throw new ApplicationException($"Not supported music file format.: \"{musicFileInfo.Format.File.FullName}\""),
+                };
+        }
 
         private static string GetMusicFileExtension(MovieInformation musicFileInfo)
         {
+            if (musicFileInfo.Format.FormatName.Split(',').Contains("m4a", StringComparer.OrdinalIgnoreCase))
+                return ".m4a";
             switch (musicFileInfo.Format.FormatName)
             {
                 case "wav":
